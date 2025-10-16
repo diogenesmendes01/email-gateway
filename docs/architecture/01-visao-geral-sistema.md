@@ -47,7 +47,7 @@ graph TB
     end
 
     subgraph "Backend API"
-        API[Express API]
+        API[NestJS API]
         AUTH[Authentication]
         CTRL[Controllers]
         SVC[Services]
@@ -129,7 +129,7 @@ O sistema segue uma **arquitetura distribuída baseada em filas** com os seguint
 - Consultar status de envios
 
 **Tecnologias:**
-- Node.js + Express
+- Node.js + NestJS
 - TypeScript
 - Prisma ORM
 - Zod (validação)
@@ -137,9 +137,9 @@ O sistema segue uma **arquitetura distribuída baseada em filas** com os seguint
 **Localização:** `/api`
 
 **Principais Endpoints:**
-- `POST /api/boleto` - Cria job de envio
-- `GET /api/boleto/:id` - Consulta status
-- `GET /api/boleto/:id/retry` - Reenvia boleto
+- `POST /v1/email/send` - Cria job de envio
+- `GET /v1/emails/:id` - Consulta status
+- `POST /v1/emails/:id/retry` - Reenvia e-mail
 
 ### 3. Redis Queue
 
@@ -205,15 +205,15 @@ sequenceDiagram
     participant S as SMTP
     participant D as Database
 
-    C->>A: POST /boleto (dados do boleto)
+    C->>A: POST /v1/email/send (dados do e-mail)
     A->>A: Valida dados
-    A->>D: Cria registro de boleto
-    D-->>A: ID do boleto
-    A->>Q: Enfileira job (boleto_id)
-    A-->>C: 202 Accepted (job_id)
+    A->>D: Cria registro no outbox
+    D-->>A: ID do envio
+    A->>Q: Enfileira job (outbox_id)
+    A-->>C: 202 Accepted (job_id, outbox_id)
 
     Q->>W: Consome job
-    W->>D: Busca dados do boleto
+    W->>D: Busca dados do e-mail
     D-->>W: Dados completos
     W->>S: Envia e-mail
 

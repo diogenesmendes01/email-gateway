@@ -148,7 +148,7 @@ POST /v1/email/send] -->|x-api-key + IP allowlist| B[API Ingestão]
 - `company_id` (fk) — escopo por empresa.  
 - `recipient_id` (fk) — referência estável em `email_logs`/`email_outbox`.
 
-### 1.10 Segurança (resumo) Segurança (resumo)
+### 1.10 Segurança (resumo)
 - **Autenticação** por **API Key** por empresa + **IP allowlist** na borda.  
 - **Controle de acesso** do painel com **Basic Auth**.  
 - **Sanitização** de HTML em armazenamento/visualização.  
