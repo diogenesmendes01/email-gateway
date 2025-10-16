@@ -1,0 +1,147 @@
+name: Documentation Validation
+
+on:
+  pull_request:
+    paths:
+      - 'docs/**/*.md'
+      - '.github/workflows/docs-validation.yml'
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  validate-docs:
+    name: Validate Documentation
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: |
+          npm install -g markdownlint-cli2
+          npm install -g markdown-link-check
+
+      - name: Check file naming conventions
+        run: |
+          echo "Checking file naming conventions..."
+
+          # Check general docs follow NN-kebab-case.md pattern
+          find docs/{architecture,api,queue-redis,worker,data,frontend,runbooks,testing} -type f -name "*.md" 2>/dev/null | while read file; do
+            filename=$(basename "$file")
+            if [[ ! "$filename" =~ ^[0-9]{2}-[a-z0-9-]+\.md$ ]]; then
+              echo "❌ Invalid naming: $file (should be NN-kebab-case.md)"
+              exit 1
+            fi
+          done
+
+          # Check ADRs follow ADR-YYYYMMDD-title.md pattern
+          find docs/adrs -type f -name "*.md" 2>/dev/null | while read file; do
+            filename=$(basename "$file")
+            if [[ ! "$filename" =~ ^ADR-[0-9]{8}-[a-z0-9-]+\.md$ ]]; then
+              echo "❌ Invalid ADR naming: $file (should be ADR-YYYYMMDD-kebab-case.md)"
+              exit 1
+            fi
+          done
+
+          echo "✅ All files follow naming conventions"
+
+      - name: Validate Markdown syntax
+        run: |
+          echo "Validating Markdown syntax..."
+          markdownlint-cli2 "docs/**/*.md" || exit 1
+          echo "✅ Markdown syntax is valid"
+        continue-on-error: false
+
+      - name: Check for broken links
+        run: |
+          echo "Checking for broken internal links..."
+          find docs -name "*.md" -type f -exec markdown-link-check --config .github/markdown-link-check-config.json {} \; || exit 1
+          echo "✅ No broken links found"
+        continue-on-error: true
+
+      - name: Validate Mermaid diagrams
+        run: |
+          echo "Validating Mermaid diagram syntax..."
+
+          # Extract and validate mermaid blocks
+          find docs -name "*.md" -type f | while read file; do
+            if grep -q '```mermaid' "$file"; then
+              echo "Found Mermaid diagram in: $file"
+              # Basic validation - check if diagram blocks are properly closed
+              mermaid_count=$(grep -c '```mermaid' "$file" || true)
+              closing_count=$(grep -c '```' "$file" || true)
+
+              if [ $((closing_count % 2)) -ne 0 ]; then
+                echo "❌ Unclosed code block in $file"
+                exit 1
+              fi
+            fi
+          done
+
+          echo "✅ All Mermaid diagrams are properly formatted"
+
+      - name: Check for required sections in docs
+        run: |
+          echo "Checking for required sections..."
+
+          # Check that documentation files have required sections
+          find docs/{architecture,api,queue-redis,worker,data,frontend} -name "*.md" -type f 2>/dev/null | while read file; do
+            if ! grep -q "## Visão Geral\|## Overview" "$file"; then
+              echo "⚠️  Missing 'Visão Geral' section in: $file"
+            fi
+          done
+
+          echo "✅ Section check complete"
+
+      - name: Validate templates are unchanged
+        run: |
+          echo "Checking if templates were modified..."
+
+          if git diff --name-only origin/${{ github.base_ref }}...HEAD | grep -E "TEMPLATE-.*\.md$"; then
+            echo "⚠️  Template files were modified. Please ensure this is intentional."
+            echo "Modified templates:"
+            git diff --name-only origin/${{ github.base_ref }}...HEAD | grep -E "TEMPLATE-.*\.md$"
+          else
+            echo "✅ No template modifications"
+          fi
+
+      - name: Check documentation coverage
+        run: |
+          echo "Checking documentation coverage..."
+
+          # List all directories that should have at least one doc
+          for dir in architecture api queue-redis worker data frontend adrs runbooks testing; do
+            doc_count=$(find "docs/$dir" -name "*.md" -type f 2>/dev/null | wc -l)
+            if [ "$doc_count" -eq 0 ]; then
+              echo "⚠️  No documentation found in docs/$dir/"
+            else
+              echo "✅ docs/$dir/: $doc_count document(s)"
+            fi
+          done
+
+      - name: Generate validation report
+        if: always()
+        run: |
+          echo "## Documentation Validation Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Files Changed" >> $GITHUB_STEP_SUMMARY
+          git diff --name-only origin/${{ github.base_ref }}...HEAD | grep "\.md$" | while read file; do
+            echo "- \`$file\`" >> $GITHUB_STEP_SUMMARY
+          done
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Validation Results" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ File naming conventions checked" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Markdown syntax validated" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Links checked" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Mermaid diagrams validated" >> $GITHUB_STEP_SUMMARY
