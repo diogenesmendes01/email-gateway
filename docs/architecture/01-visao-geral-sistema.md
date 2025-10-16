@@ -109,11 +109,13 @@ O sistema segue uma **arquitetura distribuída baseada em filas** com os seguint
 ### 1. Frontend (Web Application)
 
 **Responsabilidades:**
+
 - Interface para usuários gerenciarem boletos
 - Visualização de status de envio
 - Dashboard de monitoramento
 
 **Tecnologias:**
+
 - React/Next.js
 - TypeScript
 - Tailwind CSS
@@ -123,12 +125,14 @@ O sistema segue uma **arquitetura distribuída baseada em filas** com os seguint
 ### 2. API REST
 
 **Responsabilidades:**
+
 - Receber requisições de envio de boletos
 - Validar e autenticar requisições
 - Enfileirar jobs de envio
 - Consultar status de envios
 
 **Tecnologias:**
+
 - Node.js + NestJS
 - TypeScript
 - Prisma ORM
@@ -137,6 +141,7 @@ O sistema segue uma **arquitetura distribuída baseada em filas** com os seguint
 **Localização:** `/api`
 
 **Principais Endpoints:**
+
 - `POST /v1/email/send` - Cria job de envio
 - `GET /v1/emails/:id` - Consulta status
 - `POST /v1/emails/:id/retry` - Reenvia e-mail
@@ -144,15 +149,18 @@ O sistema segue uma **arquitetura distribuída baseada em filas** com os seguint
 ### 3. Redis Queue
 
 **Responsabilidades:**
+
 - Gerenciar fila de jobs de envio
 - Garantir entrega de mensagens
 - Suportar retry e dead letter queue
 
 **Tecnologias:**
+
 - Redis 7.x
 - Bull (queue manager)
 
 **Configuração:**
+
 - Persistência: AOF + RDB
 - Retry: Exponential backoff
 - DLQ: Após 5 tentativas
@@ -160,12 +168,14 @@ O sistema segue uma **arquitetura distribuída baseada em filas** com os seguint
 ### 4. Workers
 
 **Responsabilidades:**
+
 - Consumir jobs da fila
 - Enviar e-mails via SMTP
 - Atualizar status no banco
 - Tratar erros e retries
 
 **Tecnologias:**
+
 - Node.js
 - Nodemailer
 - Bull worker
@@ -173,6 +183,7 @@ O sistema segue uma **arquitetura distribuída baseada em filas** com os seguint
 **Localização:** `/worker`
 
 **Características:**
+
 - Escalável horizontalmente
 - Processamento paralelo
 - Graceful shutdown
@@ -180,12 +191,14 @@ O sistema segue uma **arquitetura distribuída baseada em filas** com os seguint
 ### 5. PostgreSQL
 
 **Responsabilidades:**
+
 - Armazenar dados de boletos
 - Histórico de envios
 - Logs de tentativas
 - Configurações
 
 **Tecnologias:**
+
 - PostgreSQL 15+
 - Prisma ORM
 - Migrations

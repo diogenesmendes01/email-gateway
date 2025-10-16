@@ -126,16 +126,19 @@ Para melhorar performance:
 ### Problemas Comuns
 
 **Worker não processa jobs:**
+
 - Verifique conexão com Redis
 - Confirme configuração de fila
 - Verifique logs de erro
 
 **Falhas de SMTP:**
+
 - Valide credenciais SMTP
 - Verifique configuração de TLS
 - Confirme conectividade de rede
 
 **Alto uso de memória:**
+
 - Reduza `WORKER_CONCURRENCY`
 - Configure cleanup de jobs
 - Monitore vazamentos de memória

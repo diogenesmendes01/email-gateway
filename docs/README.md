@@ -4,7 +4,7 @@ Bem-vindo à documentação do sistema de envio de boletos por e-mail.
 
 ## Estrutura da Documentação
 
-```
+```text
 docs/
 ├── architecture/          # Documentação de arquitetura geral
 ├── api/                  # Documentação da API REST
@@ -21,9 +21,11 @@ docs/
 ## Documentos Principais
 
 ### Arquitetura
+
 - [Visão Geral do Sistema](./architecture/01-visao-geral-sistema.md) - Arquitetura completa e componentes principais
 
 ### ADRs (Architecture Decision Records)
+
 - [ADR-20250116: Escolha do Redis Queue](./adrs/ADR-20250116-escolha-redis-queue.md) - Decisão sobre sistema de filas
 
 ## Como Contribuir

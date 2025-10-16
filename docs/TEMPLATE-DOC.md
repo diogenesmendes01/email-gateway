@@ -66,10 +66,12 @@ graph TD
 Descrição do componente A, sua responsabilidade e comportamento.
 
 **Responsabilidades:**
+
 - Responsabilidade 1
 - Responsabilidade 2
 
 **Dependências:**
+
 - Dependência 1
 - Dependência 2
 
@@ -149,6 +151,7 @@ Problemas comuns e suas soluções.
 **Causa:** Causa raiz provável
 
 **Solução:**
+
 1. Passo 1
 2. Passo 2
 3. Passo 3

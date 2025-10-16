@@ -15,7 +15,7 @@ Este guia descreve as práticas e padrões para contribuir com a documentação 
 
 A documentação está organizada da seguinte forma:
 
-```
+```text
 docs/
 ├── architecture/          # Documentação de arquitetura geral
 ├── api/                  # Documentação da API REST
@@ -48,10 +48,12 @@ docs/
 ### Documentação Geral
 
 Use o padrão `NN-nome-kebab.md` onde:
+
 - `NN` = número sequencial com dois dígitos (01, 02, 03, etc.)
 - `nome-kebab` = nome descritivo em kebab-case (minúsculas com hífens)
 
 **Exemplos:**
+
 - `01-visao-geral-sistema.md`
 - `02-fluxo-envio-email.md`
 - `03-integracao-smtp.md`
@@ -59,10 +61,12 @@ Use o padrão `NN-nome-kebab.md` onde:
 ### Architecture Decision Records (ADRs)
 
 Use o padrão `ADR-YYYYMMDD-titulo.md` onde:
+
 - `YYYYMMDD` = data no formato ISO (ex: 20250116)
 - `titulo` = título descritivo em kebab-case
 
 **Exemplos:**
+
 - `ADR-20250116-escolha-banco-dados.md`
 - `ADR-20250120-estrategia-retry-email.md`
 - `ADR-20250125-autenticacao-api.md`
@@ -70,6 +74,7 @@ Use o padrão `ADR-YYYYMMDD-titulo.md` onde:
 ### Runbooks
 
 Use o padrão descritivo em kebab-case:
+
 - `deploy-producao.md`
 - `rollback-procedure.md`
 - `troubleshooting-email-failures.md`
@@ -79,12 +84,14 @@ Use o padrão descritivo em kebab-case:
 ### Para Documentação Geral
 
 Use `TEMPLATE-DOC.md` como base para:
+
 - Documentação de componentes
 - Guias de configuração
 - Referências técnicas
 - Tutoriais
 
 **Como usar:**
+
 1. Copie o template: `cp docs/TEMPLATE-DOC.md docs/pasta-alvo/NN-nome-doc.md`
 2. Preencha as seções relevantes
 3. Remova seções não aplicáveis
@@ -93,6 +100,7 @@ Use `TEMPLATE-DOC.md` como base para:
 ### Para ADRs
 
 Use `TEMPLATE-ADR.md` para documentar decisões arquiteturais:
+
 1. Copie o template: `cp docs/TEMPLATE-ADR.md docs/adrs/ADR-YYYYMMDD-titulo.md`
 2. Preencha todas as seções obrigatórias
 3. Descreva o contexto, decisão, alternativas e consequências
@@ -137,6 +145,7 @@ Ao abrir um PR de documentação:
 - Aguarde aprovação antes de merge
 
 **Exemplo de descrição de PR:**
+
 ```markdown
 ## Descrição
 Adiciona documentação sobre o fluxo de retry de emails falhos.
@@ -198,6 +207,7 @@ Adiciona documentação sobre o fluxo de retry de emails falhos.
 Exemplos de diagramas úteis:
 
 **Fluxo de dados:**
+
 ```mermaid
 graph LR
     A[API] -->|enqueue| B[Redis Queue]
@@ -206,6 +216,7 @@ graph LR
 ```
 
 **Sequência:**
+
 ```mermaid
 sequenceDiagram
     Client->>API: POST /boleto
@@ -217,6 +228,7 @@ sequenceDiagram
 ```
 
 **Componentes:**
+
 ```mermaid
 graph TD
     subgraph API

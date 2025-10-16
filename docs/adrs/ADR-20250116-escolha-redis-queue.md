@@ -42,6 +42,7 @@ Bull é uma biblioteca Node.js que implementa um sistema robusto de filas sobre 
 - Eventos e hooks para observabilidade
 
 **Configuração:**
+
 - Redis 7.x com persistência AOF + RDB
 - Bull 4.x para gerenciamento de filas
 - Bull Board para dashboard de monitoramento

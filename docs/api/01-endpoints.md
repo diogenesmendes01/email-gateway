@@ -16,6 +16,7 @@ Documentação dos endpoints da API REST para envio de boletos por e-mail.
 Envia um boleto por e-mail.
 
 **Request Body:**
+
 ```json
 {
   "recipient": {
@@ -32,6 +33,7 @@ Envia um boleto por e-mail.
 ```
 
 **Response:**
+
 ```json
 {
   "jobId": "uuid-do-job",
@@ -45,6 +47,7 @@ Envia um boleto por e-mail.
 Consulta o status de um job de envio.
 
 **Response:**
+
 ```json
 {
   "jobId": "uuid-do-job",
@@ -66,7 +69,7 @@ Consulta o status de um job de envio.
 
 Todos os endpoints requerem autenticação via JWT token no header:
 
-```
+```text
 Authorization: Bearer <jwt-token>
 ```
 

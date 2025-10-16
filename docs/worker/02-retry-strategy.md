@@ -20,11 +20,13 @@ Falhas temporárias são comuns em sistemas distribuídos, especialmente ao envi
 Utilizamos backoff exponencial com jitter para evitar "thundering herd" e distribuir tentativas no tempo.
 
 **Fórmula:**
-```
+
+```text
 delay = min(max_delay, base_delay * 2^attempt + random_jitter)
 ```
 
 **Parâmetros:**
+
 - `base_delay`: 1 segundo
 - `max_delay`: 300 segundos (5 minutos)
 - `max_attempts`: 5 tentativas
@@ -33,6 +35,7 @@ delay = min(max_delay, base_delay * 2^attempt + random_jitter)
 ### Códigos de Erro SMTP
 
 #### Retry (Erros Temporários)
+
 - `421`: Serviço temporariamente indisponível
 - `450`: Mailbox temporariamente indisponível
 - `451`: Erro local no processamento
@@ -40,6 +43,7 @@ delay = min(max_delay, base_delay * 2^attempt + random_jitter)
 - `550`: Mailbox não disponível (temporário)
 
 #### Não Retry (Erros Permanentes)
+
 - `500`: Erro interno do servidor
 - `501`: Sintaxe incorreta
 - `502`: Comando não implementado
@@ -143,11 +147,13 @@ graph TD
 ## Configuração por Ambiente
 
 ### Desenvolvimento
+
 - `max_attempts`: 3
 - `base_delay`: 500ms
 - `max_delay`: 30s
 
 ### Produção
+
 - `max_attempts`: 5
 - `base_delay`: 1s
 - `max_delay`: 300s
@@ -155,16 +161,19 @@ graph TD
 ## Considerações
 
 ### Performance
+
 - Retry não deve impactar throughput
 - Delay máximo evita sobrecarga
 - Jitter distribui carga
 
 ### Observabilidade
+
 - Logs detalhados de cada tentativa
 - Métricas de retry por tipo de erro
 - Alertas para padrões anômalos
 
 ### Manutenibilidade
+
 - Configuração centralizada
 - Testes de retry automatizados
 - Documentação de códigos de erro
