@@ -551,7 +551,7 @@ export function normalizeCpfCnpj(cpfCnpj: string): string {
 }
 
 /**
- * Mascara CPF (***.***.***-**)
+ * Mascara CPF (XXX.XXX.XXX-XX)
  */
 export function maskCPF(cpf: string): string {
   if (cpf.length !== LIMITS.CPF_LENGTH) return cpf;
