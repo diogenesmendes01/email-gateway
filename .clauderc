@@ -1,0 +1,59 @@
+# Claude Code Configuration
+# Este arquivo instrui agentes de IA sobre regras do projeto
+
+## 🚨 REGRAS OBRIGATÓRIAS - LEIA ANTES DE QUALQUER AÇÃO
+
+Antes de criar commits, branches ou PRs, você DEVE:
+
+1. Ler e seguir: CONTRIBUTING.md
+2. Ler e seguir: .github/pull_request_template.md
+3. Ler e seguir: docs/PR_REVIEW_RULES.md
+4. Ler e seguir: docs/PR_ADJUSTMENTS.md
+5. Usar template: task/TEMPLATE-PR-TASK.md para itens fora de escopo
+
+## Branch Naming (OBRIGATÓRIO)
+- feature/* (nova funcionalidade)
+- fix/* (correção de bug)
+- hotfix/* (correção urgente)
+- refactor/* (refatoração)
+- chore/* (manutenção)
+- docs/* (documentação)
+
+## Commit Message (OBRIGATÓRIO)
+Usar Conventional Commits:
+<tipo>(<escopo>): <descrição>
+
+Tipos permitidos: feat, fix, chore, docs, style, refactor, perf, test, build, ci
+
+Adicionar ao final de TODOS os commits:
+
+Co-Authored-By: nome do agente se não houver usar Dev1 
+
+## Segurança (CRÍTICO)
+- NUNCA commitar .env
+- NUNCA expor secrets/API keys
+- SEMPRE verificar .gitignore
+- SEMPRE verificar git status antes de commitar
+
+## Pull Request (OBRIGATÓRIO)
+- Preencher TODO o template em .github/pull_request_template.md
+- Documentar impacto técnico (migrations, env vars, breaking changes)
+- Documentar riscos e plano de rollback
+- Registrar itens fora de escopo em /task/PR<numero>-TASK<id>.md
+
+## Workflow Actions
+- semantic-pr.yml valida título da PR (Conventional Commits)
+- labeler.yml aplica labels automaticamente
+- docs-validation.yml valida documentação
+
+## NUNCA
+- Fazer scope creep (adicionar coisas fora do escopo)
+- Commitar sem validação manual
+- Criar PR sem preencher template completo
+- Ignorar comentários Critical ou Moderate
+
+## SEMPRE
+- Manter escopo aderente
+- Validar manualmente antes de commitar
+- Documentar decisões técnicas
+- Registrar tech debt em /task quando necessário

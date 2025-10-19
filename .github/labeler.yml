@@ -1,0 +1,21 @@
+# Map labels to file path globs. Applied automatically on PRs.
+area:frontend:
+  - 'frontend/**'
+  - 'apps/web/**'
+area:backend:
+  - 'backend/**'
+  - 'services/**'
+area:infra:
+  - 'infra/**'
+  - 'deploy/**'
+  - 'docker/**'
+  - '**/Dockerfile'
+area:docs:
+  - 'docs/**'
+  - '**/*.md'
+tipo:bug:
+  - 'fix/**'
+tipo:feature:
+  - 'feature/**'
+tipo:refactor:
+  - 'refactor/**'

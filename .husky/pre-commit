@@ -1,0 +1,41 @@
+#!/usr/bin/env sh
+
+echo "🤖 Validando commit..."
+
+# Verificar se .env não está sendo commitado
+if git diff --cached --name-only | grep -q "^\.env$"; then
+  echo "❌ ERRO: Tentativa de commitar arquivo .env"
+  echo "Arquivo .env contém informações sensíveis e NÃO deve ser commitado"
+  exit 1
+fi
+
+# Verificar se .env.local não está sendo commitado
+if git diff --cached --name-only | grep -q "^\.env\..*\.local$"; then
+  echo "❌ ERRO: Tentativa de commitar arquivo .env.*.local"
+  echo "Arquivos .env locais contêm informações sensíveis"
+  exit 1
+fi
+
+# Verificar se há arquivos de credenciais
+if git diff --cached --name-only | grep -qE "(credentials|secrets|\.key|\.pem)"; then
+  echo "⚠️  AVISO: Arquivos que podem conter credenciais detectados"
+  echo "Verifique se não há informações sensíveis sendo commitadas"
+  # No Windows, não podemos fazer prompt interativo facilmente
+  # então apenas avisamos
+fi
+
+# Verificar se node_modules está sendo commitado
+if git diff --cached --name-only | grep -q "node_modules"; then
+  echo "❌ ERRO: Tentativa de commitar node_modules/"
+  echo "node_modules/ deve estar no .gitignore"
+  exit 1
+fi
+
+# Verificar se dist está sendo commitado
+if git diff --cached --name-only | grep -q "dist/"; then
+  echo "❌ ERRO: Tentativa de commitar arquivos de build (dist/)"
+  echo "Arquivos de build devem estar no .gitignore"
+  exit 1
+fi
+
+echo "✅ Validações de segurança passaram"
