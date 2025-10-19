@@ -323,7 +323,8 @@ export const emailSendBodySchema = z.object({
     .string()
     .min(1, 'HTML content is required')
     .max(LIMITS.MAX_HTML_SIZE, `HTML content must not exceed ${LIMITS.MAX_HTML_SIZE} bytes`)
-    // TODO: Adicionar sanitização de HTML (remover scripts, etc.)
+    // TODO: [TASK 3.4] Adicionar sanitização de HTML (remover scripts, etc.)
+    // Considerar usar biblioteca como DOMPurify ou isomorphic-dompurify
     .refine(
       (val) => Buffer.byteLength(val, 'utf8') <= LIMITS.MAX_HTML_SIZE,
       `HTML content size must not exceed ${LIMITS.MAX_HTML_SIZE} bytes`
