@@ -20,6 +20,7 @@ import {
   validateEmailJobData,
   PIPELINE_CONSTANTS,
 } from '@email-gateway/shared';
+import { z } from 'zod';
 
 export class ValidationService {
   constructor(private readonly prisma: PrismaClient) {}
@@ -228,9 +229,11 @@ export class ValidationService {
         }
       }
 
-      // Validação básica do formato do email
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(recipient.email)) {
+      // Validação do formato do email usando Zod
+      const emailSchema = z.string().email();
+      const emailValidation = emailSchema.safeParse(recipient.email);
+
+      if (!emailValidation.success) {
         return {
           type: ValidationType.RECIPIENT,
           success: false,
