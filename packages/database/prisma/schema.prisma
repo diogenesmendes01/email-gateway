@@ -17,22 +17,30 @@ datasource db {
 enum EmailStatus {
   PENDING
   ENQUEUED
-  PROCESSING
+  RECEIVED      // Pipeline: Job recebido
+  VALIDATED     // Pipeline: Validações OK
+  SENT_ATTEMPT  // Pipeline: Tentando enviar ao SES
   SENT
   FAILED
   RETRYING
+  RETRY_SCHEDULED // Pipeline: Agendado para retry
 }
 
 enum EventType {
   CREATED
   ENQUEUED
+  RECEIVED        // Pipeline: Job recebido
+  VALIDATED       // Pipeline: Validado
+  SENT_ATTEMPT    // Pipeline: Tentativa de envio
   PROCESSING
   SENT
   FAILED
   RETRYING
+  RETRY_SCHEDULED // Pipeline: Agendado para retry
   BOUNCED
   COMPLAINED
   DELIVERED
+  VALIDATION_FAILED // Pipeline: Falha na validação
 }
 
 // ============================================

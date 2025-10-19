@@ -13,8 +13,8 @@ export * from './schemas/email-job.types';
 export * from './schemas/email-job-retry.schema';
 export * from './schemas/email-job-retry.types';
 
-// Types (quando criados)
-// export * from './types';
+// Types
+export * from './types/email-pipeline.types';
 
 // Utils (quando criados)
 // export * from './utils';
