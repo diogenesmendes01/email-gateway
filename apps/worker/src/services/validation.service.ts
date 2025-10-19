@@ -341,9 +341,15 @@ export class ValidationService {
 
       // Validações básicas de segurança do HTML
       const suspiciousPatterns = [
-        /<script[^>]*>/i, // Scripts
-        /javascript:/i, // JavaScript URLs
-        /on\w+\s*=/i, // Event handlers (onclick, onload, etc)
+        /<script[^>]*>/gi, // Opening script tags
+        /<\/script>/gi, // Closing script tags
+        /javascript:/gi, // JavaScript URLs
+        /vbscript:/gi, // VBScript URLs
+        /data:text\/html/gi, // Data URLs with HTML
+        /on\w+\s*=/gi, // Event handlers (onclick, onload, etc)
+        /<iframe[\s\S]*?>/gi, // iframes
+        /<object[\s\S]*?>/gi, // object tags
+        /<embed[\s\S]*?>/gi, // embed tags
       ];
 
       for (const pattern of suspiciousPatterns) {
