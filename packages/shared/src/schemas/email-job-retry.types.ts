@@ -13,6 +13,8 @@
  * - Round-robin por tenant (companyId)
  */
 
+import { EMAIL_JOB_CONFIG } from './email-job.types';
+
 /**
  * Configuração de retry e backoff exponencial
  */
@@ -20,8 +22,9 @@ export const EMAIL_JOB_RETRY_CONFIG = {
   /**
    * Tentativas máximas antes de mover para DLQ
    * TASK 3.2: Após 5 falhas → DLQ
+   * @see EMAIL_JOB_CONFIG.MAX_ATTEMPTS
    */
-  MAX_ATTEMPTS: 5,
+  MAX_ATTEMPTS: EMAIL_JOB_CONFIG.MAX_ATTEMPTS,
 
   /**
    * Delay base para backoff exponencial (em milissegundos)
@@ -47,8 +50,9 @@ export const EMAIL_JOB_RETRY_CONFIG = {
   /**
    * TTL para jobs na Dead Letter Queue (em milissegundos)
    * TASK 3.2: DLQ retida por 7 dias
+   * @see EMAIL_JOB_CONFIG.DLQ_TTL
    */
-  DLQ_TTL_MS: 7 * 24 * 60 * 60 * 1000, // 7 dias = 604800000 ms
+  DLQ_TTL_MS: EMAIL_JOB_CONFIG.DLQ_TTL,
 
   /**
    * Nome da Dead Letter Queue

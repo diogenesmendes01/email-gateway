@@ -97,6 +97,10 @@ export const emailJobDLQEntrySchema = z
       .string()
       .min(1, 'lastFailureReason é obrigatório')
       .max(500, 'lastFailureReason deve ter no máximo 500 caracteres')
+      .refine(
+        (val) => val.trim().length > 0,
+        'lastFailureReason não pode ser apenas espaços em branco',
+      )
       .describe(
         'OBRIGATÓRIO (TASK 3.2): Razão da última falha antes de mover para DLQ',
       ),
@@ -232,21 +236,17 @@ export const jobRetryHistorySchema = z
  * @throws {Error} Se validação falhar
  *
  * Validações:
- * 1. Schema básico via Zod
- * 2. lastFailureReason é obrigatório (TASK 3.2)
- * 3. failedAttempts deve ser >= MAX_ATTEMPTS
+ * 1. Schema básico via Zod (inclui lastFailureReason obrigatório - TASK 3.2)
+ * 2. failedAttempts deve ser >= MAX_ATTEMPTS
+ *
+ * NOTA: Validação de lastFailureReason não-vazio já é feita pelo schema Zod (linha 98)
  */
 export function validateDLQEntry(data: unknown) {
   const parsed = emailJobDLQEntrySchema.parse(data);
 
-  // TASK 3.2: lastFailureReason é obrigatório
-  if (!parsed.lastFailureReason || parsed.lastFailureReason.trim() === '') {
-    throw new Error(
-      'lastFailureReason é obrigatório ao mover job para DLQ (TASK 3.2)',
-    );
-  }
-
   // Valida que job falhou número suficiente de vezes
+  // NOTA: Esta validação já está no schema (linha 93), mas mantida aqui
+  // para clareza e mensagem de erro mais específica
   if (parsed.failedAttempts < EMAIL_JOB_RETRY_CONFIG.MAX_ATTEMPTS) {
     throw new Error(
       `Job deve falhar pelo menos ${EMAIL_JOB_RETRY_CONFIG.MAX_ATTEMPTS} vezes antes de ir para DLQ`,
