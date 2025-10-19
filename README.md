@@ -1,6 +1,22 @@
-# Email Gateway
+# Email Gateway - MVP
 
-Gateway de envio de emails com fila, retry automático e observabilidade.
+Sistema de envio de boletos por e-mail com arquitetura assíncrona baseada em filas.
+
+## 📁 Estrutura do Projeto (Monorepo)
+
+```
+email-gateway/
+├── apps/                    # Aplicações
+│   ├── api/                # API REST NestJS
+│   ├── worker/             # Worker de processamento
+│   └── dashboard/          # Dashboard React
+├── packages/               # Código compartilhado
+│   ├── shared/            # Schemas, types, utils
+│   └── database/          # Prisma + client
+├── docs/                   # Documentação
+├── infra/                  # Infraestrutura (Docker, Nginx, etc)
+└── scripts/               # Scripts auxiliares
+```
 
 ## 📋 Para Contribuidores (Humanos e IAs)
 

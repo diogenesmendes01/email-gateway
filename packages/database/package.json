@@ -1,0 +1,28 @@
+{
+  "name": "@email-gateway/database",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Database layer with Prisma",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate deploy",
+    "db:migrate:dev": "prisma migrate dev",
+    "db:migrate:create": "prisma migrate dev --create-only",
+    "db:studio": "prisma studio",
+    "db:seed": "ts-node prisma/seed/seed.ts",
+    "db:reset": "prisma migrate reset --force"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.8.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.5",
+    "prisma": "^5.8.1",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3"
+  }
+}

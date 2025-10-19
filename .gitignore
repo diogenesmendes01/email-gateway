@@ -47,3 +47,23 @@ dump.rdb
 *.bak
 *.old
 --version/
+
+# Prisma
+prisma/migrations/**/migration.sql.backup
+
+# Docker
+*.pid
+
+# Build
+*.tsbuildinfo
+.cache/
+
+# Logs
+logs/
+lerna-debug.log*
+*.lcov
+
+# Package lock (usando workspaces)
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
