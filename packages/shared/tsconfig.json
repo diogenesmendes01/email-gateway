@@ -8,6 +8,9 @@
     "outDir": "./dist",
     "rootDir": "./src",
     "strict": true,
+    // TODO: [TASK 3.3] Enable additional strict type checks for enhanced type safety:
+    // "strictNullChecks": true (already enabled via "strict": true)
+    // "noUncheckedIndexedAccess": true (future enhancement)
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
