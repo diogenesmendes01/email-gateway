@@ -559,7 +559,7 @@ export function maskCPF(cpf: string): string {
 }
 
 /**
- * Mascara CNPJ (**.***.***/**-**)
+ * Mascara CNPJ (formato: XX.XXX.XXX/XXXX-XX com asteriscos)
  */
 export function maskCNPJ(cnpj: string): string {
   if (cnpj.length !== LIMITS.CNPJ_LENGTH) return cnpj;
