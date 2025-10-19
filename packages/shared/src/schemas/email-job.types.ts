@@ -16,6 +16,59 @@
  */
 
 /**
+ * Constantes de validação para limites de campos
+ */
+export const EMAIL_JOB_VALIDATION = {
+  /** Tamanho máximo para email (RFC 5321) */
+  MAX_EMAIL_LENGTH: 254,
+
+  /** Tamanho máximo para subject */
+  MAX_SUBJECT_LENGTH: 150,
+
+  /** Tamanho máximo para htmlRef */
+  MAX_HTML_REF_LENGTH: 512,
+
+  /** Tamanho máximo para requestId */
+  MAX_REQUEST_ID_LENGTH: 128,
+
+  /** Tamanho máximo para nome */
+  MAX_NAME_LENGTH: 120,
+
+  /** Tamanho máximo para razão social */
+  MAX_RAZAO_SOCIAL_LENGTH: 150,
+
+  /** Tamanho máximo para externalId */
+  MAX_EXTERNAL_ID_LENGTH: 64,
+
+  /** Tamanho do hash SHA-256 em hexadecimal */
+  SHA256_HEX_LENGTH: 64,
+
+  /** Máximo de destinatários em CC/BCC */
+  MAX_CC_BCC_RECIPIENTS: 5,
+
+  /** Máximo de tags permitidas */
+  MAX_TAGS: 5,
+
+  /** Tamanho máximo para cada tag */
+  MAX_TAG_LENGTH: 50,
+
+  /** Tamanho máximo para sesMessageId */
+  MAX_SES_MESSAGE_ID_LENGTH: 128,
+
+  /** Tamanho máximo para errorCode */
+  MAX_ERROR_CODE_LENGTH: 64,
+
+  /** Tamanho máximo para errorReason */
+  MAX_ERROR_REASON_LENGTH: 500,
+
+  /** Range de prioridade mínima */
+  MIN_PRIORITY: 1,
+
+  /** Range de prioridade máxima */
+  MAX_PRIORITY: 10,
+} as const;
+
+/**
  * Constantes para configuração do job
  */
 export const EMAIL_JOB_CONFIG = {

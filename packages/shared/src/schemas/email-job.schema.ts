@@ -7,7 +7,10 @@
  */
 
 import { z } from 'zod';
-import { EMAIL_JOB_CONFIG } from './email-job.types';
+import { EMAIL_JOB_CONFIG, EMAIL_JOB_VALIDATION } from './email-job.types';
+
+// TODO: [TASK 3.2] Complete magic number refactoring - replace all remaining hardcoded
+// validation limits with EMAIL_JOB_VALIDATION constants throughout this file
 
 /**
  * Schema de validação para informações do destinatário no job
@@ -50,7 +53,10 @@ export const emailJobRecipientSchema = z.object({
   email: z
     .string()
     .email('Email do destinatário deve ser válido')
-    .max(254, 'Email deve ter no máximo 254 caracteres')
+    .max(
+      EMAIL_JOB_VALIDATION.MAX_EMAIL_LENGTH,
+      `Email deve ter no máximo ${EMAIL_JOB_VALIDATION.MAX_EMAIL_LENGTH} caracteres`,
+    )
     .describe('Endereço de email do destinatário'),
 });
 
@@ -115,7 +121,8 @@ export const emailSendJobDataSchema = z
     htmlRef: z
       .string()
       .min(1, 'htmlRef não pode ser vazio')
-      .describe('Referência ao HTML armazenado (UUID, path, etc)'),
+      .max(512, 'htmlRef deve ter no máximo 512 caracteres')
+      .describe('Referência ao HTML armazenado. Formatos aceitos: UUID (para DB), path S3, ou identificador customizado'),
 
     replyTo: z
       .string()
@@ -181,11 +188,17 @@ export const emailSendJobOptionsSchema = z
     priority: z
       .number()
       .int('priority deve ser um inteiro')
-      .min(1, 'priority mínima = 1')
-      .max(10, 'priority máxima = 10')
+      .min(
+        EMAIL_JOB_VALIDATION.MIN_PRIORITY,
+        `priority mínima = ${EMAIL_JOB_VALIDATION.MIN_PRIORITY}`,
+      )
+      .max(
+        EMAIL_JOB_VALIDATION.MAX_PRIORITY,
+        `priority máxima = ${EMAIL_JOB_VALIDATION.MAX_PRIORITY}`,
+      )
       .default(EMAIL_JOB_CONFIG.DEFAULT_PRIORITY)
       .optional()
-      .describe('Prioridade do job (1=alta, 10=baixa)'),
+      .describe('Prioridade do job no BullMQ (valores menores = maior prioridade; 1=máxima, 10=mínima)'),
 
     delay: z
       .number()
@@ -196,14 +209,14 @@ export const emailSendJobOptionsSchema = z
 
     removeOnComplete: z
       .boolean()
-      .default(true)
       .optional()
+      .default(true)
       .describe('Remover job após completar'),
 
     removeOnFail: z
       .boolean()
-      .default(false)
       .optional()
+      .default(false)
       .describe('Remover job após falha permanente'),
   })
   .strict()
@@ -243,7 +256,7 @@ export const emailSendJobResultSchema = z
 
     errorReason: z
       .string()
-      .max(500)
+      .max(500, 'errorReason deve ter no máximo 500 caracteres')
       .optional()
       .describe('Mensagem de erro (se falhou)'),
 
@@ -258,15 +271,26 @@ export const emailSendJobResultSchema = z
   .describe('Resultado do processamento');
 
 /**
- * Validação personalizada: recipient.email deve coincidir com to
+ * Valida os dados do job email:send com regras de negócio adicionais
+ *
+ * @param data - Dados do job a serem validados
+ * @returns Dados validados e tipados
+ * @throws {Error} Se a validação falhar
+ *
+ * Validações aplicadas:
+ * 1. Schema básico via Zod (emailSendJobDataSchema)
+ * 2. recipient.email deve coincidir com to
+ * 3. Pelo menos um identificador do recipient deve estar presente
+ *    (recipientId, externalId ou cpfCnpjHash)
  */
 export const validateEmailJobData = (data: unknown) => {
   const parsed = emailSendJobDataSchema.parse(data);
 
   // Validação adicional: recipient.email deve coincidir com to
+  // SECURITY: Sanitized error message to prevent PII exposure (Section 25.2)
   if (parsed.recipient.email !== parsed.to) {
     throw new Error(
-      `recipient.email (${parsed.recipient.email}) deve coincidir com to (${parsed.to})`,
+      'recipient.email deve coincidir com to',
     );
   }
 

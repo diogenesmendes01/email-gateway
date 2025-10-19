@@ -6,14 +6,14 @@
  * TASK 3.1 — Contrato do Job `email:send`
  */
 
-const {
+import {
   emailJobRecipientSchema,
   emailSendJobDataSchema,
   emailSendJobOptionsSchema,
   emailSendJobResultSchema,
   validateEmailJobData,
-} = require('../email-job.schema');
-const { EMAIL_JOB_CONFIG } = require('../email-job.types');
+} from '../email-job.schema';
+import { EMAIL_JOB_CONFIG } from '../email-job.types';
 
 describe('Email Job Schemas', () => {
   describe('emailJobRecipientSchema', () => {
