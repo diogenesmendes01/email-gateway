@@ -1,8 +1,50 @@
 {
-  "devDependencies": {
-    "husky": "^9.1.7"
-  },
+  "name": "email-gateway",
+  "version": "1.0.0",
+  "private": true,
+  "description": "MVP Email Gateway - Sistema de envio de boletos por e-mail",
+  "author": "CertShift Team",
+  "license": "UNLICENSED",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
-    "prepare": "husky"
+    "prepare": "husky",
+    "dev:api": "npm run dev --workspace=@email-gateway/api",
+    "dev:worker": "npm run dev --workspace=@email-gateway/worker",
+    "dev:dashboard": "npm run dev --workspace=@email-gateway/dashboard",
+    "build": "npm run build --workspaces",
+    "build:api": "npm run build --workspace=@email-gateway/api",
+    "build:worker": "npm run build --workspace=@email-gateway/worker",
+    "build:dashboard": "npm run build --workspace=@email-gateway/dashboard",
+    "test": "npm run test --workspaces",
+    "test:api": "npm run test --workspace=@email-gateway/api",
+    "test:worker": "npm run test --workspace=@email-gateway/worker",
+    "lint": "npm run lint --workspaces",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
+    "db:generate": "npm run db:generate --workspace=@email-gateway/database",
+    "db:migrate": "npm run db:migrate --workspace=@email-gateway/database",
+    "db:migrate:dev": "npm run db:migrate:dev --workspace=@email-gateway/database",
+    "db:studio": "npm run db:studio --workspace=@email-gateway/database",
+    "db:seed": "npm run db:seed --workspace=@email-gateway/database",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "docker:logs": "docker-compose logs -f"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.5",
+    "@typescript-eslint/eslint-plugin": "^6.19.0",
+    "@typescript-eslint/parser": "^6.19.0",
+    "eslint": "^8.56.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-prettier": "^5.1.3",
+    "husky": "^9.1.7",
+    "prettier": "^3.2.4",
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
   }
 }

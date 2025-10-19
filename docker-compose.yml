@@ -1,0 +1,87 @@
+version: '3.8'
+
+services:
+  # PostgreSQL
+  postgres:
+    image: postgres:15-alpine
+    container_name: email-gateway-postgres
+    restart: unless-stopped
+    ports:
+      - '5432:5432'
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: email_gateway
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis
+  redis:
+    image: redis:7-alpine
+    container_name: email-gateway-redis
+    restart: unless-stopped
+    ports:
+      - '6379:6379'
+    command: redis-server --appendonly yes --appendfsync everysec
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # API (desenvolvimento)
+  # api:
+  #   build:
+  #     context: .
+  #     dockerfile: infra/docker/Dockerfile.api
+  #   container_name: email-gateway-api
+  #   restart: unless-stopped
+  #   ports:
+  #     - '3000:3000'
+  #   env_file:
+  #     - apps/api/.env
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #     redis:
+  #       condition: service_healthy
+  #   volumes:
+  #     - ./apps/api:/app/apps/api
+  #     - ./packages:/app/packages
+  #     - /app/node_modules
+  #   command: npm run dev:api
+
+  # Worker (desenvolvimento)
+  # worker:
+  #   build:
+  #     context: .
+  #     dockerfile: infra/docker/Dockerfile.worker
+  #   container_name: email-gateway-worker
+  #   restart: unless-stopped
+  #   env_file:
+  #     - apps/worker/.env
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #     redis:
+  #       condition: service_healthy
+  #   volumes:
+  #     - ./apps/worker:/app/apps/worker
+  #     - ./packages:/app/packages
+  #     - /app/node_modules
+  #   command: npm run dev:worker
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  default:
+    name: email-gateway-network
