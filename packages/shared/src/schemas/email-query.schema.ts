@@ -375,10 +375,17 @@ export const emailDetailResponseSchema = z.object({
  * Parse sort string into field and direction
  */
 export function parseSortParam(sort: string): { field: string; direction: 'asc' | 'desc' } {
-  const [field, direction] = sort.split(':');
+  const parts = sort.split(':');
+  const field = parts[0];
+  const direction = parts[1];
+
+  if (!field) {
+    throw new Error('Sort field is required');
+  }
+
   return {
     field,
-    direction: direction as 'asc' | 'desc',
+    direction: (direction || 'asc') as 'asc' | 'desc',
   };
 }
 
