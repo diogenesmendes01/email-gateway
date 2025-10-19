@@ -84,7 +84,7 @@ export class ValidationService {
         error: errorMessage,
         errorCode: ErrorCode.INVALID_PAYLOAD,
         metadata: {
-          originalError: error instanceof Error ? error.message : String(error),
+          errorType: error instanceof Error ? error.constructor.name : typeof error,
         },
       };
     }
@@ -146,7 +146,7 @@ export class ValidationService {
         error: 'Erro ao validar outbox no banco de dados',
         errorCode: ErrorCode.OUTBOX_NOT_FOUND,
         metadata: {
-          originalError: error instanceof Error ? error.message : String(error),
+          errorType: error instanceof Error ? error.constructor.name : typeof error,
         },
       };
     }
@@ -262,7 +262,7 @@ export class ValidationService {
         error: 'Erro ao validar recipient',
         errorCode: ErrorCode.RECIPIENT_NOT_FOUND,
         metadata: {
-          originalError: error instanceof Error ? error.message : String(error),
+          errorType: error instanceof Error ? error.constructor.name : typeof error,
         },
       };
     }
@@ -382,7 +382,7 @@ export class ValidationService {
         error: 'Erro ao validar template',
         errorCode: ErrorCode.INVALID_TEMPLATE,
         metadata: {
-          originalError: error instanceof Error ? error.message : String(error),
+          errorType: error instanceof Error ? error.constructor.name : typeof error,
         },
       };
     }
