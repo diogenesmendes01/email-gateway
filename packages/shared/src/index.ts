@@ -7,6 +7,7 @@
 // Schemas
 export * from './schemas/email-send.schema';
 export * from './schemas/email-send.types';
+export * from './schemas/email-query.schema';
 
 // Types (quando criados)
 // export * from './types';

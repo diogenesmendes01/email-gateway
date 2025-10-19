@@ -10,7 +10,35 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// TODO: Add more models as needed (Email, Recipient, EmailLog, etc.)
+// ============================================
+// ENUMS
+// ============================================
+
+enum EmailStatus {
+  PENDING
+  ENQUEUED
+  PROCESSING
+  SENT
+  FAILED
+  RETRYING
+}
+
+enum EventType {
+  CREATED
+  ENQUEUED
+  PROCESSING
+  SENT
+  FAILED
+  RETRYING
+  BOUNCED
+  COMPLAINED
+  DELIVERED
+}
+
+// ============================================
+// MODELS
+// ============================================
+
 model Company {
   id        String   @id @default(cuid())
   name      String
@@ -19,5 +47,132 @@ model Company {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
+  // Relations
+  recipients   Recipient[]
+  emailOutbox  EmailOutbox[]
+  emailLogs    EmailLog[]
+  idempotencyKeys IdempotencyKey[]
+
   @@map("companies")
+}
+
+model Recipient {
+  id            String   @id @default(cuid())
+  companyId     String   @map("company_id")
+  externalId    String?  @map("external_id")
+  cpfCnpjHash   String?  @map("cpf_cnpj_hash") @db.VarChar(64)
+  cpfCnpjEnc    String?  @map("cpf_cnpj_enc") // Encrypted CPF/CNPJ
+  razaoSocial   String?  @map("razao_social") @db.VarChar(150)
+  nome          String?  @db.VarChar(120)
+  email         String   @db.VarChar(254)
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  deletedAt     DateTime? @map("deleted_at")
+
+  // Relations
+  company     Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  emailOutbox EmailOutbox[]
+  emailLogs   EmailLog[]
+
+  @@unique([companyId, externalId])
+  @@index([companyId, cpfCnpjHash])
+  @@index([companyId, email])
+  @@map("recipients")
+}
+
+model EmailOutbox {
+  id           String      @id @default(cuid())
+  companyId    String      @map("company_id")
+  recipientId  String?     @map("recipient_id")
+  externalId   String?     @map("external_id") @db.VarChar(64)
+  to           String      @db.VarChar(254)
+  cc           String[]    @default([])
+  bcc          String[]    @default([])
+  subject      String      @db.VarChar(150)
+  html         String      @db.Text
+  replyTo      String?     @map("reply_to") @db.VarChar(254)
+  headers      Json?
+  tags         String[]    @default([])
+  status       EmailStatus @default(PENDING)
+  jobId        String?     @unique @map("job_id")
+  requestId    String?     @map("request_id") @db.VarChar(128)
+  attempts     Int         @default(0)
+  lastError    String?     @map("last_error") @db.Text
+  createdAt    DateTime    @default(now()) @map("created_at")
+  updatedAt    DateTime    @updatedAt @map("updated_at")
+  enqueuedAt   DateTime?   @map("enqueued_at")
+  processedAt  DateTime?   @map("processed_at")
+
+  // Relations
+  company   Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  recipient Recipient? @relation(fields: [recipientId], references: [id], onDelete: SetNull)
+  emailLog  EmailLog?
+
+  @@index([companyId, status])
+  @@index([companyId, externalId])
+  @@index([companyId, createdAt])
+  @@index([recipientId])
+  @@map("email_outbox")
+}
+
+model EmailLog {
+  id            String      @id @default(cuid())
+  outboxId      String      @unique @map("outbox_id")
+  companyId     String      @map("company_id")
+  recipientId   String?     @map("recipient_id")
+  to            String      @db.VarChar(254)
+  subject       String      @db.VarChar(150)
+  status        EmailStatus
+  sesMessageId  String?     @unique @map("ses_message_id") @db.VarChar(128)
+  errorCode     String?     @map("error_code") @db.VarChar(64)
+  errorReason   String?     @map("error_reason") @db.Text
+  attempts      Int         @default(0)
+  durationMs    Int?        @map("duration_ms")
+  requestId     String?     @map("request_id") @db.VarChar(128)
+  createdAt     DateTime    @default(now()) @map("created_at")
+  sentAt        DateTime?   @map("sent_at")
+  failedAt      DateTime?   @map("failed_at")
+
+  // Relations
+  company     Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  recipient   Recipient?   @relation(fields: [recipientId], references: [id], onDelete: SetNull)
+  outbox      EmailOutbox  @relation(fields: [outboxId], references: [id], onDelete: Cascade)
+  events      EmailEvent[]
+
+  @@index([companyId, status])
+  @@index([companyId, createdAt])
+  @@index([recipientId])
+  @@index([sesMessageId])
+  @@map("email_logs")
+}
+
+model EmailEvent {
+  id          String    @id @default(cuid())
+  emailLogId  String    @map("email_log_id")
+  type        EventType
+  metadata    Json?
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  // Relations
+  emailLog EmailLog @relation(fields: [emailLogId], references: [id], onDelete: Cascade)
+
+  @@index([emailLogId, createdAt])
+  @@map("email_events")
+}
+
+model IdempotencyKey {
+  id         String   @id @default(cuid())
+  companyId  String   @map("company_id")
+  key        String   @db.VarChar(128)
+  outboxId   String   @map("outbox_id")
+  requestHash String  @map("request_hash") @db.VarChar(64)
+  createdAt  DateTime @default(now()) @map("created_at")
+  expiresAt  DateTime @map("expires_at")
+
+  // Relations
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, key])
+  @@index([expiresAt])
+  @@map("idempotency_keys")
 }
