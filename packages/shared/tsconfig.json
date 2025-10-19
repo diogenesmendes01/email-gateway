@@ -8,9 +8,15 @@
     "outDir": "./dist",
     "rootDir": "./src",
     "strict": true,
-    // TODO: [TASK 3.3] Enable additional strict type checks for enhanced type safety:
-    // "strictNullChecks": true (already enabled via "strict": true)
-    // "noUncheckedIndexedAccess": true (future enhancement)
+
+    // TASK 3.3: Additional strict type checks for enhanced type safety
+    // strictNullChecks is already enabled via "strict": true
+    "noUncheckedIndexedAccess": true, // Requires handling of possibly undefined array/object access
+    "noUnusedLocals": true,            // Error on unused local variables
+    "noUnusedParameters": true,        // Error on unused function parameters
+    "noImplicitReturns": true,         // Error if not all code paths return a value
+    "noFallthroughCasesInSwitch": true, // Error on fallthrough cases in switch statements
+
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,

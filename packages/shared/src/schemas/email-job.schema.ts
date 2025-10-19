@@ -9,9 +9,6 @@
 import { z } from 'zod';
 import { EMAIL_JOB_CONFIG, EMAIL_JOB_VALIDATION } from './email-job.types';
 
-// TODO: [TASK 3.2] Complete magic number refactoring - replace all remaining hardcoded
-// validation limits with EMAIL_JOB_VALIDATION constants throughout this file
-
 /**
  * Schema de validação para informações do destinatário no job
  */
@@ -25,13 +22,19 @@ export const emailJobRecipientSchema = z.object({
   externalId: z
     .string()
     .min(1, 'externalId não pode ser vazio')
-    .max(64, 'externalId deve ter no máximo 64 caracteres')
+    .max(
+      EMAIL_JOB_VALIDATION.MAX_EXTERNAL_ID_LENGTH,
+      `externalId deve ter no máximo ${EMAIL_JOB_VALIDATION.MAX_EXTERNAL_ID_LENGTH} caracteres`,
+    )
     .optional()
     .describe('ID externo do destinatário no sistema do parceiro'),
 
   cpfCnpjHash: z
     .string()
-    .length(64, 'cpfCnpjHash deve ser SHA-256 (64 chars hex)')
+    .length(
+      EMAIL_JOB_VALIDATION.SHA256_HEX_LENGTH,
+      `cpfCnpjHash deve ser SHA-256 (${EMAIL_JOB_VALIDATION.SHA256_HEX_LENGTH} chars hex)`,
+    )
     .regex(/^[a-f0-9]{64}$/, 'cpfCnpjHash deve ser um hash SHA-256 válido')
     .optional()
     .describe('Hash SHA-256 do CPF/CNPJ normalizado'),
@@ -39,14 +42,20 @@ export const emailJobRecipientSchema = z.object({
   razaoSocial: z
     .string()
     .min(1)
-    .max(150, 'razaoSocial deve ter no máximo 150 caracteres')
+    .max(
+      EMAIL_JOB_VALIDATION.MAX_RAZAO_SOCIAL_LENGTH,
+      `razaoSocial deve ter no máximo ${EMAIL_JOB_VALIDATION.MAX_RAZAO_SOCIAL_LENGTH} caracteres`,
+    )
     .optional()
     .describe('Razão social (pessoa jurídica)'),
 
   nome: z
     .string()
     .min(1)
-    .max(120, 'nome deve ter no máximo 120 caracteres')
+    .max(
+      EMAIL_JOB_VALIDATION.MAX_NAME_LENGTH,
+      `nome deve ter no máximo ${EMAIL_JOB_VALIDATION.MAX_NAME_LENGTH} caracteres`,
+    )
     .optional()
     .describe('Nome (pessoa física)'),
 
@@ -78,13 +87,19 @@ export const emailSendJobDataSchema = z
     requestId: z
       .string()
       .min(1, 'requestId não pode ser vazio')
-      .max(128, 'requestId deve ter no máximo 128 caracteres')
+      .max(
+        EMAIL_JOB_VALIDATION.MAX_REQUEST_ID_LENGTH,
+        `requestId deve ter no máximo ${EMAIL_JOB_VALIDATION.MAX_REQUEST_ID_LENGTH} caracteres`,
+      )
       .describe('ID da requisição original para correlação'),
 
     to: z
       .string()
       .email('Endereço de email "to" deve ser válido')
-      .max(254, 'Email deve ter no máximo 254 caracteres')
+      .max(
+        EMAIL_JOB_VALIDATION.MAX_EMAIL_LENGTH,
+        `Email deve ter no máximo ${EMAIL_JOB_VALIDATION.MAX_EMAIL_LENGTH} caracteres`,
+      )
       .describe('Destinatário principal'),
 
     cc: z
@@ -92,9 +107,12 @@ export const emailSendJobDataSchema = z
         z
           .string()
           .email('Endereços em "cc" devem ser válidos')
-          .max(254),
+          .max(EMAIL_JOB_VALIDATION.MAX_EMAIL_LENGTH),
       )
-      .max(5, 'Máximo 5 destinatários em CC')
+      .max(
+        EMAIL_JOB_VALIDATION.MAX_CC_BCC_RECIPIENTS,
+        `Máximo ${EMAIL_JOB_VALIDATION.MAX_CC_BCC_RECIPIENTS} destinatários em CC`,
+      )
       .optional()
       .describe('Destinatários em cópia'),
 
@@ -103,16 +121,22 @@ export const emailSendJobDataSchema = z
         z
           .string()
           .email('Endereços em "bcc" devem ser válidos')
-          .max(254),
+          .max(EMAIL_JOB_VALIDATION.MAX_EMAIL_LENGTH),
       )
-      .max(5, 'Máximo 5 destinatários em BCC')
+      .max(
+        EMAIL_JOB_VALIDATION.MAX_CC_BCC_RECIPIENTS,
+        `Máximo ${EMAIL_JOB_VALIDATION.MAX_CC_BCC_RECIPIENTS} destinatários em BCC`,
+      )
       .optional()
       .describe('Destinatários em cópia oculta'),
 
     subject: z
       .string()
       .min(1, 'Subject não pode ser vazio')
-      .max(150, 'Subject deve ter no máximo 150 caracteres')
+      .max(
+        EMAIL_JOB_VALIDATION.MAX_SUBJECT_LENGTH,
+        `Subject deve ter no máximo ${EMAIL_JOB_VALIDATION.MAX_SUBJECT_LENGTH} caracteres`,
+      )
       .refine((val) => !val.includes('\n'), {
         message: 'Subject não pode conter quebras de linha',
       })
@@ -121,13 +145,16 @@ export const emailSendJobDataSchema = z
     htmlRef: z
       .string()
       .min(1, 'htmlRef não pode ser vazio')
-      .max(512, 'htmlRef deve ter no máximo 512 caracteres')
+      .max(
+        EMAIL_JOB_VALIDATION.MAX_HTML_REF_LENGTH,
+        `htmlRef deve ter no máximo ${EMAIL_JOB_VALIDATION.MAX_HTML_REF_LENGTH} caracteres`,
+      )
       .describe('Referência ao HTML armazenado. Formatos aceitos: UUID (para DB), path S3, ou identificador customizado'),
 
     replyTo: z
       .string()
       .email('replyTo deve ser um email válido')
-      .max(254)
+      .max(EMAIL_JOB_VALIDATION.MAX_EMAIL_LENGTH)
       .optional()
       .describe('Endereço de resposta'),
 
@@ -137,8 +164,16 @@ export const emailSendJobDataSchema = z
       .describe('Headers customizados (safe-listed)'),
 
     tags: z
-      .array(z.string().min(1).max(50))
-      .max(5, 'Máximo 5 tags')
+      .array(
+        z
+          .string()
+          .min(1)
+          .max(EMAIL_JOB_VALIDATION.MAX_TAG_LENGTH),
+      )
+      .max(
+        EMAIL_JOB_VALIDATION.MAX_TAGS,
+        `Máximo ${EMAIL_JOB_VALIDATION.MAX_TAGS} tags`,
+      )
       .optional()
       .describe('Tags para categorização'),
 
@@ -229,7 +264,10 @@ export const emailSendJobResultSchema = z
   .object({
     sesMessageId: z
       .string()
-      .max(128)
+      .max(
+        EMAIL_JOB_VALIDATION.MAX_SES_MESSAGE_ID_LENGTH,
+        `sesMessageId deve ter no máximo ${EMAIL_JOB_VALIDATION.MAX_SES_MESSAGE_ID_LENGTH} caracteres`,
+      )
       .optional()
       .describe('ID da mensagem no SES'),
 
@@ -250,13 +288,19 @@ export const emailSendJobResultSchema = z
 
     errorCode: z
       .string()
-      .max(64)
+      .max(
+        EMAIL_JOB_VALIDATION.MAX_ERROR_CODE_LENGTH,
+        `errorCode deve ter no máximo ${EMAIL_JOB_VALIDATION.MAX_ERROR_CODE_LENGTH} caracteres`,
+      )
       .optional()
       .describe('Código do erro (se falhou)'),
 
     errorReason: z
       .string()
-      .max(500, 'errorReason deve ter no máximo 500 caracteres')
+      .max(
+        EMAIL_JOB_VALIDATION.MAX_ERROR_REASON_LENGTH,
+        `errorReason deve ter no máximo ${EMAIL_JOB_VALIDATION.MAX_ERROR_REASON_LENGTH} caracteres`,
+      )
       .optional()
       .describe('Mensagem de erro (se falhou)'),
 

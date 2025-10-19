@@ -155,7 +155,7 @@ function validateCpfCnpj(value: string): boolean {
  */
 export const emailSchema = z
   .string()
-  .max(LIMITS.MAX_EMAIL_LENGTH, 'Email must not exceed 254 characters')
+  .max(LIMITS.MAX_EMAIL_LENGTH, `Email must not exceed ${LIMITS.MAX_EMAIL_LENGTH} characters`)
   .regex(PATTERNS.email, 'Invalid email format')
   .transform((val) => val.toLowerCase().trim());
 
@@ -164,8 +164,8 @@ export const emailSchema = z
  */
 export const externalIdSchema = z
   .string()
-  .min(LIMITS.MIN_EXTERNAL_ID_LENGTH, 'External ID must have at least 1 character')
-  .max(LIMITS.MAX_EXTERNAL_ID_LENGTH, 'External ID must not exceed 64 characters')
+  .min(LIMITS.MIN_EXTERNAL_ID_LENGTH, `External ID must have at least ${LIMITS.MIN_EXTERNAL_ID_LENGTH} character`)
+  .max(LIMITS.MAX_EXTERNAL_ID_LENGTH, `External ID must not exceed ${LIMITS.MAX_EXTERNAL_ID_LENGTH} characters`)
   .regex(PATTERNS.externalId, 'External ID must contain only alphanumeric, hyphens, and underscores')
   .trim();
 
@@ -175,7 +175,7 @@ export const externalIdSchema = z
 export const tagSchema = z
   .string()
   .min(1, 'Tag must have at least 1 character')
-  .max(LIMITS.MAX_TAG_LENGTH, 'Tag must not exceed 32 characters')
+  .max(LIMITS.MAX_TAG_LENGTH, `Tag must not exceed ${LIMITS.MAX_TAG_LENGTH} characters`)
   .regex(PATTERNS.tag, 'Tag must contain only alphanumeric, hyphens, and underscores')
   .trim();
 
@@ -187,7 +187,7 @@ export const cpfCnpjSchema = z
   .regex(PATTERNS.cpfCnpj, 'CPF/CNPJ must contain only digits')
   .refine(
     (val) => val.length === LIMITS.CPF_LENGTH || val.length === LIMITS.CNPJ_LENGTH,
-    'CPF must have 11 digits or CNPJ must have 14 digits'
+    `CPF must have ${LIMITS.CPF_LENGTH} digits or CNPJ must have ${LIMITS.CNPJ_LENGTH} digits`
   )
   .refine(
     (val) => validateCpfCnpj(val),
@@ -221,8 +221,8 @@ export const recipientSchema = z.object({
    */
   razaoSocial: z
     .string()
-    .min(LIMITS.MIN_RAZAO_SOCIAL_LENGTH, 'Razão social must have at least 1 character')
-    .max(LIMITS.MAX_RAZAO_SOCIAL_LENGTH, 'Razão social must not exceed 150 characters')
+    .min(LIMITS.MIN_RAZAO_SOCIAL_LENGTH, `Razão social must have at least ${LIMITS.MIN_RAZAO_SOCIAL_LENGTH} character`)
+    .max(LIMITS.MAX_RAZAO_SOCIAL_LENGTH, `Razão social must not exceed ${LIMITS.MAX_RAZAO_SOCIAL_LENGTH} characters`)
     .trim()
     .optional(),
 
@@ -231,8 +231,8 @@ export const recipientSchema = z.object({
    */
   nome: z
     .string()
-    .min(LIMITS.MIN_NOME_LENGTH, 'Nome must have at least 1 character')
-    .max(LIMITS.MAX_NOME_LENGTH, 'Nome must not exceed 120 characters')
+    .min(LIMITS.MIN_NOME_LENGTH, `Nome must have at least ${LIMITS.MIN_NOME_LENGTH} character`)
+    .max(LIMITS.MAX_NOME_LENGTH, `Nome must not exceed ${LIMITS.MAX_NOME_LENGTH} characters`)
     .trim()
     .optional(),
 
@@ -258,11 +258,11 @@ export const customHeadersSchema = z
   .record(
     z
       .string()
-      .max(LIMITS.MAX_HEADER_KEY_LENGTH, 'Header key must not exceed 64 characters')
+      .max(LIMITS.MAX_HEADER_KEY_LENGTH, `Header key must not exceed ${LIMITS.MAX_HEADER_KEY_LENGTH} characters`)
       .regex(PATTERNS.customHeader, 'Header must be X-Custom-* or X-Priority'),
     z
       .string()
-      .max(LIMITS.MAX_HEADER_VALUE_LENGTH, 'Header value must not exceed 256 characters')
+      .max(LIMITS.MAX_HEADER_VALUE_LENGTH, `Header value must not exceed ${LIMITS.MAX_HEADER_VALUE_LENGTH} characters`)
   )
   .refine(
     (headers) => Object.keys(headers).length <= LIMITS.MAX_HEADERS_COUNT,
@@ -308,8 +308,8 @@ export const emailSendBodySchema = z.object({
    */
   subject: z
     .string()
-    .min(LIMITS.MIN_SUBJECT_LENGTH, 'Subject must have at least 1 character')
-    .max(LIMITS.MAX_SUBJECT_LENGTH, 'Subject must not exceed 150 characters')
+    .min(LIMITS.MIN_SUBJECT_LENGTH, `Subject must have at least ${LIMITS.MIN_SUBJECT_LENGTH} character`)
+    .max(LIMITS.MAX_SUBJECT_LENGTH, `Subject must not exceed ${LIMITS.MAX_SUBJECT_LENGTH} characters`)
     .refine(
       (val) => !/[\n\r]/.test(val),
       'Subject must not contain line breaks'
@@ -411,7 +411,7 @@ export const emailSendHeadersSchema = z.object({
    */
   'idempotency-key': z
     .string()
-    .max(LIMITS.MAX_IDEMPOTENCY_KEY_LENGTH, 'Idempotency-Key must not exceed 128 characters')
+    .max(LIMITS.MAX_IDEMPOTENCY_KEY_LENGTH, `Idempotency-Key must not exceed ${LIMITS.MAX_IDEMPOTENCY_KEY_LENGTH} characters`)
     .regex(PATTERNS.idempotencyKey, 'Idempotency-Key must contain only alphanumeric, hyphens, and underscores')
     .optional(),
 
@@ -420,7 +420,7 @@ export const emailSendHeadersSchema = z.object({
    */
   'x-request-id': z
     .string()
-    .max(128, 'X-Request-Id must not exceed 128 characters')
+    .max(LIMITS.MAX_IDEMPOTENCY_KEY_LENGTH, `X-Request-Id must not exceed ${LIMITS.MAX_IDEMPOTENCY_KEY_LENGTH} characters`)
     .optional(),
 }).passthrough(); // Permite outros headers
 

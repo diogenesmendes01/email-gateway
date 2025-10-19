@@ -93,6 +93,21 @@ graph TB
     WORKER3 -->|Update Status| PRISMA
     SVC -.->|Store Files| STORAGE
     WORKER1 -.->|Fetch Files| STORAGE
+
+    %% Estilos coloridos por camada (TASK-01)
+    classDef frontendStyle fill:#e1f5ff,stroke:#0288d1,stroke-width:2px,color:#01579b
+    classDef apiStyle fill:#fff3e0,stroke:#f57c00,stroke-width:2px,color:#e65100
+    classDef queueStyle fill:#f3e5f5,stroke:#8e24aa,stroke-width:2px,color:#4a148c
+    classDef workerStyle fill:#e8f5e9,stroke:#43a047,stroke-width:2px,color:#1b5e20
+    classDef dataStyle fill:#fff9c4,stroke:#fbc02d,stroke-width:2px,color:#f57f17
+    classDef externalStyle fill:#ffebee,stroke:#e53935,stroke-width:2px,color:#b71c1c
+
+    class WEB frontendStyle
+    class API,AUTH,CTRL,SVC apiStyle
+    class REDIS,BULL queueStyle
+    class WORKER1,WORKER2,WORKER3 workerStyle
+    class PG,PRISMA dataStyle
+    class SMTP,STORAGE externalStyle
 ```
 
 ### Padrão Arquitetural
