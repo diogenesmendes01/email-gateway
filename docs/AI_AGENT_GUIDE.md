@@ -4,9 +4,29 @@
 
 Este documento garante que agentes de IA (como Claude, GitHub Copilot, ChatGPT) sigam as regras do projeto ao criar commits, branches e Pull Requests.
 
+---
+
+## ⚡ LEIA ISTO PRIMEIRO
+
+**Se você está implementando uma nova feature ou task:**
+
+### 🚀 Comece por aqui:
+1. **PRIMEIRO:** Leia [../NEW-FEATURES.md](../NEW-FEATURES.md) - Guia rápido de início
+2. Use a decision tree para identificar seu tipo de tarefa (API, Worker, Bug Fix, etc.)
+3. Siga apenas os documentos essenciais listados para seu tipo de tarefa
+4. Use os quick patterns e checklists fornecidos
+
+**Economia de tempo:** 70% menos documentos para ler, contexto focado.
+
+---
+
 ## 📚 Documentos Obrigatórios - LEIA ANTES DE TUDO
 
 Você **DEVE** ler e seguir **TODOS** esses documentos antes de qualquer ação:
+
+### 0️⃣ **Guia de Início Rápido (COMECE AQUI)** ⚡
+
+- [../NEW-FEATURES.md](../NEW-FEATURES.md) - **LEIA PRIMEIRO** - Decision tree, quick patterns, troubleshooting
 
 ### 1️⃣ Configuração Básica
 
@@ -14,13 +34,18 @@ Você **DEVE** ler e seguir **TODOS** esses documentos antes de qualquer ação:
 - [README.md](../README.md) - Visão geral do projeto
 - [.clauderc](../.clauderc) - Configurações específicas para Claude
 
-### 2️⃣ Regras de PR e Review
+### 2️⃣ **Padrões de Código e Testes (CRÍTICO)** ⚠️
+
+- [CODE-QUALITY-STANDARDS.md](CODE-QUALITY-STANDARDS.md) - **OBRIGATÓRIO** - Exception handling, logging, configuration
+- [testing/TESTING-STANDARDS.md](testing/TESTING-STANDARDS.md) - **OBRIGATÓRIO** - Cobertura mínima 70%, padrões de testes
+
+### 3️⃣ Regras de PR e Review
 
 - [.github/pull_request_template.md](../.github/pull_request_template.md) - Template obrigatório de PR
 - [PR_REVIEW_RULES.md](PR_REVIEW_RULES.md) - Como revisar PRs (severidades, eixos)
 - [PR_ADJUSTMENTS.md](PR_ADJUSTMENTS.md) - Como tratar comentários de review
 
-### 3️⃣ Templates e Automações
+### 4️⃣ Templates e Automações
 
 - [task/TEMPLATE-PR-TASK.md](../task/TEMPLATE-PR-TASK.md) - Template para registrar tarefas fora de escopo
 - [.github/workflows/semantic-pr.yml](../.github/workflows/semantic-pr.yml) - Validação de título de PR
@@ -325,11 +350,43 @@ Quando algo surgir que **não** faz parte do escopo atual:
    - **Nível (1–5):** <número>
    ```
 
+## 🚀 Fluxo de Trabalho Otimizado
+
+### Para Implementar Nova Feature/Task:
+
+```
+1. ⚡ Ler NEW-FEATURES.md (30 segundos)
+   └─ Identificar tipo de tarefa via decision tree
+
+2. 📚 Ler apenas documentos essenciais (20 minutos)
+   └─ NEW-FEATURES.md lista 2-4 docs específicos
+   └─ Ignorar resto da documentação
+
+3. 💻 Copiar quick pattern relevante (10 segundos)
+   └─ Adaptar para sua tarefa específica
+
+4. ✅ Implementar seguindo checklist (variável)
+   └─ Validar cada item do checklist
+
+5. 🧪 Rodar testes e validações
+   └─ npm run test:cov (cobertura >= 70%)
+   └─ npm run lint
+   └─ npm run build
+
+6. 📝 Criar PR seguindo template
+   └─ Usar checklist de qualidade
+
+Total: ~70% menos tempo de leitura!
+```
+
+---
+
 ## 🤖 Checklist Final para Agentes de IA
 
 Antes de **qualquer** ação de commit/push/PR, verifique:
 
-- [ ] Li todos os documentos obrigatórios
+- [ ] **Li NEW-FEATURES.md e identifiquei meu tipo de tarefa**
+- [ ] Li todos os documentos essenciais para meu tipo de tarefa
 - [ ] Entendi o escopo da tarefa
 - [ ] Branch usa nomenclatura correta
 - [ ] Commits seguem Conventional Commits
@@ -338,6 +395,20 @@ Antes de **qualquer** ação de commit/push/PR, verifique:
 - [ ] Template de PR será preenchido completamente
 - [ ] Itens fora de escopo estão registrados em `/task`
 - [ ] Não há scope creep (adicionar coisas extras)
+
+### ⚠️ Checklist de Qualidade de Código (CRÍTICO)
+
+- [ ] **Testes implementados:**
+  - [ ] Testes unitários para serviços/utilitários
+  - [ ] Testes de integração para APIs/workers
+  - [ ] Cobertura >= 70% (verificar com `npm run test:cov`)
+- [ ] **Padrões de código seguidos:**
+  - [ ] Exception handling com filtro global (ver `CODE-QUALITY-STANDARDS.md`)
+  - [ ] Logging estruturado em JSON (sem PII)
+  - [ ] Request ID propagado em toda a cadeia
+  - [ ] Environment variables validadas
+  - [ ] TypeScript strict mode (sem `any`)
+  - [ ] Queries otimizadas com índices corretos
 
 ## 📖 Referências
 

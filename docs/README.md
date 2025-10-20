@@ -20,11 +20,18 @@ docs/
 
 ## Documentos Principais
 
-### Arquitetura
+### 📐 Arquitetura
 
 - [Visão Geral do Sistema](./architecture/01-visao-geral-sistema.md) - Arquitetura completa e componentes principais
+- [Pacote de Documentos de Arquitetura MVP](./00-pacote-documentos-arquitetura-mvp.md) - Documento principal de referência
 
-### ADRs (Architecture Decision Records)
+### 📘 Padrões e Qualidade de Código
+
+- [Code Quality Standards](./CODE-QUALITY-STANDARDS.md) - **OBRIGATÓRIO** - Padrões de qualidade, exception handling, logging, configuration
+- [Testing Standards](./testing/TESTING-STANDARDS.md) - **OBRIGATÓRIO** - Padrões de testes unitários, integração e E2E
+- [AI Agent Guide](./AI_AGENT_GUIDE.md) - Guia completo para agentes de IA contribuírem no projeto
+
+### 🏗️ ADRs (Architecture Decision Records)
 
 - [ADR-20250116: Escolha do Redis Queue](./adrs/ADR-20250116-escolha-redis-queue.md) - Decisão sobre sistema de filas
 
