@@ -7,12 +7,15 @@
  * TASK 4.2 — Concorrência, fairness e desligamento gracioso
  */
 
-import { Worker, Job } from 'bullmq';
+import { Worker, Job, Queue } from 'bullmq';
 import { PrismaClient } from '@email-gateway/database';
 import { EMAIL_JOB_CONFIG, EmailSendJobData } from '@email-gateway/shared';
+import Redis from 'ioredis';
 
 import { EmailSendProcessor } from './processors/email-send.processor';
 import { SESService } from './services/ses.service';
+import { MetricsService } from './services/metrics.service';
+import { TracingService } from './services/tracing.service';
 import { loadWorkerConfig } from './config/worker.config';
 import { loadSESConfig, validateSESConfig } from './config/ses.config';
 
@@ -23,10 +26,34 @@ class EmailWorker {
   private worker?: Worker;
   private prisma: PrismaClient;
   private processor: EmailSendProcessor;
+  private metricsService: MetricsService;
+  private tracingService: TracingService;
+  private redis: Redis;
+  private queue: Queue;
   private isShuttingDown = false;
 
   constructor() {
     this.prisma = new PrismaClient();
+
+    // Carrega configurações
+    const config = loadWorkerConfig();
+
+    // Inicializa Redis para métricas
+    this.redis = new Redis({
+      host: config.redis.host,
+      port: config.redis.port,
+      password: config.redis.password,
+      db: config.redis.db,
+    });
+
+    // Inicializa Queue para métricas
+    this.queue = new Queue(EMAIL_JOB_CONFIG.QUEUE_NAME, {
+      connection: this.redis,
+    });
+
+    // Inicializa serviços de métricas e tracing
+    this.metricsService = new MetricsService(this.redis, this.queue);
+    this.tracingService = new TracingService('email-worker');
 
     // Carrega e valida configuração do SES
     const sesConfig = loadSESConfig();
@@ -35,7 +62,12 @@ class EmailWorker {
     const sesService = new SESService(sesConfig);
 
     // Inicializa o processador
-    this.processor = new EmailSendProcessor(this.prisma, sesService);
+    this.processor = new EmailSendProcessor(
+      this.prisma,
+      sesService,
+      this.metricsService,
+      this.tracingService
+    );
   }
 
   /**
@@ -126,9 +158,49 @@ class EmailWorker {
     // Setup graceful shutdown
     this.setupGracefulShutdown();
 
+    // Setup metrics alert monitoring (check every 5 minutes)
+    this.setupMetricsAlertMonitoring();
+
     console.log(
       `[EmailWorker] Worker started successfully with concurrency=${config.concurrency}`,
     );
+    console.log('[EmailWorker] Metrics and tracing enabled (TASK 7.1)');
+  }
+
+  /**
+   * Setup periodic metrics alert monitoring (TASK 7.1)
+   * Checks for alert conditions every 5 minutes:
+   * - DLQ depth > 100
+   * - Queue age P95 > 120s
+   */
+  private setupMetricsAlertMonitoring() {
+    const checkInterval = 5 * 60 * 1000; // 5 minutes
+
+    const checkAlerts = async () => {
+      if (this.isShuttingDown) return;
+
+      try {
+        const alertResult = await this.metricsService.checkAlerts();
+
+        if (alertResult.dlqAlert || alertResult.queueAgeAlert) {
+          console.error(`[EmailWorker] ALERT: ${alertResult.message}`);
+
+          // Get full metrics summary for context
+          const metrics = await this.metricsService.getMetricsSummary();
+          console.error('[EmailWorker] Current metrics:', metrics);
+        }
+      } catch (error) {
+        console.error('[EmailWorker] Error checking alerts:', error);
+      }
+    };
+
+    // Initial check after 1 minute
+    setTimeout(checkAlerts, 60 * 1000);
+
+    // Then check every 5 minutes
+    setInterval(checkAlerts, checkInterval);
+
+    console.log('[EmailWorker] Alert monitoring enabled (checking every 5 minutes)');
   }
 
   /**

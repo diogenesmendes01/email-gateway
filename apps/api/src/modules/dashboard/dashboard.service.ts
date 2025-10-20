@@ -11,6 +11,7 @@
 import { Injectable } from '@nestjs/common';
 import { prisma } from '@email-gateway/database';
 import { AuthService } from '../auth/auth.service';
+import Redis from 'ioredis';
 
 interface DashboardOverview {
   kpis: {
@@ -63,7 +64,17 @@ interface CompanyApiKeyStatus {
 
 @Injectable()
 export class DashboardService {
-  constructor(private authService: AuthService) {}
+  private redis: Redis;
+
+  constructor(private authService: AuthService) {
+    // Initialize Redis connection for metrics
+    this.redis = new Redis({
+      host: process.env.REDIS_HOST || 'localhost',
+      port: parseInt(process.env.REDIS_PORT || '6379', 10),
+      password: process.env.REDIS_PASSWORD,
+      db: parseInt(process.env.REDIS_DB || '0', 10),
+    });
+  }
 
   /**
    * Get dashboard overview with KPIs
@@ -440,5 +451,127 @@ export class DashboardService {
     });
 
     return violations;
+  }
+
+  /**
+   * Get real-time metrics from worker (TASK 7.1)
+   * Returns metrics collected by MetricsService in worker
+   */
+  async getMetrics(): Promise<{
+    queue_depth: number;
+    queue_age_p95: number;
+    send_latency_p50: number;
+    send_latency_p95: number;
+    send_latency_p99: number;
+    error_rate: number;
+    dlq_depth: number;
+    tenant_fairness_ratio: number;
+    error_breakdown: Record<string, number>;
+  }> {
+    const METRICS_PREFIX = 'metrics';
+    const QUEUE_AGE_KEY = `${METRICS_PREFIX}:queue_age`;
+    const SEND_LATENCY_KEY = `${METRICS_PREFIX}:send_latency`;
+    const ERROR_COUNT_KEY = `${METRICS_PREFIX}:error_count`;
+    const SUCCESS_COUNT_KEY = `${METRICS_PREFIX}:success_count`;
+    const TENANT_JOBS_KEY = `${METRICS_PREFIX}:tenant_jobs`;
+    const METRICS_WINDOW = 300; // 5 minutes in seconds
+
+    const now = Date.now();
+    const cutoff = now - (METRICS_WINDOW * 1000);
+
+    // Get queue age P95
+    const queueAgeEntries = await this.redis.zrangebyscore(
+      QUEUE_AGE_KEY,
+      cutoff,
+      '+inf'
+    );
+    const queueAges = queueAgeEntries
+      .map(entry => JSON.parse(entry).age)
+      .sort((a, b) => a - b);
+    const queueAgeP95 = queueAges.length > 0
+      ? queueAges[Math.ceil(queueAges.length * 0.95) - 1] || 0
+      : 0;
+
+    // Get send latency percentiles
+    const latencyEntries = await this.redis.zrangebyscore(
+      SEND_LATENCY_KEY,
+      cutoff,
+      '+inf'
+    );
+    const latencies = latencyEntries
+      .map(entry => JSON.parse(entry).latency)
+      .sort((a, b) => a - b);
+
+    const sendLatencyP50 = latencies.length > 0
+      ? latencies[Math.ceil(latencies.length * 0.50) - 1] || 0
+      : 0;
+    const sendLatencyP95 = latencies.length > 0
+      ? latencies[Math.ceil(latencies.length * 0.95) - 1] || 0
+      : 0;
+    const sendLatencyP99 = latencies.length > 0
+      ? latencies[Math.ceil(latencies.length * 0.99) - 1] || 0
+      : 0;
+
+    // Get error rate
+    const getRecentWindows = (count: number): string[] => {
+      const windows: string[] = [];
+      for (let i = 0; i < count; i++) {
+        const windowStart = Math.floor(now / (METRICS_WINDOW * 1000)) * METRICS_WINDOW;
+        const offset = windowStart - (i * METRICS_WINDOW);
+        windows.push(offset.toString());
+      }
+      return windows;
+    };
+
+    const windows = getRecentWindows(3);
+    let totalErrors = 0;
+    let totalSuccess = 0;
+    const errorBreakdown: Record<string, number> = {};
+
+    for (const window of windows) {
+      const errors = await this.redis.hvals(`${ERROR_COUNT_KEY}:${window}`);
+      const successes = await this.redis.hvals(`${SUCCESS_COUNT_KEY}:${window}`);
+      const errorsByCode = await this.redis.hgetall(`${ERROR_COUNT_KEY}:${window}:by_code`);
+
+      totalErrors += errors.reduce((sum, val) => sum + parseInt(val, 10), 0);
+      totalSuccess += successes.reduce((sum, val) => sum + parseInt(val, 10), 0);
+
+      for (const [errorCode, count] of Object.entries(errorsByCode)) {
+        errorBreakdown[errorCode] = (errorBreakdown[errorCode] || 0) + parseInt(count, 10);
+      }
+    }
+
+    const total = totalErrors + totalSuccess;
+    const errorRate = total === 0 ? 0 : (totalErrors / total) * 100;
+
+    // Get tenant fairness ratio
+    const tenantCounts = new Map<string, number>();
+    for (const window of windows) {
+      const jobs = await this.redis.hgetall(`${TENANT_JOBS_KEY}:${window}`);
+      for (const [companyId, count] of Object.entries(jobs)) {
+        const current = tenantCounts.get(companyId) || 0;
+        tenantCounts.set(companyId, current + parseInt(count, 10));
+      }
+    }
+
+    const counts = Array.from(tenantCounts.values());
+    const tenantFairnessRatio = counts.length > 0
+      ? Math.max(...counts) / Math.min(...counts.filter(c => c > 0))
+      : 1.0;
+
+    // Get queue depth and DLQ depth from queue status
+    const queueStatus = await this.getQueueStatus();
+
+    return {
+      queue_depth: queueStatus.pending + queueStatus.processing,
+      queue_age_p95: Math.round(queueAgeP95),
+      send_latency_p50: Math.round(sendLatencyP50),
+      send_latency_p95: Math.round(sendLatencyP95),
+      send_latency_p99: Math.round(sendLatencyP99),
+      error_rate: Math.round(errorRate * 100) / 100,
+      dlq_depth: queueStatus.dlq,
+      tenant_fairness_ratio: Math.round((tenantFairnessRatio || 1.0) * 100) / 100,
+      error_breakdown: errorBreakdown,
+    };
   }
 }

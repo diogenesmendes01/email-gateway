@@ -35,6 +35,8 @@ import { ValidationService } from '../services/validation.service';
 import { LoggingService } from '../services/logging.service';
 import { SESService } from '../services/ses.service';
 import { ErrorMappingService } from '../services/error-mapping.service';
+import { MetricsService } from '../services/metrics.service';
+import { TracingService, TraceContext } from '../services/tracing.service';
 
 /**
  * Processador do job email:send
@@ -45,14 +47,20 @@ export class EmailSendProcessor {
   private validationService: ValidationService;
   private loggingService: LoggingService;
   private sesService: SESService;
+  private metricsService: MetricsService;
+  private tracingService: TracingService;
 
   constructor(
     private readonly prisma: PrismaClient,
     sesService: SESService,
+    metricsService: MetricsService,
+    tracingService: TracingService,
   ) {
     this.validationService = new ValidationService(prisma);
     this.loggingService = new LoggingService(prisma);
     this.sesService = sesService;
+    this.metricsService = metricsService;
+    this.tracingService = tracingService;
   }
 
   /**
@@ -66,6 +74,24 @@ export class EmailSendProcessor {
   async process(job: Job<EmailSendJobData>) {
     const startTime = Date.now();
     const jobData = job.data;
+
+    // Extract or create trace context
+    let traceContext: TraceContext = this.tracingService.extractContextFromJob(jobData) ||
+      this.tracingService.createTrace(jobData.companyId);
+
+    // Record queue age metric (time from enqueue to processing start)
+    const enqueuedAt = job.timestamp || startTime;
+    await this.metricsService.recordQueueAge(enqueuedAt);
+
+    // Record tenant job allocation
+    await this.metricsService.recordTenantJob(jobData.companyId);
+
+    // Log job start with trace context
+    this.tracingService.logStart(traceContext, 'email-send-job', {
+      jobId: job.id,
+      outboxId: jobData.outboxId,
+      attempt: jobData.attempt,
+    });
 
     // Inicializa contexto do pipeline
     const context: PipelineContext = {
@@ -125,6 +151,16 @@ export class EmailSendProcessor {
           durationMs,
         );
 
+        // Record success metrics
+        await this.metricsService.recordSuccess(jobData.companyId);
+        await this.metricsService.recordSendLatency(durationMs, jobData.companyId);
+
+        // Log success with trace
+        this.tracingService.logComplete(traceContext, 'email-send-job', startTime, {
+          sesMessageId: sendResult.messageId,
+          status: 'success',
+        });
+
         return {
           success: true,
           sesMessageId: sendResult.messageId,
@@ -134,17 +170,49 @@ export class EmailSendProcessor {
         // ===================================================
         // ESTADO 4b: FAILED ou RETRY_SCHEDULED
         // ===================================================
-        return await this.handleFailure(
+        const result = await this.handleFailure(
           context,
           jobData,
           sendResult.error!,
           durationMs,
         );
+
+        // Record error metrics
+        await this.metricsService.recordError(jobData.companyId, sendResult.error!.code);
+
+        // Log error with trace
+        this.tracingService.logError(
+          traceContext,
+          'email-send-job',
+          new Error(sendResult.error!.message),
+          startTime,
+          {
+            errorCode: sendResult.error!.code,
+            retryable: sendResult.error!.retryable,
+          }
+        );
+
+        return result;
       }
     } catch (error) {
       // Erro inesperado no pipeline
       const durationMs = Date.now() - startTime;
       const mappedError = ErrorMappingService.mapGenericError(error);
+
+      // Record error metrics
+      await this.metricsService.recordError(jobData.companyId, mappedError.code);
+
+      // Log error with trace
+      this.tracingService.logError(
+        traceContext,
+        'email-send-job',
+        error as Error,
+        startTime,
+        {
+          errorCode: mappedError.code,
+          errorCategory: mappedError.category,
+        }
+      );
 
       return await this.handleFailure(context, jobData, mappedError, durationMs);
     }

@@ -43,6 +43,20 @@ enum EventType {
   VALIDATION_FAILED // Pipeline: Falha na validação
 }
 
+enum DomainVerificationStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  TEMPORARY_FAILURE
+}
+
+enum DKIMVerificationStatus {
+  NOT_STARTED
+  PENDING
+  SUCCESS
+  FAILED
+}
+
 // ============================================
 // MODELS
 // ============================================
@@ -68,6 +82,7 @@ model Company {
   emailLogs    EmailLog[]
   idempotencyKeys IdempotencyKey[]
   auditLogs   AuditLog[]
+  domains     Domain[]
 
   @@map("companies")
 }
@@ -212,4 +227,26 @@ model AuditLog {
   @@index([action, createdAt])
   @@index([resource, resourceId])
   @@map("audit_logs")
+}
+
+model Domain {
+  id               String                   @id @default(cuid())
+  companyId        String                   @map("company_id")
+  name             String                   @unique @db.VarChar(255)
+  status           DomainVerificationStatus @default(PENDING)
+  verificationToken String?                 @map("verification_token") @db.VarChar(255)
+  dkimEnabled      Boolean                  @default(false) @map("dkim_enabled")
+  dkimTokens       String[]                 @map("dkim_tokens") @default([])
+  dkimStatus       DKIMVerificationStatus   @default(NOT_STARTED) @map("dkim_status")
+  lastChecked      DateTime?                @map("last_checked")
+  createdAt        DateTime                 @default(now()) @map("created_at")
+  updatedAt        DateTime                 @updatedAt @map("updated_at")
+
+  // Relations
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([status])
+  @@index([lastChecked])
+  @@map("domains")
 }
