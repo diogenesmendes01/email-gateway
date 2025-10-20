@@ -44,9 +44,32 @@
       "^.+\\.(t|j)s$": "ts-jest"
     },
     "collectCoverageFrom": [
-      "**/*.(t|j)s"
+      "services/**/*.ts",
+      "!services/**/__tests__/**"
     ],
     "coverageDirectory": "../coverage",
+    "coverageReporters": [
+      "text",
+      "lcov"
+    ],
+    "coveragePathIgnorePatterns": [
+      "<rootDir>/../dist/",
+      "<rootDir>/index.ts",
+      "<rootDir>/config/",
+      "<rootDir>/processors/",
+      "<rootDir>/services/logging.service.ts",
+      "<rootDir>/services/tracing.service.ts",
+      "<rootDir>/services/audit.service.ts",
+      "<rootDir>/services/domain-management.service.ts"
+    ],
+    "coverageThreshold": {
+      "global": {
+        "branches": 70,
+        "functions": 70,
+        "lines": 70,
+        "statements": 70
+      }
+    },
     "testEnvironment": "node"
   }
 }
