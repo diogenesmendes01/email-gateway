@@ -1,0 +1,91 @@
+{
+  "project": {
+    "name": "email-gateway",
+    "description": "Gateway de envio de emails com fila, retry e observabilidade",
+    "language": "typescript",
+    "framework": "node.js"
+  },
+  "rules": {
+    "readBeforeCommit": [
+      "CONTRIBUTING.md",
+      "docs/AI_AGENT_GUIDE.md"
+    ],
+    "readBeforePR": [
+      ".github/pull_request_template.md",
+      "docs/PR_REVIEW_RULES.md",
+      "docs/PR_ADJUSTMENTS.md"
+    ],
+    "neverCommit": [
+      ".env",
+      ".env.local",
+      ".env.*.local",
+      "credentials.*",
+      "secrets.*",
+      "*.key",
+      "*.pem"
+    ]
+  },
+  "conventions": {
+    "branchPrefixes": [
+      "feature/",
+      "fix/",
+      "hotfix/",
+      "refactor/",
+      "chore/",
+      "docs/",
+      "release/"
+    ],
+    "commitTypes": [
+      "feat",
+      "fix",
+      "chore",
+      "docs",
+      "style",
+      "refactor",
+      "perf",
+      "test",
+      "build",
+      "ci"
+    ],
+    "commitFooter": "🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>"
+  },
+  "workflows": {
+    "beforeCommit": "Execute /pre-commit-check",
+    "beforePR": "Execute /pre-pr-check"
+  },
+  "commands": {
+    "rules": "Mostra regras do projeto",
+    "pre-commit-check": "Checklist antes de commitar",
+    "pre-pr-check": "Checklist antes de abrir PR"
+  },
+  "hooks": {
+    "tool-use-submit-hook": {
+      "enabled": true,
+      "auto-approve": {
+        "Read": true,
+        "Glob": true,
+        "Grep": true,
+        "Bash(gh pr view *)": true,
+        "Bash(gh pr diff *)": true,
+        "Bash(gh pr list *)": true,
+        "Bash(gh pr review *)": true,
+        "Bash(gh api *)": true,
+        "Bash(npm run test:cov)": true,
+        "Bash(npm run test)": true,
+        "Bash(npm run build)": true,
+        "Bash(npm run lint)": true,
+        "Bash(git status)": true,
+        "Bash(git diff *)": true,
+        "Bash(git log *)": true,
+        "Bash(cat *)": true,
+        "Bash(ls *)": true,
+        "Bash(prisma migrate status)": true,
+        "Bash(prisma migrate diff)": true,
+        "Bash(grep *)": true,
+        "Bash(find *)": true,
+        "Bash(head *)": true,
+        "Bash(tail *)": true
+      }
+    }
+  }
+}
