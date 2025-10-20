@@ -16,6 +16,7 @@ import {
   InternalServerErrorException,
   Logger,
 } from '@nestjs/common';
+import { QueueService } from '../../queue/queue.service';
 import { prisma } from '@email-gateway/database';
 import {
   EmailSendBody,
@@ -38,6 +39,7 @@ interface SendEmailParams {
 @Injectable()
 export class EmailSendService {
   private readonly logger = new Logger(EmailSendService.name);
+  constructor(private readonly queueService: QueueService) {}
   /**
    * Send email asynchronously
    */
@@ -93,19 +95,57 @@ export class EmailSendService {
       });
     }
 
-    // TODO: Implementar integração com queue (BullMQ)
-    // Por enquanto, marca como ENQUEUED sem processar
-    // Em uma implementação completa, aqui seria feita a integração com BullMQ
-    // await this.queueService.enqueueEmailJob(jobId, outbox);
     
-    this.logger.log({
-      message: 'Email enqueued for processing',
-      jobId,
-      outboxId,
-      companyId,
-      requestId,
-      status: EmailStatus.ENQUEUED,
-    });
+    // Enfileira job no BullMQ
+    try {
+      const jobData = {
+        outboxId,
+        companyId,
+        requestId: requestId || this.generateRequestId(),
+        to: body.to,
+        cc: body.cc || [],
+        bcc: body.bcc || [],
+        subject: body.subject,
+        htmlRef: outboxId, // simples referência; pode ser ajustada para S3/DB
+        replyTo: body.replyTo,
+        headers: body.headers,
+        tags: body.tags || [],
+        recipient: {
+          recipientId: recipientId,
+          externalId: body.recipient?.externalId,
+          cpfCnpjHash: body.recipient?.cpfCnpj ? this.hashCpfCnpj(body.recipient.cpfCnpj) : undefined,
+          razaoSocial: body.recipient?.razaoSocial,
+          nome: body.recipient?.nome,
+          email: body.recipient?.email || body.to,
+        },
+        attempt: 1,
+        enqueuedAt: new Date().toISOString(),
+      } as any;
+
+      const enqueuedJobId = await this.queueService.enqueueEmailJob(jobData);
+
+      // Atualiza outbox com jobId e status ENQUEUED
+      await prisma.emailOutbox.update({
+        where: { id: outboxId },
+        data: {
+          jobId: enqueuedJobId,
+          status: EmailStatus.ENQUEUED,
+          enqueuedAt: new Date(),
+        },
+      });
+
+      console.log(`✅ Email enqueued: outboxId=${outboxId}, jobId=${enqueuedJobId}`);
+    } catch (error) {
+      // Rollback outbox em caso de falha ao enfileirar
+      await prisma.emailOutbox.delete({ where: { id: outboxId } });
+      throw new InternalServerErrorException({
+        error: {
+          code: 'QUEUE_UNAVAILABLE',
+          message: 'Unable to enqueue email for processing',
+          requestId,
+        },
+      });
+    }
 
     // Create response
     const response: EmailSendResponse = {

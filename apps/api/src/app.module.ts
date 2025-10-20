@@ -4,6 +4,7 @@ import { ThrottlerModule } from '@nestjs/throttler';
 
 // Modules
 import { HealthModule } from './modules/health/health.module';
+import { QueueModule } from './modules/queue/queue.module';
 import { EmailModule } from './modules/email/email.module';
 import { RecipientModule } from './modules/recipient/recipient.module';
 import { AuthModule } from './modules/auth/auth.module';
@@ -29,6 +30,7 @@ import { DomainModule } from './modules/domain/domain.module';
     // Feature modules
     HealthModule,
     AuthModule,
+    QueueModule,
     EmailModule,
     RecipientModule,
     DashboardModule,
