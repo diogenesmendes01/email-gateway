@@ -1,21 +1,21 @@
 # Map labels to file path globs. Applied automatically on PRs.
 frontend:
-  - frontend/**
-  - apps/web/**
+  - frontend/
+  - apps/web/
 backend:
-  - backend/**
-  - services/**
+  - backend/
+  - services/
 infrastructure:
-  - infra/**
-  - deploy/**
-  - docker/**
-  - '**/Dockerfile'
+  - infra/
+  - deploy/
+  - docker/
+  - Dockerfile
 documentation:
-  - docs/**
-  - '**/*.md'
+  - docs/
+  - "*.md"
 bug:
-  - fix/**
+  - fix/
 feature:
-  - feature/**
+  - feature/
 refactor:
-  - refactor/**
+  - refactor/
