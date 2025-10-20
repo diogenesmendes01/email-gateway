@@ -40,6 +40,7 @@ No contexto deste sistema, os seguintes campos são classificados como **PII sen
 **Estratégias de proteção:**
 
 #### Armazenamento
+
 ```typescript
 // NÃO armazenar CPF/CNPJ em plaintext!
 // ❌ ERRADO:
@@ -61,6 +62,7 @@ await prisma.recipient.create({
 ```
 
 #### Logs
+
 ```typescript
 // ❌ ERRADO:
 logger.info('Processing recipient', { cpfCnpj: '12345678901' });
@@ -76,6 +78,7 @@ logger.info('Processing recipient', {
 #### Funções utilitárias
 
 **`packages/shared/src/schemas/email-send.schema.ts`:**
+
 ```typescript
 /**
  * Mascara CPF (XXX.XXX.XXX-XX)
@@ -120,6 +123,7 @@ export async function hashCpfCnpj(cpfCnpj: string): Promise<string> {
 **Estratégias de proteção:**
 
 #### Logs
+
 ```typescript
 // ❌ ERRADO:
 logger.info('Sending email', { to: 'cliente@example.com' });
@@ -142,6 +146,7 @@ logger.info('Sending email', {
 ```
 
 #### API Response
+
 ```json
 {
   "id": "550e8400-e29b-41d4-a716-446655440000",
@@ -152,6 +157,7 @@ logger.info('Sending email', {
 ```
 
 **Implementação:**
+
 ```typescript
 // apps/api/src/modules/email/email.service.ts
 function sanitizeEmailForResponse(email: EmailOutbox) {
@@ -193,6 +199,7 @@ function sanitizeHtml(html: string): string {
 ```
 
 **Logs:**
+
 ```typescript
 // ❌ ERRADO: Logar HTML completo
 logger.info('Sending email', { html });
@@ -223,6 +230,7 @@ logger.info('Sending email', {
 ### Implementação de TTL
 
 #### 1. Redis Queue Jobs
+
 ```typescript
 // packages/shared/src/schemas/email-job.types.ts
 export const EMAIL_JOB_CONFIG = {
@@ -239,6 +247,7 @@ await emailQueue.add('email:send', data, {
 ```
 
 #### 2. Redis DLQ
+
 ```typescript
 // Dead Letter Queue com TTL de 7 dias
 export const EMAIL_JOB_RETRY_CONFIG = {
@@ -255,6 +264,7 @@ await redis.zadd(
 ```
 
 #### 3. PostgreSQL - Cleanup automático
+
 ```sql
 -- Criar função de cleanup
 CREATE OR REPLACE FUNCTION cleanup_old_email_outbox()
@@ -280,6 +290,7 @@ SELECT cron.schedule('cleanup-emails', '0 3 * * *', 'SELECT cleanup_old_email_ou
 ```
 
 **Alternativa com CronJob do Kubernetes:**
+
 ```yaml
 apiVersion: batch/v1
 kind: CronJob
@@ -325,9 +336,11 @@ spec:
 O sistema deve suportar os seguintes direitos do titular de dados:
 
 #### 1. Direito de Acesso (Art. 18, II)
+
 **Requisição:** "Quais emails foram enviados para meu endereço?"
 
 **Implementação:**
+
 ```typescript
 // GET /v1/emails/by-recipient
 async getEmailsByRecipient(cpfCnpj: string): Promise<Email[]> {
@@ -354,9 +367,11 @@ async getEmailsByRecipient(cpfCnpj: string): Promise<Email[]> {
 ```
 
 #### 2. Direito de Correção (Art. 18, III)
+
 **Requisição:** "Meu email está incorreto, preciso atualizá-lo."
 
 **Implementação:**
+
 ```typescript
 // PATCH /v1/recipients/:id
 async updateRecipient(id: string, data: UpdateRecipientDto) {
@@ -374,9 +389,11 @@ async updateRecipient(id: string, data: UpdateRecipientDto) {
 ```
 
 #### 3. Direito de Exclusão (Art. 18, VI)
+
 **Requisição:** "Quero que meus dados sejam deletados."
 
 **Implementação:**
+
 ```typescript
 // DELETE /v1/recipients/:id/gdpr-delete
 async gdprDeleteRecipient(id: string) {
@@ -409,9 +426,11 @@ async gdprDeleteRecipient(id: string) {
 ```
 
 #### 4. Direito de Portabilidade (Art. 18, V)
+
 **Requisição:** "Quero exportar meus dados."
 
 **Implementação:**
+
 ```typescript
 // GET /v1/recipients/:id/export
 async exportRecipientData(id: string): Promise<Buffer> {
@@ -469,6 +488,7 @@ CREATE INDEX idx_pii_access_log_user ON pii_access_log(user_id, created_at DESC)
 ```
 
 **Implementação:**
+
 ```typescript
 // Decorator para auditoria automática
 @AuditPII('VIEW', 'recipient')

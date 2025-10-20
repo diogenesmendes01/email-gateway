@@ -1,8 +1,9 @@
 # 🚀 Instruções de Setup - Email Gateway
 
-## ✅ O que já está pronto:
+## ✅ O que já está pronto
 
 ### 1. Estrutura do Monorepo
+
 - ✅ Pastas criadas (`apps/`, `packages/`, `infra/`, etc)
 - ✅ Workspaces npm configurado
 - ✅ Schemas Zod movidos para `packages/shared/`
@@ -11,12 +12,14 @@
 ### 2. Arquivos Base Criados
 
 #### Root
+
 - ✅ `package.json` (workspaces)
 - ✅ `docker-compose.yml` (Postgres + Redis)
 - ✅ `.gitignore`
 - ✅ `README.md`
 
 #### packages/shared
+
 - ✅ `package.json`
 - ✅ `tsconfig.json`
 - ✅ `src/schemas/email-send.schema.ts`
@@ -25,12 +28,14 @@
 - ✅ `src/index.ts`
 
 #### packages/database
+
 - ✅ `package.json`
 - ✅ `tsconfig.json`
 - ✅ `src/client.ts` (Prisma client singleton)
 - ✅ `src/index.ts`
 
 #### apps/api
+
 - ✅ `package.json`
 - ✅ `tsconfig.json`
 - ✅ `nest-cli.json`
@@ -63,6 +68,7 @@ docker ps
 ```
 
 Você deve ver:
+
 - `email-gateway-postgres` (porta 5432)
 - `email-gateway-redis` (porta 6379)
 
@@ -71,6 +77,7 @@ Você deve ver:
 **Localização:** `packages/database/prisma/schema.prisma`
 
 Criar o schema com as tabelas:
+
 - `companies`
 - `recipients`
 - `email_outbox`
@@ -102,6 +109,7 @@ npm run db:migrate:dev
 - `health.module.ts`
 
 Endpoints:
+
 - `GET /v1/health` - Health check básico
 - `GET /v1/health/ready` - Readiness (verifica DB + Redis)
 
@@ -125,6 +133,7 @@ Endpoints:
 - `email.module.ts`
 
 Endpoints:
+
 - `POST /v1/email/send`
 - `GET /v1/emails`
 - `GET /v1/emails/:id`
@@ -137,6 +146,7 @@ Endpoints:
 - `recipient.module.ts`
 
 Responsável por:
+
 - Upsert de recipients
 - Hash de CPF/CNPJ
 - Masking
@@ -212,6 +222,7 @@ cd ../..
 ### Erro: "Cannot find module @email-gateway/shared"
 
 **Solução:**
+
 ```bash
 # Rebuild
 npm run build
@@ -224,6 +235,7 @@ npm install
 ### Erro: "Prisma schema not found"
 
 **Solução:**
+
 ```bash
 # Criar o schema primeiro (Passo 3)
 # Depois:
@@ -233,6 +245,7 @@ npm run db:generate
 ### Docker não sobe
 
 **Solução:**
+
 ```bash
 # Verificar portas
 lsof -i :5432
@@ -246,11 +259,13 @@ lsof -i :6379
 ## 📚 Referências Úteis
 
 ### Documentação do Projeto
+
 - [Arquitetura MVP](./00-pacote-documentos-arquitetura-mvp.md)
 - [Contrato POST /v1/email/send](./api/03-email-send-contract.md)
 - [Schemas Guide](../packages/shared/src/schemas/schemas-guide.md)
 
 ### TASKs (em ordem)
+
 1. ✅ **TASK 0.1** — Estrutura de diretórios ✅ **FEITO**
 2. ✅ **TASK 2.1** — POST /v1/email/send (contrato) ✅ **FEITO**
 3. 🔄 **TASK 5.1** — Prisma schema ← **PRÓXIMO**
@@ -260,6 +275,7 @@ lsof -i :6379
 7. ... (continua)
 
 ### Tecnologias
+
 - [NestJS](https://nestjs.com/)
 - [Prisma](https://www.prisma.io/)
 - [Zod](https://zod.dev/)

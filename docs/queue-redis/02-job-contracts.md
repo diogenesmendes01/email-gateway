@@ -34,6 +34,7 @@ O job NÃO trafega o HTML completo do email. Apenas uma **referência** (`htmlRe
 - Qualquer identificador que permita recuperar o HTML
 
 **Benefícios:**
+
 - Reduz tamanho do job em Redis (economia de memória)
 - Evita timeout em jobs grandes
 - Facilita migração de storage no futuro
@@ -43,6 +44,7 @@ O job NÃO trafega o HTML completo do email. Apenas uma **referência** (`htmlRe
 O `jobId` do BullMQ é **sempre igual** ao `outboxId` (UUID do registro em `email_outbox`).
 
 **Garantias:**
+
 - **Idempotência**: mesmo outbox nunca processado 2x
 - **Rastreabilidade**: correlação direta entre job e registro no banco
 - **Reprocessamento seguro**: retry não cria duplicatas
@@ -52,6 +54,7 @@ O `jobId` do BullMQ é **sempre igual** ao `outboxId` (UUID do registro em `emai
 Todo job tem **Time-To-Live de 24 horas** (86.400.000 ms).
 
 **Comportamento:**
+
 - Após 24h sem sucesso, o job **expira automaticamente**
 - Jobs expirados são movidos para status `EXPIRED` no banco
 - Evita jobs "órfãos" acumulando indefinidamente
@@ -188,6 +191,7 @@ await emailQueue.add(
 ```
 
 **Comportamento:**
+
 - Se job com mesmo `jobId` já existe: BullMQ **rejeita** a duplicata
 - Se job foi completado: não é reprocessado
 - Se job está ativo: não cria novo job
@@ -399,6 +403,7 @@ const validated = validateEmailJobData(jobData);
 A função `validateEmailJobData` adiciona:
 
 1. **recipient.email = to**
+
    ```typescript
    if (parsed.recipient.email !== parsed.to) {
      throw new Error('recipient.email must match to');
@@ -406,6 +411,7 @@ A função `validateEmailJobData` adiciona:
    ```
 
 2. **Pelo menos um identificador**
+
    ```typescript
    if (!recipientId && !externalId && !cpfCnpjHash) {
      throw new Error('At least one recipient identifier required');

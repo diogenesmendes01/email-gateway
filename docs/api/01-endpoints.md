@@ -61,6 +61,7 @@ Limites aplicados **por empresa** (`company_id`):
 | 1 dia | 10.000 requisições | Limite diário |
 
 **Headers de Resposta:**
+
 ```http
 X-RateLimit-Limit: 100
 X-RateLimit-Remaining: 95

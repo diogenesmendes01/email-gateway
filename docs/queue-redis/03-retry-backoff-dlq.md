@@ -11,6 +11,7 @@
 Estratégia completa de retry, backoff exponencial, Dead Letter Queue (DLQ) e fairness por tenant para o sistema de envio de e-mails.
 
 Este documento implementa os requisitos da **TASK 3.2**:
+
 - Backoff exponencial com jitter (1s→60s)
 - Mover à DLQ após 5 falhas
 - TTL DLQ 7 dias
@@ -65,6 +66,7 @@ jitter = random(-JITTER_FACTOR * delay, +JITTER_FACTOR * delay)
 | 6+        | 60s (cap)  | ~60s              | 45000-75000|
 
 **Benefícios do Jitter:**
+
 - Evita "thundering herd" (múltiplos jobs retrying simultaneamente)
 - Distribui carga no tempo
 - Melhora taxa de sucesso em cenários de rate limit
@@ -314,11 +316,13 @@ auto-aof-rewrite-min-size 64mb
 ### Justificativa
 
 **AOF everysec:**
+
 - Balanceio entre durabilidade e performance
 - Perda máxima de 1 segundo de dados em crash
 - Performance ~99% do "no fsync"
 
 **noeviction:**
+
 - **CRÍTICO**: Garante que jobs nunca sejam removidos silenciosamente
 - Sistema falha se memória encher (preferível a perder jobs)
 - Requer monitoramento proativo de memória
@@ -532,11 +536,14 @@ npm test -- email-job-retry.schema.spec
 ### Cenário 1: DLQ Crescendo Rapidamente
 
 **Sintomas:**
+
 - DLQ com > 100 jobs
 - Taxa de entrada > 2% dos envios
 
 **Ações:**
+
 1. Verificar distribuição de `errorCode`:
+
    ```sql
    SELECT lastFailureCode, COUNT(*)
    FROM dlq
@@ -545,6 +552,7 @@ npm test -- email-job-retry.schema.spec
    ```
 
 2. Identificar se é erro específico de empresa:
+
    ```sql
    SELECT companyId, COUNT(*)
    FROM dlq
@@ -560,16 +568,20 @@ npm test -- email-job-retry.schema.spec
 ### Cenário 2: Redis Próximo do Limite de Memória
 
 **Sintomas:**
+
 - `used_memory / maxmemory > 0.9`
 - Alertas de memória
 
 **Ações:**
+
 1. Verificar tamanho da DLQ:
+
    ```redis
    ZCARD email:send:dlq
    ```
 
 2. Verificar jobs pendentes:
+
    ```redis
    ZCARD bull:email:send:wait
    ZCARD bull:email:send:active
@@ -577,6 +589,7 @@ npm test -- email-job-retry.schema.spec
    ```
 
 3. Se DLQ grande, exportar e limpar jobs antigos:
+
    ```bash
    # Exportar DLQ para análise
    redis-cli --scan --pattern "bull:email:send:dlq:*" > dlq_export.txt
@@ -589,10 +602,12 @@ npm test -- email-job-retry.schema.spec
 ### Cenário 3: Tenant Monopolizando Fila
 
 **Sintomas:**
+
 - `consecutiveBatchCount` alto para uma empresa
 - Outras empresas com `roundsWithoutProcessing` crescendo
 
 **Ações:**
+
 1. Verificar métricas de fairness
 2. Ajustar `MAX_JOBS_PER_TENANT_BATCH` se necessário
 3. Revisar prioridades calculadas

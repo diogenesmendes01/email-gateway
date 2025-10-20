@@ -168,6 +168,7 @@ POST /v1/email/send
   - Max: 10 pares
   - Chaves: max 64 chars, valores: max 256 chars
 - **Exemplo:**
+
   ```json
   {
     "X-Custom-Invoice": "INV-123",
@@ -326,12 +327,14 @@ Indica que a requisição foi aceita e o job foi enfileirado com sucesso.
 **Status Code:** `202 Accepted`
 
 **Headers:**
+
 ```text
 Content-Type: application/json
 X-Request-Id: <requestId gerado ou propagado>
 ```
 
 **Body:**
+
 ```json
 {
   "outboxId": "550e8400-e29b-41d4-a716-446655440000",
@@ -381,6 +384,7 @@ Todos os erros seguem o mesmo formato:
 **Quando:** Campos obrigatórios faltando ou payload malformado
 
 **Exemplo:**
+
 ```json
 {
   "error": {
@@ -407,6 +411,7 @@ Todos os erros seguem o mesmo formato:
 **Quando:** `X-API-Key` ausente ou inválida
 
 **Exemplo:**
+
 ```json
 {
   "error": {
@@ -423,6 +428,7 @@ Todos os erros seguem o mesmo formato:
 **Quando:** IP não autorizado (não está na allowlist)
 
 **Exemplo:**
+
 ```json
 {
   "error": {
@@ -445,6 +451,7 @@ Todos os erros seguem o mesmo formato:
 **Quando:** `Idempotency-Key` duplicada com corpo diferente
 
 **Exemplo:**
+
 ```json
 {
   "error": {
@@ -467,6 +474,7 @@ Todos os erros seguem o mesmo formato:
 **Quando:** Payload excede 1MB
 
 **Exemplo:**
+
 ```json
 {
   "error": {
@@ -489,6 +497,7 @@ Todos os erros seguem o mesmo formato:
 **Quando:** Validação de negócio falha (emails inválidos, CPF/CNPJ inválido, etc.)
 
 **Exemplo:**
+
 ```json
 {
   "error": {
@@ -517,6 +526,7 @@ Todos os erros seguem o mesmo formato:
 **Quando:** Rate limit excedido
 
 **Headers:**
+
 ```text
 X-RateLimit-Limit: 100
 X-RateLimit-Remaining: 0
@@ -525,6 +535,7 @@ Retry-After: 60
 ```
 
 **Body:**
+
 ```json
 {
   "error": {
@@ -549,6 +560,7 @@ Retry-After: 60
 **Quando:** Erro inesperado no servidor
 
 **Exemplo:**
+
 ```json
 {
   "error": {
@@ -565,6 +577,7 @@ Retry-After: 60
 **Quando:** Redis/Postgres indisponível
 
 **Exemplo:**
+
 ```json
 {
   "error": {
@@ -621,6 +634,7 @@ Existem **duas formas** de garantir idempotência:
 ### Equivalência de Payload
 
 Dois payloads são considerados equivalentes se:
+
 - `to`, `subject`, `html` são idênticos
 - `recipient` (se fornecido) é idêntico
 - Campos opcionais (`cc`, `bcc`, `tags`, etc.) são idênticos ou ambos ausentes
@@ -687,6 +701,7 @@ X-RateLimit-Reset: 1634567890
 **Status:** `429 Too Many Requests`
 
 **Headers:**
+
 ```text
 Retry-After: 60
 ```
@@ -703,6 +718,7 @@ Ao receber `429`, o cliente deve:
 4. Limite de retries: 3-5 tentativas
 
 **Exemplo de backoff:**
+
 - 1ª tentativa: aguarda `Retry-After` (ex: 60s)
 - 2ª tentativa: aguarda `Retry-After * 2` (ex: 120s)
 - 3ª tentativa: aguarda `Retry-After * 4` (ex: 240s)
@@ -1053,11 +1069,13 @@ Para consultar o status de um envio após receber o `202 Accepted`, utilize:
 **Endpoint:** `GET /v1/emails/{outboxId}`
 
 **Headers:**
+
 ```text
 X-API-Key: sk_live_abc123xyz
 ```
 
 **Response:**
+
 ```json
 {
   "id": "550e8400-e29b-41d4-a716-446655440000",
@@ -1100,6 +1118,7 @@ X-API-Key: sk_live_abc123xyz
 ```
 
 **Possíveis Status:**
+
 - `PENDING`: Aguardando processamento
 - `ENQUEUED`: Na fila
 - `PROCESSING`: Sendo processado
@@ -1112,6 +1131,7 @@ X-API-Key: sk_live_abc123xyz
 **Endpoint:** `GET /v1/emails`
 
 **Query Parameters:**
+
 - `status`: Filtrar por status
 - `dateFrom`, `dateTo`: Filtrar por período
 - `to`: Filtrar por destinatário
@@ -1124,6 +1144,7 @@ X-API-Key: sk_live_abc123xyz
 - `sort`: Ordenação (default: `createdAt:desc`)
 
 **Exemplo:**
+
 ```http
 GET /v1/emails?status=SENT&dateFrom=2025-10-01&dateTo=2025-10-31&page=1&pageSize=20 HTTP/1.1
 Host: api.emailgateway.com
