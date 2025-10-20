@@ -348,13 +348,16 @@ export class EmailSendService {
   public decryptCpfCnpj(encryptedCpfCnpj: string, salt: string, requestId?: string): string {
     try {
       return decryptCpfCnpj(encryptedCpfCnpj, this.getEncryptionKey(), salt);
-    } catch (error) {
-      this.logger.error({
-        message: 'Failed to decrypt CPF/CNPJ',
-        requestId,
-        error: error.message,
-        stack: error.stack,
-      });
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+          const errorStack = error instanceof Error ? error.stack : undefined;
+          
+          this.logger.error({
+            message: 'Failed to decrypt CPF/CNPJ',
+            requestId,
+            error: errorMessage,
+            stack: errorStack,
+          });
       throw new InternalServerErrorException({
         code: 'DECRYPTION_FAILED',
         message: 'Unable to decrypt sensitive data',
