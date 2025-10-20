@@ -34,6 +34,10 @@ class EmailWorker {
   private redis: Redis;
   private queue: Queue;
   private isShuttingDown = false;
+  private currentConcurrency = 1;
+  private originalConcurrency = 1;
+  private violationCount = 0;
+  private recoveryCount = 0;
 
   constructor() {
     this.prisma = new PrismaClient();
@@ -84,6 +88,8 @@ class EmailWorker {
     // Carrega configuração
     const config = loadWorkerConfig();
 
+    this.currentConcurrency = config.concurrency;
+    this.originalConcurrency = config.concurrency;
     console.log('[EmailWorker] Configuration:', {
       concurrency: config.concurrency,
       redis: {
@@ -233,17 +239,34 @@ class EmailWorker {
 
           // Estratégia simples de auto-throttle: reduzir concorrência pela metade
           // até o mínimo de 1 sempre que houver violação
-          const current = (this.worker as any).opts?.concurrency || 1;
+          const current = this.currentConcurrency;
           const next = Math.max(minConcurrency, Math.floor(current / 2));
 
           if (next < current) {
             try {
               await this.worker.pause();
-              (this.worker as any).opts.concurrency = next;
+              this.currentConcurrency = next;
               await this.worker.resume();
               console.warn(`[EmailWorker] Auto-throttle applied: concurrency ${current} -> ${next}`);
             } catch (err) {
               console.error('[EmailWorker] Failed to apply auto-throttle:', err);
+            }
+          }
+          this.violationCount += 1;
+          this.recoveryCount = 0;
+        } else {
+          // Recuperação: aumentar concorrência gradualmente após 3 avaliações OK
+          this.recoveryCount += 1;
+          this.violationCount = 0;
+          if (this.recoveryCount >= 3 && this.currentConcurrency < this.originalConcurrency) {
+            const increased = Math.min(this.originalConcurrency, Math.max(1, Math.floor(this.currentConcurrency * 1.5)));
+            try {
+              await this.worker.pause();
+              this.currentConcurrency = increased;
+              await this.worker.resume();
+              console.log(`[EmailWorker] SLO recovered; concurrency increased to ${increased}`);
+            } catch (err) {
+              console.error('[EmailWorker] Failed to increase concurrency:', err);
             }
           }
         }

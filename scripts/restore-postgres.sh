@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Restore simples do Postgres (RTO)
+# Restore seguro do Postgres (RTO)
 # Uso: restore-postgres.sh <arquivo.sql.gz>
 
-if [[ -z "${DATABASE_URL:-}" ]]; then
-  echo "DATABASE_URL não definido. Abortando." >&2
+if [[ -z "${DB_HOST:-}" || -z "${DB_PORT:-}" || -z "${DB_USER:-}" || -z "${DB_NAME:-}" ]]; then
+  echo "DB_HOST, DB_PORT, DB_USER e DB_NAME devem estar definidos. Abortando." >&2
   exit 1
 fi
 
@@ -21,6 +21,12 @@ if [[ ! -f "$FILE" ]]; then
 fi
 
 echo "[RESTORE] Restaurando de $FILE ..."
-gunzip -c "$FILE" | psql "$DATABASE_URL"
+if [[ -n "${DB_PASSWORD:-}" ]]; then
+  export PGPASSWORD="${DB_PASSWORD}"
+fi
+
+gunzip -c "$FILE" | psql -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}" -d "${DB_NAME}"
+
+unset PGPASSWORD || true
 echo "[RESTORE] Concluído."
 
