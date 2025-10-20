@@ -1,0 +1,177 @@
+# Coolify Configuration
+# TASK 8.1 - Arquitetura de Deploy, healthchecks e variáveis
+
+# Informações do projeto
+PROJECT_NAME="email-gateway"
+PROJECT_DESCRIPTION="MVP de envio de boletos por e-mail"
+PROJECT_VERSION="1.0.0"
+
+# Configurações de deploy
+DEPLOY_BRANCH="prod"
+DEPLOY_STRATEGY="rolling"
+MAX_REPLICAS=3
+MIN_REPLICAS=1
+
+# Health checks
+HEALTH_CHECK_PATH="/v1/health/healthz"
+READINESS_CHECK_PATH="/v1/health/readyz"
+HEALTH_CHECK_INTERVAL=30
+HEALTH_CHECK_TIMEOUT=10
+HEALTH_CHECK_RETRIES=3
+
+# Configurações de recursos
+RESOURCE_LIMITS:
+  CPU: "1000m"
+  MEMORY: "512Mi"
+RESOURCE_REQUESTS:
+  CPU: "250m"
+  MEMORY: "256Mi"
+
+# Configurações de rede
+PORT=3000
+PROTOCOL=http
+
+# Variáveis de ambiente obrigatórias
+REQUIRED_ENV_VARS:
+  - DATABASE_URL
+  - REDIS_URL
+  - AWS_ACCESS_KEY_ID
+  - AWS_SECRET_ACCESS_KEY
+  - AWS_SES_REGION
+  - SES_FROM_ADDRESS
+  - DASHBOARD_USERNAME
+  - DASHBOARD_PASSWORD_HASH
+  - ENCRYPTION_KEY
+
+# Variáveis de ambiente opcionais com valores padrão
+OPTIONAL_ENV_VARS:
+  NODE_ENV: "production"
+  PORT: "3000"
+  API_PREFIX: "v1"
+  CORS_ORIGIN: "*"
+  RATE_LIMIT_TTL: "60"
+  RATE_LIMIT_MAX: "100"
+  SES_QUOTA_THRESHOLD: "80"
+  SLO_TARGET_SUCCESS_RATE_PCT: "95"
+  SLO_MAX_ERROR_RATE_PCT: "5"
+  SLO_MAX_QUEUE_AGE_P95_MS: "120000"
+
+# Configurações de rollback
+ROLLBACK_ENABLED: true
+MAX_ROLLBACK_RELEASES: 2
+ROLLBACK_TIMEOUT: "5m"
+
+# Configurações de backup
+BACKUP_ENABLED: true
+BACKUP_RETENTION_DAYS: 7
+BACKUP_SCHEDULE: "0 2 * * *"  # Diariamente às 2h
+
+# Configurações de monitoramento
+MONITORING_ENABLED: true
+METRICS_ENDPOINT: "/v1/metrics"
+LOGS_RETENTION_DAYS: 30
+
+# Configurações de segurança
+SECURITY_SCAN_ENABLED: true
+VULNERABILITY_SCAN_SCHEDULE: "0 3 * * 0"  # Semanalmente aos domingos às 3h
+
+# Configurações de SSL/TLS
+SSL_ENABLED: false
+SSL_CERT_PATH: "/etc/ssl/certs"
+SSL_KEY_PATH: "/etc/ssl/private"
+
+# Configurações de cache
+CACHE_ENABLED: true
+CACHE_TTL: "3600"  # 1 hora
+
+# Configurações de rate limiting
+RATE_LIMITING_ENABLED: true
+RATE_LIMIT_WINDOW: "60s"
+RATE_LIMIT_MAX_REQUESTS: 100
+
+# Configurações de logging
+LOG_LEVEL: "info"
+LOG_FORMAT: "json"
+LOG_OUTPUT: "stdout"
+
+# Configurações de alertas
+ALERTS_ENABLED: true
+ALERT_EMAIL: "admin@yourdomain.com"
+ALERT_WEBHOOK_URL: ""
+
+# Configurações de escalonamento automático
+AUTO_SCALING_ENABLED: true
+MIN_CPU_UTILIZATION: 30
+MAX_CPU_UTILIZATION: 80
+SCALE_UP_COOLDOWN: "5m"
+SCALE_DOWN_COOLDOWN: "10m"
+
+# Configurações de rede
+NETWORK_POLICY_ENABLED: true
+INGRESS_ENABLED: true
+EGRESS_ENABLED: true
+
+# Configurações de persistência
+PERSISTENT_VOLUMES:
+  - name: "postgres-data"
+    size: "10Gi"
+    storage_class: "standard"
+  - name: "redis-data"
+    size: "1Gi"
+    storage_class: "standard"
+
+# Configurações de secrets
+SECRETS_MANAGEMENT: "kubernetes"
+SECRET_ROTATION_ENABLED: true
+SECRET_ROTATION_SCHEDULE: "0 0 1 * *"  # Mensalmente no dia 1
+
+# Configurações de CI/CD
+CI_CD_ENABLED: true
+BUILD_TIMEOUT: "10m"
+DEPLOY_TIMEOUT: "5m"
+TEST_TIMEOUT: "5m"
+
+# Configurações de qualidade de código
+CODE_QUALITY_CHECKS:
+  - linting
+  - type_checking
+  - security_scan
+  - test_coverage
+
+# Configurações de testes
+TEST_CONFIGURATION:
+  UNIT_TESTS: true
+  INTEGRATION_TESTS: true
+  E2E_TESTS: false
+  COVERAGE_THRESHOLD: 70
+
+# Configurações de documentação
+DOCUMENTATION_ENABLED: true
+API_DOCS_ENABLED: true
+SWAGGER_ENABLED: true
+
+# Configurações de métricas
+METRICS_ENABLED: true
+PROMETHEUS_ENABLED: true
+GRAFANA_ENABLED: true
+
+# Configurações de tracing
+TRACING_ENABLED: true
+JAEGER_ENABLED: true
+TRACE_SAMPLING_RATE: 0.1
+
+# Configurações de desenvolvimento
+DEV_MODE_ENABLED: false
+HOT_RELOAD_ENABLED: false
+DEBUG_MODE_ENABLED: false
+
+# Configurações de staging
+STAGING_ENABLED: true
+STAGING_BRANCH: "staging"
+STAGING_AUTO_DEPLOY: true
+
+# Configurações de produção
+PRODUCTION_ENABLED: true
+PRODUCTION_BRANCH: "prod"
+PRODUCTION_AUTO_DEPLOY: false
+PRODUCTION_MANUAL_APPROVAL: true

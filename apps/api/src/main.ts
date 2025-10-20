@@ -1,18 +1,29 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { Logger, ValidationPipe } from '@nestjs/common';
+import { AppConfigService } from './config/app.config';
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
 
-  // Validate critical environment variables
-  if (!process.env.ENCRYPTION_KEY || process.env.ENCRYPTION_KEY.length < 32) {
-    logger.error('❌ ENCRYPTION_KEY must be set and at least 32 characters');
-    logger.error('Generate with: openssl rand -base64 32');
+  try {
+    // Validação das variáveis de ambiente críticas
+    const configService = new AppConfigService(null as any);
+    
+    logger.log('✅ Environment validation passed');
+    logger.log(`🌍 Environment: ${configService.app.nodeEnv}`);
+    logger.log(`🚀 Port: ${configService.app.port}`);
+    logger.log(`📡 API Prefix: ${configService.app.apiPrefix}`);
+    
+    // Log de configurações (sem dados sensíveis)
+    logger.debug('Configuration loaded:', configService.getAll());
+
+  } catch (error) {
+    logger.error('❌ Environment validation failed:', error.message);
+    logger.error('Check your .env file and ensure all required variables are set');
+    logger.error('See env.example for reference');
     process.exit(1);
   }
-
-  logger.log('✅ Environment validation passed');
 
   const app = await NestFactory.create(AppModule);
 
@@ -41,6 +52,8 @@ async function bootstrap() {
 
   logger.log(`🚀 API running on: http://localhost:${port}/${prefix}`);
   logger.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+  logger.log(`📊 Health checks available at: http://localhost:${port}/${prefix}/health/healthz`);
+  logger.log(`🔍 Readiness checks available at: http://localhost:${port}/${prefix}/health/readyz`);
 }
 
 bootstrap();
