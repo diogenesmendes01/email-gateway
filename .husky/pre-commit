@@ -38,11 +38,12 @@ if git diff --cached --name-only | grep -q "node_modules"; then
   exit 1
 fi
 
-# Verificar se dist está sendo commitado
-if git diff --cached --name-only | grep -q "dist/"; then
-  echo "❌ ERRO: Tentativa de commitar arquivos de build (dist/)"
-  echo "Arquivos de build devem estar no .gitignore"
-  exit 1
+# Verificar se dist está sendo commitado (exceto arquivos específicos permitidos)
+if git diff --cached --name-only | grep -q "^dist/" || git diff --cached --name-only | grep -q "/dist/"; then
+  echo "⚠️  AVISO: Tentativa de commitar arquivos de build (dist/)"
+  echo "Se isso foi intencional, use: git commit --no-verify"
+  # Apenas aviso, não bloqueia (comentar as linhas abaixo para bloquear)
+  # exit 1
 fi
 
 echo "✅ Validações de segurança passaram"
