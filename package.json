@@ -41,7 +41,9 @@
     "ci:build-packages": "cd packages/shared && npm run build && cd ../database && npm run build && cd ../../apps/worker && npm run build -- --skipLibCheck",
     "ci:check-types": "cd packages/shared && npx tsc --noEmit && cd ../../apps/worker && npx tsc --noEmit --skipLibCheck",
     "ci:audit": "npm audit --audit-level high",
-    "ci:full": "npm run ci:build && npm run ci:test && npm run ci:lint && npm run ci:check-types && npm run ci:audit"
+    "cleanup:retention": "tsx scripts/cleanup-retention.ts",
+    "cleanup:retention:dry": "tsx scripts/cleanup-retention.ts --dry-run",
+    "cleanup:retention:stats": "tsx scripts/cleanup-retention.ts --stats"
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",

@@ -18,6 +18,9 @@ export * from './types/email-pipeline.types';
 
 // Utils
 export * from './utils/masking.util';
+export * from './utils/encryption.util';
+export * from './utils/retention.util';
+export * from './utils/access-control.util';
 
 // Constants (quando criados)
 // export * from './constants';
