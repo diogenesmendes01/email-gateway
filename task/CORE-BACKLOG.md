@@ -14,7 +14,12 @@
 
 ### Validação
 - A tarefa será considerada concluída se o comportamento for compatível com a descrição da atividade e padrões do projeto.
-- A entrega deve estar versionada corretamente e com cobertura de testes (se aplicável).
+- **OBRIGATÓRIO**: A entrega deve estar versionada corretamente e com cobertura de testes adequada:
+  - **Testes unitários**: obrigatórios para serviços, utilitários e lógica de negócio
+  - **Testes de integração**: obrigatórios para endpoints de API, jobs de fila e integrações externas
+  - **Cobertura mínima**: 70% para novos códigos (medido por linha)
+  - Seguir padrões definidos em `docs/testing/TESTING-STANDARDS.md`
+  - Testes devem passar no CI antes do merge
 
 ### Arquivos
 - Identificar os arquivos afetados com base na atividade descrita.
@@ -40,7 +45,12 @@
 
 ### Validação
 - A tarefa será considerada concluída se o comportamento for compatível com a descrição da atividade e padrões do projeto.
-- A entrega deve estar versionada corretamente e com cobertura de testes (se aplicável).
+- **OBRIGATÓRIO**: A entrega deve estar versionada corretamente e com cobertura de testes adequada:
+  - **Testes unitários**: obrigatórios para serviços, utilitários e lógica de negócio
+  - **Testes de integração**: obrigatórios para endpoints de API, jobs de fila e integrações externas
+  - **Cobertura mínima**: 70% para novos códigos (medido por linha)
+  - Seguir padrões definidos em `docs/testing/TESTING-STANDARDS.md`
+  - Testes devem passar no CI antes do merge
 
 ### Arquivos
 - Identificar os arquivos afetados com base na atividade descrita.
@@ -66,7 +76,12 @@
 
 ### Validação
 - A tarefa será considerada concluída se o comportamento for compatível com a descrição da atividade e padrões do projeto.
-- A entrega deve estar versionada corretamente e com cobertura de testes (se aplicável).
+- **OBRIGATÓRIO**: A entrega deve estar versionada corretamente e com cobertura de testes adequada:
+  - **Testes unitários**: obrigatórios para serviços, utilitários e lógica de negócio
+  - **Testes de integração**: obrigatórios para endpoints de API, jobs de fila e integrações externas
+  - **Cobertura mínima**: 70% para novos códigos (medido por linha)
+  - Seguir padrões definidos em `docs/testing/TESTING-STANDARDS.md`
+  - Testes devem passar no CI antes do merge
 
 ### Arquivos
 - Identificar os arquivos afetados com base na atividade descrita.
@@ -92,7 +107,12 @@
 
 ### Validação
 - A tarefa será considerada concluída se o comportamento for compatível com a descrição da atividade e padrões do projeto.
-- A entrega deve estar versionada corretamente e com cobertura de testes (se aplicável).
+- **OBRIGATÓRIO**: A entrega deve estar versionada corretamente e com cobertura de testes adequada:
+  - **Testes unitários**: obrigatórios para serviços, utilitários e lógica de negócio
+  - **Testes de integração**: obrigatórios para endpoints de API, jobs de fila e integrações externas
+  - **Cobertura mínima**: 70% para novos códigos (medido por linha)
+  - Seguir padrões definidos em `docs/testing/TESTING-STANDARDS.md`
+  - Testes devem passar no CI antes do merge
 
 ### Arquivos
 - Identificar os arquivos afetados com base na atividade descrita.
@@ -118,7 +138,12 @@
 
 ### Validação
 - A tarefa será considerada concluída se o comportamento for compatível com a descrição da atividade e padrões do projeto.
-- A entrega deve estar versionada corretamente e com cobertura de testes (se aplicável).
+- **OBRIGATÓRIO**: A entrega deve estar versionada corretamente e com cobertura de testes adequada:
+  - **Testes unitários**: obrigatórios para serviços, utilitários e lógica de negócio
+  - **Testes de integração**: obrigatórios para endpoints de API, jobs de fila e integrações externas
+  - **Cobertura mínima**: 70% para novos códigos (medido por linha)
+  - Seguir padrões definidos em `docs/testing/TESTING-STANDARDS.md`
+  - Testes devem passar no CI antes do merge
 
 ### Arquivos
 - Identificar os arquivos afetados com base na atividade descrita.
@@ -144,7 +169,12 @@
 
 ### Validação
 - A tarefa será considerada concluída se o comportamento for compatível com a descrição da atividade e padrões do projeto.
-- A entrega deve estar versionada corretamente e com cobertura de testes (se aplicável).
+- **OBRIGATÓRIO**: A entrega deve estar versionada corretamente e com cobertura de testes adequada:
+  - **Testes unitários**: obrigatórios para serviços, utilitários e lógica de negócio
+  - **Testes de integração**: obrigatórios para endpoints de API, jobs de fila e integrações externas
+  - **Cobertura mínima**: 70% para novos códigos (medido por linha)
+  - Seguir padrões definidos em `docs/testing/TESTING-STANDARDS.md`
+  - Testes devem passar no CI antes do merge
 
 ### Arquivos
 - Identificar os arquivos afetados com base na atividade descrita.
@@ -170,7 +200,12 @@
 
 ### Validação
 - A tarefa será considerada concluída se o comportamento for compatível com a descrição da atividade e padrões do projeto.
-- A entrega deve estar versionada corretamente e com cobertura de testes (se aplicável).
+- **OBRIGATÓRIO**: A entrega deve estar versionada corretamente e com cobertura de testes adequada:
+  - **Testes unitários**: obrigatórios para serviços, utilitários e lógica de negócio
+  - **Testes de integração**: obrigatórios para endpoints de API, jobs de fila e integrações externas
+  - **Cobertura mínima**: 70% para novos códigos (medido por linha)
+  - Seguir padrões definidos em `docs/testing/TESTING-STANDARDS.md`
+  - Testes devem passar no CI antes do merge
 
 ### Arquivos
 - Identificar os arquivos afetados com base na atividade descrita.
@@ -196,7 +231,12 @@
 
 ### Validação
 - A tarefa será considerada concluída se o comportamento for compatível com a descrição da atividade e padrões do projeto.
-- A entrega deve estar versionada corretamente e com cobertura de testes (se aplicável).
+- **OBRIGATÓRIO**: A entrega deve estar versionada corretamente e com cobertura de testes adequada:
+  - **Testes unitários**: obrigatórios para serviços, utilitários e lógica de negócio
+  - **Testes de integração**: obrigatórios para endpoints de API, jobs de fila e integrações externas
+  - **Cobertura mínima**: 70% para novos códigos (medido por linha)
+  - Seguir padrões definidos em `docs/testing/TESTING-STANDARDS.md`
+  - Testes devem passar no CI antes do merge
 
 ### Arquivos
 - Identificar os arquivos afetados com base na atividade descrita.
@@ -222,7 +262,12 @@
 
 ### Validação
 - A tarefa será considerada concluída se o comportamento for compatível com a descrição da atividade e padrões do projeto.
-- A entrega deve estar versionada corretamente e com cobertura de testes (se aplicável).
+- **OBRIGATÓRIO**: A entrega deve estar versionada corretamente e com cobertura de testes adequada:
+  - **Testes unitários**: obrigatórios para serviços, utilitários e lógica de negócio
+  - **Testes de integração**: obrigatórios para endpoints de API, jobs de fila e integrações externas
+  - **Cobertura mínima**: 70% para novos códigos (medido por linha)
+  - Seguir padrões definidos em `docs/testing/TESTING-STANDARDS.md`
+  - Testes devem passar no CI antes do merge
 
 ### Arquivos
 - Identificar os arquivos afetados com base na atividade descrita.
@@ -248,7 +293,12 @@
 
 ### Validação
 - A tarefa será considerada concluída se o comportamento for compatível com a descrição da atividade e padrões do projeto.
-- A entrega deve estar versionada corretamente e com cobertura de testes (se aplicável).
+- **OBRIGATÓRIO**: A entrega deve estar versionada corretamente e com cobertura de testes adequada:
+  - **Testes unitários**: obrigatórios para serviços, utilitários e lógica de negócio
+  - **Testes de integração**: obrigatórios para endpoints de API, jobs de fila e integrações externas
+  - **Cobertura mínima**: 70% para novos códigos (medido por linha)
+  - Seguir padrões definidos em `docs/testing/TESTING-STANDARDS.md`
+  - Testes devem passar no CI antes do merge
 
 ### Arquivos
 - Identificar os arquivos afetados com base na atividade descrita.
@@ -274,7 +324,12 @@
 
 ### Validação
 - A tarefa será considerada concluída se o comportamento for compatível com a descrição da atividade e padrões do projeto.
-- A entrega deve estar versionada corretamente e com cobertura de testes (se aplicável).
+- **OBRIGATÓRIO**: A entrega deve estar versionada corretamente e com cobertura de testes adequada:
+  - **Testes unitários**: obrigatórios para serviços, utilitários e lógica de negócio
+  - **Testes de integração**: obrigatórios para endpoints de API, jobs de fila e integrações externas
+  - **Cobertura mínima**: 70% para novos códigos (medido por linha)
+  - Seguir padrões definidos em `docs/testing/TESTING-STANDARDS.md`
+  - Testes devem passar no CI antes do merge
 
 ### Arquivos
 - Identificar os arquivos afetados com base na atividade descrita.
@@ -300,7 +355,12 @@
 
 ### Validação
 - A tarefa será considerada concluída se o comportamento for compatível com a descrição da atividade e padrões do projeto.
-- A entrega deve estar versionada corretamente e com cobertura de testes (se aplicável).
+- **OBRIGATÓRIO**: A entrega deve estar versionada corretamente e com cobertura de testes adequada:
+  - **Testes unitários**: obrigatórios para serviços, utilitários e lógica de negócio
+  - **Testes de integração**: obrigatórios para endpoints de API, jobs de fila e integrações externas
+  - **Cobertura mínima**: 70% para novos códigos (medido por linha)
+  - Seguir padrões definidos em `docs/testing/TESTING-STANDARDS.md`
+  - Testes devem passar no CI antes do merge
 
 ### Arquivos
 - Identificar os arquivos afetados com base na atividade descrita.
@@ -326,7 +386,12 @@
 
 ### Validação
 - A tarefa será considerada concluída se o comportamento for compatível com a descrição da atividade e padrões do projeto.
-- A entrega deve estar versionada corretamente e com cobertura de testes (se aplicável).
+- **OBRIGATÓRIO**: A entrega deve estar versionada corretamente e com cobertura de testes adequada:
+  - **Testes unitários**: obrigatórios para serviços, utilitários e lógica de negócio
+  - **Testes de integração**: obrigatórios para endpoints de API, jobs de fila e integrações externas
+  - **Cobertura mínima**: 70% para novos códigos (medido por linha)
+  - Seguir padrões definidos em `docs/testing/TESTING-STANDARDS.md`
+  - Testes devem passar no CI antes do merge
 
 ### Arquivos
 - Identificar os arquivos afetados com base na atividade descrita.
@@ -352,7 +417,12 @@
 
 ### Validação
 - A tarefa será considerada concluída se o comportamento for compatível com a descrição da atividade e padrões do projeto.
-- A entrega deve estar versionada corretamente e com cobertura de testes (se aplicável).
+- **OBRIGATÓRIO**: A entrega deve estar versionada corretamente e com cobertura de testes adequada:
+  - **Testes unitários**: obrigatórios para serviços, utilitários e lógica de negócio
+  - **Testes de integração**: obrigatórios para endpoints de API, jobs de fila e integrações externas
+  - **Cobertura mínima**: 70% para novos códigos (medido por linha)
+  - Seguir padrões definidos em `docs/testing/TESTING-STANDARDS.md`
+  - Testes devem passar no CI antes do merge
 
 ### Arquivos
 - Identificar os arquivos afetados com base na atividade descrita.
@@ -378,7 +448,12 @@
 
 ### Validação
 - A tarefa será considerada concluída se o comportamento for compatível com a descrição da atividade e padrões do projeto.
-- A entrega deve estar versionada corretamente e com cobertura de testes (se aplicável).
+- **OBRIGATÓRIO**: A entrega deve estar versionada corretamente e com cobertura de testes adequada:
+  - **Testes unitários**: obrigatórios para serviços, utilitários e lógica de negócio
+  - **Testes de integração**: obrigatórios para endpoints de API, jobs de fila e integrações externas
+  - **Cobertura mínima**: 70% para novos códigos (medido por linha)
+  - Seguir padrões definidos em `docs/testing/TESTING-STANDARDS.md`
+  - Testes devem passar no CI antes do merge
 
 ### Arquivos
 - Identificar os arquivos afetados com base na atividade descrita.
@@ -404,7 +479,12 @@
 
 ### Validação
 - A tarefa será considerada concluída se o comportamento for compatível com a descrição da atividade e padrões do projeto.
-- A entrega deve estar versionada corretamente e com cobertura de testes (se aplicável).
+- **OBRIGATÓRIO**: A entrega deve estar versionada corretamente e com cobertura de testes adequada:
+  - **Testes unitários**: obrigatórios para serviços, utilitários e lógica de negócio
+  - **Testes de integração**: obrigatórios para endpoints de API, jobs de fila e integrações externas
+  - **Cobertura mínima**: 70% para novos códigos (medido por linha)
+  - Seguir padrões definidos em `docs/testing/TESTING-STANDARDS.md`
+  - Testes devem passar no CI antes do merge
 
 ### Arquivos
 - Identificar os arquivos afetados com base na atividade descrita.
@@ -430,7 +510,12 @@
 
 ### Validação
 - A tarefa será considerada concluída se o comportamento for compatível com a descrição da atividade e padrões do projeto.
-- A entrega deve estar versionada corretamente e com cobertura de testes (se aplicável).
+- **OBRIGATÓRIO**: A entrega deve estar versionada corretamente e com cobertura de testes adequada:
+  - **Testes unitários**: obrigatórios para serviços, utilitários e lógica de negócio
+  - **Testes de integração**: obrigatórios para endpoints de API, jobs de fila e integrações externas
+  - **Cobertura mínima**: 70% para novos códigos (medido por linha)
+  - Seguir padrões definidos em `docs/testing/TESTING-STANDARDS.md`
+  - Testes devem passar no CI antes do merge
 
 ### Arquivos
 - Identificar os arquivos afetados com base na atividade descrita.
@@ -456,7 +541,12 @@
 
 ### Validação
 - A tarefa será considerada concluída se o comportamento for compatível com a descrição da atividade e padrões do projeto.
-- A entrega deve estar versionada corretamente e com cobertura de testes (se aplicável).
+- **OBRIGATÓRIO**: A entrega deve estar versionada corretamente e com cobertura de testes adequada:
+  - **Testes unitários**: obrigatórios para serviços, utilitários e lógica de negócio
+  - **Testes de integração**: obrigatórios para endpoints de API, jobs de fila e integrações externas
+  - **Cobertura mínima**: 70% para novos códigos (medido por linha)
+  - Seguir padrões definidos em `docs/testing/TESTING-STANDARDS.md`
+  - Testes devem passar no CI antes do merge
 
 ### Arquivos
 - Identificar os arquivos afetados com base na atividade descrita.
@@ -482,7 +572,12 @@
 
 ### Validação
 - A tarefa será considerada concluída se o comportamento for compatível com a descrição da atividade e padrões do projeto.
-- A entrega deve estar versionada corretamente e com cobertura de testes (se aplicável).
+- **OBRIGATÓRIO**: A entrega deve estar versionada corretamente e com cobertura de testes adequada:
+  - **Testes unitários**: obrigatórios para serviços, utilitários e lógica de negócio
+  - **Testes de integração**: obrigatórios para endpoints de API, jobs de fila e integrações externas
+  - **Cobertura mínima**: 70% para novos códigos (medido por linha)
+  - Seguir padrões definidos em `docs/testing/TESTING-STANDARDS.md`
+  - Testes devem passar no CI antes do merge
 
 ### Arquivos
 - Identificar os arquivos afetados com base na atividade descrita.
@@ -508,7 +603,12 @@
 
 ### Validação
 - A tarefa será considerada concluída se o comportamento for compatível com a descrição da atividade e padrões do projeto.
-- A entrega deve estar versionada corretamente e com cobertura de testes (se aplicável).
+- **OBRIGATÓRIO**: A entrega deve estar versionada corretamente e com cobertura de testes adequada:
+  - **Testes unitários**: obrigatórios para serviços, utilitários e lógica de negócio
+  - **Testes de integração**: obrigatórios para endpoints de API, jobs de fila e integrações externas
+  - **Cobertura mínima**: 70% para novos códigos (medido por linha)
+  - Seguir padrões definidos em `docs/testing/TESTING-STANDARDS.md`
+  - Testes devem passar no CI antes do merge
 
 ### Arquivos
 - Identificar os arquivos afetados com base na atividade descrita.
@@ -534,7 +634,12 @@
 
 ### Validação
 - A tarefa será considerada concluída se o comportamento for compatível com a descrição da atividade e padrões do projeto.
-- A entrega deve estar versionada corretamente e com cobertura de testes (se aplicável).
+- **OBRIGATÓRIO**: A entrega deve estar versionada corretamente e com cobertura de testes adequada:
+  - **Testes unitários**: obrigatórios para serviços, utilitários e lógica de negócio
+  - **Testes de integração**: obrigatórios para endpoints de API, jobs de fila e integrações externas
+  - **Cobertura mínima**: 70% para novos códigos (medido por linha)
+  - Seguir padrões definidos em `docs/testing/TESTING-STANDARDS.md`
+  - Testes devem passar no CI antes do merge
 
 ### Arquivos
 - Identificar os arquivos afetados com base na atividade descrita.
@@ -560,7 +665,12 @@
 
 ### Validação
 - A tarefa será considerada concluída se o comportamento for compatível com a descrição da atividade e padrões do projeto.
-- A entrega deve estar versionada corretamente e com cobertura de testes (se aplicável).
+- **OBRIGATÓRIO**: A entrega deve estar versionada corretamente e com cobertura de testes adequada:
+  - **Testes unitários**: obrigatórios para serviços, utilitários e lógica de negócio
+  - **Testes de integração**: obrigatórios para endpoints de API, jobs de fila e integrações externas
+  - **Cobertura mínima**: 70% para novos códigos (medido por linha)
+  - Seguir padrões definidos em `docs/testing/TESTING-STANDARDS.md`
+  - Testes devem passar no CI antes do merge
 
 ### Arquivos
 - Identificar os arquivos afetados com base na atividade descrita.
@@ -586,7 +696,12 @@
 
 ### Validação
 - A tarefa será considerada concluída se o comportamento for compatível com a descrição da atividade e padrões do projeto.
-- A entrega deve estar versionada corretamente e com cobertura de testes (se aplicável).
+- **OBRIGATÓRIO**: A entrega deve estar versionada corretamente e com cobertura de testes adequada:
+  - **Testes unitários**: obrigatórios para serviços, utilitários e lógica de negócio
+  - **Testes de integração**: obrigatórios para endpoints de API, jobs de fila e integrações externas
+  - **Cobertura mínima**: 70% para novos códigos (medido por linha)
+  - Seguir padrões definidos em `docs/testing/TESTING-STANDARDS.md`
+  - Testes devem passar no CI antes do merge
 
 ### Arquivos
 - Identificar os arquivos afetados com base na atividade descrita.
@@ -612,7 +727,12 @@
 
 ### Validação
 - A tarefa será considerada concluída se o comportamento for compatível com a descrição da atividade e padrões do projeto.
-- A entrega deve estar versionada corretamente e com cobertura de testes (se aplicável).
+- **OBRIGATÓRIO**: A entrega deve estar versionada corretamente e com cobertura de testes adequada:
+  - **Testes unitários**: obrigatórios para serviços, utilitários e lógica de negócio
+  - **Testes de integração**: obrigatórios para endpoints de API, jobs de fila e integrações externas
+  - **Cobertura mínima**: 70% para novos códigos (medido por linha)
+  - Seguir padrões definidos em `docs/testing/TESTING-STANDARDS.md`
+  - Testes devem passar no CI antes do merge
 
 ### Arquivos
 - Identificar os arquivos afetados com base na atividade descrita.
@@ -638,7 +758,12 @@
 
 ### Validação
 - A tarefa será considerada concluída se o comportamento for compatível com a descrição da atividade e padrões do projeto.
-- A entrega deve estar versionada corretamente e com cobertura de testes (se aplicável).
+- **OBRIGATÓRIO**: A entrega deve estar versionada corretamente e com cobertura de testes adequada:
+  - **Testes unitários**: obrigatórios para serviços, utilitários e lógica de negócio
+  - **Testes de integração**: obrigatórios para endpoints de API, jobs de fila e integrações externas
+  - **Cobertura mínima**: 70% para novos códigos (medido por linha)
+  - Seguir padrões definidos em `docs/testing/TESTING-STANDARDS.md`
+  - Testes devem passar no CI antes do merge
 
 ### Arquivos
 - Identificar os arquivos afetados com base na atividade descrita.
@@ -664,7 +789,12 @@
 
 ### Validação
 - A tarefa será considerada concluída se o comportamento for compatível com a descrição da atividade e padrões do projeto.
-- A entrega deve estar versionada corretamente e com cobertura de testes (se aplicável).
+- **OBRIGATÓRIO**: A entrega deve estar versionada corretamente e com cobertura de testes adequada:
+  - **Testes unitários**: obrigatórios para serviços, utilitários e lógica de negócio
+  - **Testes de integração**: obrigatórios para endpoints de API, jobs de fila e integrações externas
+  - **Cobertura mínima**: 70% para novos códigos (medido por linha)
+  - Seguir padrões definidos em `docs/testing/TESTING-STANDARDS.md`
+  - Testes devem passar no CI antes do merge
 
 ### Arquivos
 - Identificar os arquivos afetados com base na atividade descrita.
@@ -690,7 +820,12 @@
 
 ### Validação
 - A tarefa será considerada concluída se o comportamento for compatível com a descrição da atividade e padrões do projeto.
-- A entrega deve estar versionada corretamente e com cobertura de testes (se aplicável).
+- **OBRIGATÓRIO**: A entrega deve estar versionada corretamente e com cobertura de testes adequada:
+  - **Testes unitários**: obrigatórios para serviços, utilitários e lógica de negócio
+  - **Testes de integração**: obrigatórios para endpoints de API, jobs de fila e integrações externas
+  - **Cobertura mínima**: 70% para novos códigos (medido por linha)
+  - Seguir padrões definidos em `docs/testing/TESTING-STANDARDS.md`
+  - Testes devem passar no CI antes do merge
 
 ### Arquivos
 - Identificar os arquivos afetados com base na atividade descrita.
@@ -716,7 +851,12 @@
 
 ### Validação
 - A tarefa será considerada concluída se o comportamento for compatível com a descrição da atividade e padrões do projeto.
-- A entrega deve estar versionada corretamente e com cobertura de testes (se aplicável).
+- **OBRIGATÓRIO**: A entrega deve estar versionada corretamente e com cobertura de testes adequada:
+  - **Testes unitários**: obrigatórios para serviços, utilitários e lógica de negócio
+  - **Testes de integração**: obrigatórios para endpoints de API, jobs de fila e integrações externas
+  - **Cobertura mínima**: 70% para novos códigos (medido por linha)
+  - Seguir padrões definidos em `docs/testing/TESTING-STANDARDS.md`
+  - Testes devem passar no CI antes do merge
 
 ### Arquivos
 - Identificar os arquivos afetados com base na atividade descrita.
@@ -742,7 +882,12 @@
 
 ### Validação
 - A tarefa será considerada concluída se o comportamento for compatível com a descrição da atividade e padrões do projeto.
-- A entrega deve estar versionada corretamente e com cobertura de testes (se aplicável).
+- **OBRIGATÓRIO**: A entrega deve estar versionada corretamente e com cobertura de testes adequada:
+  - **Testes unitários**: obrigatórios para serviços, utilitários e lógica de negócio
+  - **Testes de integração**: obrigatórios para endpoints de API, jobs de fila e integrações externas
+  - **Cobertura mínima**: 70% para novos códigos (medido por linha)
+  - Seguir padrões definidos em `docs/testing/TESTING-STANDARDS.md`
+  - Testes devem passar no CI antes do merge
 
 ### Arquivos
 - Identificar os arquivos afetados com base na atividade descrita.
@@ -768,7 +913,12 @@
 
 ### Validação
 - A tarefa será considerada concluída se o comportamento for compatível com a descrição da atividade e padrões do projeto.
-- A entrega deve estar versionada corretamente e com cobertura de testes (se aplicável).
+- **OBRIGATÓRIO**: A entrega deve estar versionada corretamente e com cobertura de testes adequada:
+  - **Testes unitários**: obrigatórios para serviços, utilitários e lógica de negócio
+  - **Testes de integração**: obrigatórios para endpoints de API, jobs de fila e integrações externas
+  - **Cobertura mínima**: 70% para novos códigos (medido por linha)
+  - Seguir padrões definidos em `docs/testing/TESTING-STANDARDS.md`
+  - Testes devem passar no CI antes do merge
 
 ### Arquivos
 - Identificar os arquivos afetados com base na atividade descrita.

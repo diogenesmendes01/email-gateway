@@ -20,9 +20,33 @@ email-gateway/
 
 ## 📋 Para Contribuidores (Humanos e IAs)
 
-**🤖 ATENÇÃO AGENTES DE IA:** Antes de criar commits, branches ou PRs, você **DEVE** ler e seguir:
+### 🤖 Para Agentes de IA Implementando Features
 
-👉 **[CONTRIBUTING.md](CONTRIBUTING.md)** - Guia completo de contribuição
+**⚡ COMECE AQUI - Leia isto PRIMEIRO:**
+
+👉 **[NEW-FEATURES.md](NEW-FEATURES.md)** - Guia rápido de início (30 segundos)
+
+**O que este guia oferece:**
+- ✅ **Decision tree** para identificar seu tipo de tarefa
+- ✅ **Documentos essenciais** específicos (em vez de ler todos os 20+ docs)
+- ✅ **Quick patterns** prontos para copiar e adaptar
+- ✅ **Checklists** para validação
+- ✅ **Troubleshooting** para problemas comuns
+
+**Economia:** 70% menos documentos para ler, contexto focado.
+
+---
+
+### 📚 Documentação Completa
+
+**Para workflow de Git/PRs:**
+
+👉 **[docs/AI_AGENT_GUIDE.md](docs/AI_AGENT_GUIDE.md)** - Regras de commits, branches, PRs
+
+**Para padrões de qualidade:**
+
+- [docs/CODE-QUALITY-STANDARDS.md](docs/CODE-QUALITY-STANDARDS.md) - Exception handling, logging, config
+- [docs/testing/TESTING-STANDARDS.md](docs/testing/TESTING-STANDARDS.md) - Testes (cobertura >= 70%)
 
 ### Links Rápidos para Regras
 
