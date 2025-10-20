@@ -15,7 +15,15 @@ async function testEncryption() {
   // Test data
   const testCpf = '12345678901';
   const testCnpj = '12345678000195';
-  const encryptionKey = process.env.ENCRYPTION_KEY || 'test-key-for-validation-only';
+  
+  // Validate encryption key is provided
+  if (!process.env.ENCRYPTION_KEY) {
+    console.error('❌ ENCRYPTION_KEY environment variable is required');
+    console.error('Generate with: openssl rand -base64 32');
+    process.exit(1);
+  }
+
+  const encryptionKey = process.env.ENCRYPTION_KEY;
 
   if (encryptionKey.length < 32) {
     console.error('❌ ENCRYPTION_KEY must be at least 32 characters');

@@ -180,6 +180,28 @@ export function generateSha256(data: string): string {
 }
 
 /**
+ * Comparação segura contra timing attacks
+ *
+ * @param a - Primeira string
+ * @param b - Segunda string
+ * @returns True se iguais
+ */
+export function constantTimeCompare(a: string, b: string): boolean {
+  if (a.length !== b.length) {
+    return false;
+  }
+
+  const bufferA = Buffer.from(a, 'utf8');
+  const bufferB = Buffer.from(b, 'utf8');
+
+  if (bufferA.length !== bufferB.length) {
+    return false;
+  }
+
+  return crypto.timingSafeEqual(bufferA, bufferB);
+}
+
+/**
  * Valida se uma string é um hash válido
  *
  * @param hash - String para validar

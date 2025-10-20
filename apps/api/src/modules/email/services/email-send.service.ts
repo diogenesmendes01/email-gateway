@@ -14,6 +14,7 @@ import {
   Injectable,
   BadRequestException,
   InternalServerErrorException,
+  Logger,
 } from '@nestjs/common';
 import { prisma } from '@email-gateway/database';
 import {
@@ -36,6 +37,7 @@ interface SendEmailParams {
 
 @Injectable()
 export class EmailSendService {
+  private readonly logger = new Logger(EmailSendService.name);
   /**
    * Send email asynchronously
    */
@@ -96,7 +98,14 @@ export class EmailSendService {
     // Em uma implementação completa, aqui seria feita a integração com BullMQ
     // await this.queueService.enqueueEmailJob(jobId, outbox);
     
-    console.log(`📧 Email enqueued for processing: ${jobId}`);
+    this.logger.log({
+      message: 'Email enqueued for processing',
+      jobId,
+      outboxId,
+      companyId,
+      requestId,
+      status: EmailStatus.ENQUEUED,
+    });
 
     // Create response
     const response: EmailSendResponse = {
@@ -336,12 +345,20 @@ export class EmailSendService {
   /**
    * Decrypt CPF/CNPJ for authorized access (using secure implementation)
    */
-  public decryptCpfCnpj(encryptedCpfCnpj: string, salt: string): string {
+  public decryptCpfCnpj(encryptedCpfCnpj: string, salt: string, requestId?: string): string {
     try {
       return decryptCpfCnpj(encryptedCpfCnpj, this.getEncryptionKey(), salt);
     } catch (error) {
-      console.error('Error decrypting CPF/CNPJ:', error);
-      throw new Error('Failed to decrypt sensitive data');
+      this.logger.error({
+        message: 'Failed to decrypt CPF/CNPJ',
+        requestId,
+        error: error.message,
+        stack: error.stack,
+      });
+      throw new InternalServerErrorException({
+        code: 'DECRYPTION_FAILED',
+        message: 'Unable to decrypt sensitive data',
+      });
     }
   }
 }
