@@ -189,17 +189,22 @@ export class AppConfigService {
 
   /**
    * Valida e transforma as variáveis de ambiente
+   * WHY: Falha rápida na inicialização evita problemas em runtime
+   * WHY: Validação centralizada garante consistência em toda aplicação
    */
   private validateEnvironment(): EnvironmentVariables {
+    // Transforma process.env em objeto tipado com validações
     const config = plainToClass(EnvironmentVariables, process.env, {
-      enableImplicitConversion: true,
+      enableImplicitConversion: true, // Converte strings para números/booleans automaticamente
     });
 
+    // Executa validações definidas nos decorators (@IsString, @IsNumber, etc.)
     const errors = validateSync(config, {
-      skipMissingProperties: false,
+      skipMissingProperties: false, // Falha se propriedades obrigatórias estão ausentes
     });
 
     if (errors.length > 0) {
+      // WHY: Mensagens detalhadas ajudam na depuração de problemas de configuração
       const errorMessages = errors.map(error => 
         Object.values(error.constraints || {}).join(', ')
       ).join('; ');
@@ -355,10 +360,13 @@ export class AppConfigService {
 
   /**
    * Mascara valores sensíveis para logging
+   * WHY: Previne vazamento de secrets em logs que podem ser compartilhados
+   * WHY: Mantém formato legível para debug sem expor dados completos
    */
   private maskSensitiveValue(value?: string): string {
     if (!value) return 'not_set';
-    if (value.length <= 8) return '***';
+    if (value.length <= 8) return '***'; // Valores muito curtos são completamente mascarados
+    // WHY: Mostra início e fim para facilitar identificação, mas mascara o meio
     return `${value.substring(0, 4)}***${value.substring(value.length - 4)}`;
   }
 

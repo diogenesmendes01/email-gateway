@@ -1,7 +1,5 @@
 # Dependencies
 node_modules/
-<<<<<<< Updated upstream
-=======
 */node_modules/
 
 # Environment variables
@@ -9,23 +7,6 @@ node_modules/
 .env.local
 .env.*.local
 
-# Build outputs
-dist/
-*/dist/
-build/
-*.tsbuildinfo
-
-# Logs
-logs/
-*.log
->>>>>>> Stashed changes
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-
-<<<<<<< Updated upstream
-# Environment variables
 # Block production and sensitive environment files
 .env.production
 .env.production.local
@@ -37,40 +18,39 @@ pnpm-debug.log*
 # .env.local - allowed for local overrides
 # .env.test - allowed for test configs
 
-# IDE and Editor
-=======
+# Build outputs
+dist/
+*/dist/
+build/
+*.tsbuildinfo
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
 # OS files
 .DS_Store
 Thumbs.db
 nul
 
-# IDE
->>>>>>> Stashed changes
+# IDE and Editor
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
-<<<<<<< Updated upstream
-.DS_Store
 
 # Claude Code local config
 .claude/
-
-# Build outputs
-dist/
-build/
-*.log
-
-# OS files
-Thumbs.db
-.DS_Store
 
 # Temporary files
 *.tmp
 tmp/
 temp/
-nul
 
 # Test coverage
 coverage/
@@ -91,10 +71,7 @@ prisma/migrations/**/migration.sql.backup
 *.pid
 
 # Build
-*.tsbuildinfo
 .cache/
-
-# Logs
 logs/
 lerna-debug.log*
 *.lcov
@@ -102,13 +79,3 @@ lerna-debug.log*
 # Package lock (usando workspaces)
 yarn.lock
 pnpm-lock.yaml
-=======
-
-# Testing
-coverage/
-.nyc_output/
-
-# Temporary files
-*.tmp
-*.temp
->>>>>>> Stashed changes

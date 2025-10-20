@@ -43,7 +43,8 @@ export class HealthService {
   }
 
   /**
-   * Executa todas as verificações de readiness
+   * Executa todas as verificações de readiness em paralelo
+   * Otimização: executa DB, Redis e SES checks simultaneamente para reduzir tempo de resposta
    */
   async performReadinessChecks(): Promise<ReadinessChecks> {
     const [database, redis, ses] = await Promise.allSettled([

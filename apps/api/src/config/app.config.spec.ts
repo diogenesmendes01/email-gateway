@@ -318,5 +318,78 @@ describe('AppConfigService', () => {
         new AppConfigService(mockConfigService as any);
       }).toThrow('Configuração de ambiente inválida');
     });
+
+    it('deve lançar erro para DATABASE_URL com formato inválido', () => {
+      const mockConfigService = {
+        get: jest.fn((key: string, defaultValue?: any) => {
+          const config = {
+            DATABASE_URL: 'invalid-url-format', // URL inválida
+            REDIS_URL: 'redis://localhost:6379',
+            AWS_ACCESS_KEY_ID: 'test-key',
+            AWS_SECRET_ACCESS_KEY: 'test-secret',
+            AWS_REGION: 'us-east-1',
+            AWS_SES_REGION: 'us-east-1',
+            SES_FROM_ADDRESS: 'test@example.com',
+            DASHBOARD_USERNAME: 'admin',
+            DASHBOARD_PASSWORD_HASH: 'hashed-password',
+            ENCRYPTION_KEY: 'a'.repeat(32),
+          };
+          return config[key] || defaultValue;
+        }),
+      };
+
+      expect(() => {
+        new AppConfigService(mockConfigService as any);
+      }).toThrow('Configuração de ambiente inválida');
+    });
+
+    it('deve lançar erro para PORT fora do range válido', () => {
+      const mockConfigService = {
+        get: jest.fn((key: string, defaultValue?: any) => {
+          const config = {
+            DATABASE_URL: 'postgresql://user:pass@localhost:5432/db',
+            REDIS_URL: 'redis://localhost:6379',
+            AWS_ACCESS_KEY_ID: 'test-key',
+            AWS_SECRET_ACCESS_KEY: 'test-secret',
+            AWS_REGION: 'us-east-1',
+            AWS_SES_REGION: 'us-east-1',
+            SES_FROM_ADDRESS: 'test@example.com',
+            DASHBOARD_USERNAME: 'admin',
+            DASHBOARD_PASSWORD_HASH: 'hashed-password',
+            ENCRYPTION_KEY: 'a'.repeat(32),
+            PORT: '70000', // Porta fora do range válido (1-65535)
+          };
+          return config[key] || defaultValue;
+        }),
+      };
+
+      expect(() => {
+        new AppConfigService(mockConfigService as any);
+      }).toThrow('Configuração de ambiente inválida');
+    });
+
+    it('deve lançar erro para REDIS_URL malformada', () => {
+      const mockConfigService = {
+        get: jest.fn((key: string, defaultValue?: any) => {
+          const config = {
+            DATABASE_URL: 'postgresql://user:pass@localhost:5432/db',
+            REDIS_URL: 'not-a-redis-url', // URL Redis inválida
+            AWS_ACCESS_KEY_ID: 'test-key',
+            AWS_SECRET_ACCESS_KEY: 'test-secret',
+            AWS_REGION: 'us-east-1',
+            AWS_SES_REGION: 'us-east-1',
+            SES_FROM_ADDRESS: 'test@example.com',
+            DASHBOARD_USERNAME: 'admin',
+            DASHBOARD_PASSWORD_HASH: 'hashed-password',
+            ENCRYPTION_KEY: 'a'.repeat(32),
+          };
+          return config[key] || defaultValue;
+        }),
+      };
+
+      expect(() => {
+        new AppConfigService(mockConfigService as any);
+      }).toThrow('Configuração de ambiente inválida');
+    });
   });
 });

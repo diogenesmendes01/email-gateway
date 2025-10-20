@@ -1,4 +1,5 @@
-import { Controller, Get, HttpStatus, HttpException } from '@nestjs/common';
+import { Controller, Get, HttpStatus, HttpException, UseGuards } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { QueueService } from '../queue/queue.service';
 import { HealthService } from './health.service';
 
@@ -14,6 +15,7 @@ export class HealthController {
    * Usado por load balancers e monitors básicos
    */
   @Get('healthz')
+  @Throttle(60, 60) // 60 requests per minute
   async getHealthz() {
     try {
       return {
@@ -39,6 +41,7 @@ export class HealthController {
    * Usado para determinar se a aplicação está pronta para receber tráfego
    */
   @Get('readyz')
+  @Throttle(30, 60) // 30 requests per minute (mais restritivo)
   async getReadyz() {
     try {
       const checks = await this.healthService.performReadinessChecks();
