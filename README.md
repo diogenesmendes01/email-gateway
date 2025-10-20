@@ -18,6 +18,38 @@ email-gateway/
 └── scripts/               # Scripts auxiliares
 ```
 
+## 🔐 Configuração de Segurança
+
+### Chave de Criptografia (OBRIGATÓRIO)
+
+O sistema usa criptografia AES-256-CBC para proteger dados sensíveis (CPF/CNPJ). É **obrigatório** configurar uma chave segura:
+
+```bash
+# Gerar chave de 32 bytes (256 bits)
+openssl rand -base64 32
+
+# Adicionar ao arquivo .env
+ENCRYPTION_KEY="sua-chave-gerada-aqui"
+```
+
+**⚠️ IMPORTANTE:**
+- A chave deve ter pelo menos 32 caracteres
+- Use chaves diferentes para dev/staging/prod
+- NUNCA commite a chave no repositório
+- A aplicação falhará ao iniciar sem uma chave válida
+
+### Validação de Segurança
+
+Execute o script de teste para validar a implementação:
+
+```bash
+npm run test:security
+# ou
+npx tsx scripts/test-encryption.ts
+```
+
+---
+
 ## 📋 Para Contribuidores (Humanos e IAs)
 
 ### 🤖 Para Agentes de IA Implementando Features

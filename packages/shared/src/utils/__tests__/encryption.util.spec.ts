@@ -13,6 +13,7 @@ import {
   deserializeEncrypted,
   generateHmacSha256,
   generateSha256,
+  constantTimeCompare,
   isValidHash,
   normalizeCpfCnpjForHash,
   hashCpfCnpjHmac,
@@ -263,6 +264,70 @@ describe('Encryption Utilities', () => {
       expect(() => {
         decryptCpfCnpj(encrypted, wrongPassword, salt);
       }).toThrow();
+    });
+  });
+
+  describe('constantTimeCompare', () => {
+    it('should return true for identical strings', () => {
+      const str1 = 'test-string-123';
+      const str2 = 'test-string-123';
+      
+      expect(constantTimeCompare(str1, str2)).toBe(true);
+    });
+
+    it('should return false for different strings of same length', () => {
+      const str1 = 'test-string-123';
+      const str2 = 'test-string-456';
+      
+      expect(constantTimeCompare(str1, str2)).toBe(false);
+    });
+
+    it('should return false for different length strings', () => {
+      const str1 = 'short';
+      const str2 = 'much-longer-string';
+      
+      expect(constantTimeCompare(str1, str2)).toBe(false);
+    });
+
+    it('should return false for empty string vs non-empty', () => {
+      const str1 = '';
+      const str2 = 'non-empty';
+      
+      expect(constantTimeCompare(str1, str2)).toBe(false);
+    });
+
+    it('should return true for empty strings', () => {
+      const str1 = '';
+      const str2 = '';
+      
+      expect(constantTimeCompare(str1, str2)).toBe(true);
+    });
+
+    it('should handle special characters correctly', () => {
+      const str1 = 'test@#$%^&*()';
+      const str2 = 'test@#$%^&*()';
+      const str3 = 'test@#$%^&*()!';
+      
+      expect(constantTimeCompare(str1, str2)).toBe(true);
+      expect(constantTimeCompare(str1, str3)).toBe(false);
+    });
+
+    it('should handle unicode characters', () => {
+      const str1 = 'café';
+      const str2 = 'café';
+      const str3 = 'cafe';
+      
+      expect(constantTimeCompare(str1, str2)).toBe(true);
+      expect(constantTimeCompare(str1, str3)).toBe(false);
+    });
+
+    it('should handle binary data correctly', () => {
+      const str1 = Buffer.from('binary-data').toString('binary');
+      const str2 = Buffer.from('binary-data').toString('binary');
+      const str3 = Buffer.from('different-data').toString('binary');
+      
+      expect(constantTimeCompare(str1, str2)).toBe(true);
+      expect(constantTimeCompare(str1, str3)).toBe(false);
     });
   });
 });
