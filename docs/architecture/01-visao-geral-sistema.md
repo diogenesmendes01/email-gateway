@@ -309,6 +309,18 @@ graph LR
 - Health checks em todos componentes
 - Graceful shutdown de workers
 
+### SLO/Capacidade e DR/RTO (TASK 7.2)
+
+- SLOs operacionais:
+  - Taxa de sucesso P95 ≥ 95%
+  - P95 de idade na fila ≤ 120s
+- Monitoramento contínuo via `MetricsService` + `SLOService`
+- Auto-throttle de concorrência do worker em violações de SLO
+- DR/RTO:
+  - Redis com AOF everysec e noeviction (ver `redis.conf`)
+  - Scripts de backup/restore do Postgres: `scripts/backup-postgres.sh` e `scripts/restore-postgres.sh`
+  - Testes de caos: `scripts/chaos-redis-down-60s.sh`, `scripts/chaos-disk-fill.sh`, flag `CHAOS_SES_429`
+
 ## Roadmap
 
 - [x] Implementação MVP básico

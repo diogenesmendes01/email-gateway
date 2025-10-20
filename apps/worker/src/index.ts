@@ -17,6 +17,7 @@ import { EmailSendProcessor } from './processors/email-send.processor';
 import { SESService } from './services/ses.service';
 import { MetricsService } from './services/metrics.service';
 import { TracingService } from './services/tracing.service';
+import { SLOService } from './services/slo.service';
 import { loadWorkerConfig } from './config/worker.config';
 import { loadSESConfig, validateSESConfig } from './config/ses.config';
 
@@ -28,10 +29,15 @@ class EmailWorker {
   private prisma: PrismaClient;
   private processor: EmailSendProcessor;
   private metricsService: MetricsService;
+  private sloService?: SLOService;
   private tracingService: TracingService;
   private redis: Redis;
   private queue: Queue;
   private isShuttingDown = false;
+  private currentConcurrency = 1;
+  private originalConcurrency = 1;
+  private violationCount = 0;
+  private recoveryCount = 0;
 
   constructor() {
     this.prisma = new PrismaClient();
@@ -54,6 +60,8 @@ class EmailWorker {
 
     // TASK 7.1: Inicializa serviços de métricas e tracing
     this.metricsService = new MetricsService(this.redis, this.queue);
+    // TASK 7.2: Inicializa SLO service
+    this.sloService = new SLOService(this.metricsService);
     this.tracingService = new TracingService('email-worker');
 
     // Carrega e valida configuração do SES
@@ -80,6 +88,8 @@ class EmailWorker {
     // Carrega configuração
     const config = loadWorkerConfig();
 
+    this.currentConcurrency = config.concurrency;
+    this.originalConcurrency = config.concurrency;
     console.log('[EmailWorker] Configuration:', {
       concurrency: config.concurrency,
       redis: {
@@ -162,6 +172,9 @@ class EmailWorker {
     // TASK 7.1: Setup metrics alert monitoring (check every 5 minutes)
     this.setupMetricsAlertMonitoring();
 
+    // TASK 7.2: Setup SLO monitoring (check every 5 minutes)
+    this.setupSLOMonitoring();
+
     console.log(
       `[EmailWorker] Worker started successfully with concurrency=${config.concurrency}`,
     );
@@ -202,6 +215,71 @@ class EmailWorker {
     setInterval(checkAlerts, checkInterval);
 
     console.log('[EmailWorker] Alert monitoring enabled (checking every 5 minutes)');
+  }
+
+  /**
+   * TASK 7.2: Monitora SLOs e executa ações de capacidade/DR leves
+   * - Se errorRate > limite ou queueAgeP95 > limite:
+   *   - Loga violação
+   *   - Reduz concorrência temporariamente (auto-throttle)
+   *   - Opcional: pausar novos jobs se situação crítica
+   */
+  private setupSLOMonitoring() {
+    const checkInterval = 5 * 60 * 1000; // 5 minutos
+    const minConcurrency = 1;
+
+    const evaluate = async () => {
+      if (this.isShuttingDown || !this.worker || !this.sloService) return;
+
+      try {
+        const result = await this.sloService.evaluate();
+
+        if (!result.withinSLO) {
+          console.error('[EmailWorker] SLO violation detected:', result.violations.join(', '));
+
+          // Estratégia simples de auto-throttle: reduzir concorrência pela metade
+          // até o mínimo de 1 sempre que houver violação
+          const current = this.currentConcurrency;
+          const next = Math.max(minConcurrency, Math.floor(current / 2));
+
+          if (next < current) {
+            try {
+              await this.worker.pause();
+              this.currentConcurrency = next;
+              await this.worker.resume();
+              console.warn(`[EmailWorker] Auto-throttle applied: concurrency ${current} -> ${next}`);
+            } catch (err) {
+              console.error('[EmailWorker] Failed to apply auto-throttle:', err);
+            }
+          }
+          this.violationCount += 1;
+          this.recoveryCount = 0;
+        } else {
+          // Recuperação: aumentar concorrência gradualmente após 3 avaliações OK
+          this.recoveryCount += 1;
+          this.violationCount = 0;
+          if (this.recoveryCount >= 3 && this.currentConcurrency < this.originalConcurrency) {
+            const increased = Math.min(this.originalConcurrency, Math.max(1, Math.floor(this.currentConcurrency * 1.5)));
+            try {
+              await this.worker.pause();
+              this.currentConcurrency = increased;
+              await this.worker.resume();
+              console.log(`[EmailWorker] SLO recovered; concurrency increased to ${increased}`);
+            } catch (err) {
+              console.error('[EmailWorker] Failed to increase concurrency:', err);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('[EmailWorker] Error in SLO monitoring:', error);
+      }
+    };
+
+    // primeira avaliação após 2 minutos
+    setTimeout(evaluate, 2 * 60 * 1000);
+    setInterval(evaluate, checkInterval);
+
+    console.log('[EmailWorker] SLO monitoring enabled (every 5 minutes)');
   }
 
   /**

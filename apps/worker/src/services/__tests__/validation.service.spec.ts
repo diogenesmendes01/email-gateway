@@ -45,6 +45,10 @@ describe('ValidationService', () => {
         },
         subject: 'Test Email',
         htmlRef: 'test-ref',
+        requestId: 'req-123',
+        to: 'test@example.com',
+        attempt: 1,
+        enqueuedAt: new Date().toISOString(),
       };
 
       const result = await validationService.validateIntegrity(validJobData);
@@ -97,6 +101,10 @@ describe('ValidationService', () => {
       },
       subject: 'Test Email',
       htmlRef: 'test-ref',
+      requestId: 'req-123',
+      to: 'test@example.com',
+      attempt: 1,
+      enqueuedAt: new Date().toISOString(),
     };
 
     it('should pass validation when outbox exists with matching companyId', async () => {
@@ -162,6 +170,10 @@ describe('ValidationService', () => {
       },
       subject: 'Test Email',
       htmlRef: 'test-ref',
+      requestId: 'req-123',
+      to: 'test@example.com',
+      attempt: 1,
+      enqueuedAt: new Date().toISOString(),
     };
 
     it('should pass validation for valid recipient with recipientId', async () => {
@@ -277,6 +289,10 @@ describe('ValidationService', () => {
       },
       subject: 'Test Email',
       htmlRef: 'test-ref',
+      requestId: 'req-123',
+      to: 'test@example.com',
+      attempt: 1,
+      enqueuedAt: new Date().toISOString(),
     };
 
     it('should pass validation for valid HTML template', async () => {
@@ -394,6 +410,10 @@ describe('ValidationService', () => {
       },
       subject: 'Test Email',
       htmlRef: 'test-ref',
+      requestId: 'req-123',
+      to: 'test@example.com',
+      attempt: 1,
+      enqueuedAt: new Date().toISOString(),
     };
 
     it('should run all validations when data is valid', async () => {
