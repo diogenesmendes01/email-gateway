@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ExecutionContext, HttpException, HttpStatus } from '@nestjs/common';
 import { RateLimitGuard } from './rate-limit.guard';
 import { AuthService } from './auth.service';
+import { RedisService } from './redis.service';
 
 describe('RateLimitGuard', () => {
   let guard: RateLimitGuard;
@@ -35,6 +36,15 @@ describe('RateLimitGuard', () => {
               burst: 120,
               windowMs: 1000,
             }),
+          },
+        },
+        {
+          provide: RedisService,
+          useValue: {
+            incr: jest.fn().mockResolvedValue(1),
+            expire: jest.fn().mockResolvedValue(1),
+            ttl: jest.fn().mockResolvedValue(60),
+            get: jest.fn().mockResolvedValue('0'),
           },
         },
       ],
