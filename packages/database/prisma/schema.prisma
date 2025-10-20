@@ -51,7 +51,14 @@ model Company {
   id        String   @id @default(cuid())
   name      String
   apiKey    String   @unique @map("api_key")
+  apiKeyHash String  @unique @map("api_key_hash") @db.VarChar(128)
+  apiKeyPrefix String @map("api_key_prefix") @db.VarChar(20)
+  apiKeyCreatedAt DateTime @map("api_key_created_at")
+  apiKeyExpiresAt DateTime @map("api_key_expires_at")
+  lastUsedAt DateTime? @map("last_used_at")
   isActive  Boolean  @default(true) @map("is_active")
+  allowedIps String[] @default([]) @map("allowed_ips")
+  rateLimitConfig Json? @map("rate_limit_config")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -60,6 +67,7 @@ model Company {
   emailOutbox  EmailOutbox[]
   emailLogs    EmailLog[]
   idempotencyKeys IdempotencyKey[]
+  auditLogs   AuditLog[]
 
   @@map("companies")
 }
@@ -183,4 +191,25 @@ model IdempotencyKey {
   @@unique([companyId, key])
   @@index([expiresAt])
   @@map("idempotency_keys")
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  companyId String   @map("company_id")
+  userId    String?  @map("user_id") @db.VarChar(128)
+  action    String   @db.VarChar(64)
+  resource  String   @db.VarChar(64)
+  resourceId String? @map("resource_id") @db.VarChar(128)
+  ipAddress String?  @map("ip_address") @db.VarChar(45)
+  userAgent String?  @map("user_agent") @db.Text
+  metadata  Json?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, createdAt])
+  @@index([action, createdAt])
+  @@index([resource, resourceId])
+  @@map("audit_logs")
 }
