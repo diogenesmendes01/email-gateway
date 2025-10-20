@@ -1,4 +1,4 @@
-import { UseGuards, applyDecorators } from '@nestjs/common';
+import { UseGuards, applyDecorators, createParamDecorator, ExecutionContext } from '@nestjs/common';
 import { ApiKeyGuard } from './auth.guard';
 import { RateLimitGuard } from './rate-limit.guard';
 import { BasicAuthGuard } from './basic-auth.guard';
@@ -47,3 +47,14 @@ export function Audited() {
     UseInterceptors(AuditInterceptor),
   );
 }
+
+/**
+ * Decorator para extrair companyId do request (injetado pelo ApiKeyGuard)
+ * Usado em endpoints protegidos por API Key
+ */
+export const Company = createParamDecorator(
+  (data: unknown, ctx: ExecutionContext) => {
+    const request = ctx.switchToHttp().getRequest();
+    return request.companyId;
+  },
+);

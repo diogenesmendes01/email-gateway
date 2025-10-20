@@ -7,6 +7,7 @@ import { RedisService } from './redis.service';
 describe('RateLimitGuard', () => {
   let guard: RateLimitGuard;
   let authService: AuthService;
+  let redisService: RedisService;
 
   const mockRequest = {
     companyId: 'company-123',
@@ -41,10 +42,11 @@ describe('RateLimitGuard', () => {
         {
           provide: RedisService,
           useValue: {
-            incr: jest.fn().mockResolvedValue(1),
-            expire: jest.fn().mockResolvedValue(1),
-            ttl: jest.fn().mockResolvedValue(60),
-            get: jest.fn().mockResolvedValue('0'),
+            incr: jest.fn(),
+            expire: jest.fn(),
+            ttl: jest.fn(),
+            get: jest.fn(),
+            isConnected: jest.fn().mockResolvedValue(true),
           },
         },
       ],
@@ -52,11 +54,11 @@ describe('RateLimitGuard', () => {
 
     guard = module.get<RateLimitGuard>(RateLimitGuard);
     authService = module.get<AuthService>(AuthService);
+    redisService = module.get<RedisService>(RedisService);
   });
 
   afterEach(() => {
-    // Clean up rate limit store
-    // Redis service is used instead of in-memory store
+    jest.clearAllMocks();
   });
 
   it('should be defined', () => {
@@ -65,6 +67,12 @@ describe('RateLimitGuard', () => {
 
   describe('canActivate', () => {
     it('should allow request when within rate limits', async () => {
+      // Mock Redis responses for successful rate limiting
+      (redisService.incr as jest.Mock).mockResolvedValue(1);
+      (redisService.expire as jest.Mock).mockResolvedValue(1);
+      (redisService.ttl as jest.Mock).mockResolvedValue(60);
+      (redisService.get as jest.Mock).mockResolvedValue('0');
+
       const result = await guard.canActivate(mockContext);
       expect(result).toBe(true);
     });
@@ -83,12 +91,12 @@ describe('RateLimitGuard', () => {
     });
 
     it('should throw 429 when RPS limit exceeded', async () => {
-      // Make 60 requests to hit the RPS limit
-      for (let i = 0; i < 60; i++) {
-        await guard.canActivate(mockContext);
-      }
+      // Mock Redis to simulate rate limit exceeded
+      (redisService.incr as jest.Mock).mockResolvedValue(61); // Exceeds RPS limit
+      (redisService.expire as jest.Mock).mockResolvedValue(1);
+      (redisService.ttl as jest.Mock).mockResolvedValue(60);
+      (redisService.get as jest.Mock).mockResolvedValue('0');
 
-      // The 61st request should be blocked
       await expect(guard.canActivate(mockContext)).rejects.toThrow(
         new HttpException(
           expect.objectContaining({
@@ -103,12 +111,12 @@ describe('RateLimitGuard', () => {
     });
 
     it('should throw 429 when burst limit exceeded', async () => {
-      // Make 120 requests to hit the burst limit
-      for (let i = 0; i < 120; i++) {
-        await guard.canActivate(mockContext);
-      }
+      // Mock Redis to simulate burst limit exceeded
+      (redisService.incr as jest.Mock).mockResolvedValue(1);
+      (redisService.expire as jest.Mock).mockResolvedValue(1);
+      (redisService.ttl as jest.Mock).mockResolvedValue(60);
+      (redisService.get as jest.Mock).mockResolvedValue('121'); // Exceeds burst limit
 
-      // The 121st request should be blocked by burst limit
       await expect(guard.canActivate(mockContext)).rejects.toThrow(
         new HttpException(
           expect.objectContaining({
@@ -132,6 +140,12 @@ describe('RateLimitGuard', () => {
         }),
       } as ExecutionContext;
 
+      // Mock Redis responses
+      (redisService.incr as jest.Mock).mockResolvedValue(1);
+      (redisService.expire as jest.Mock).mockResolvedValue(1);
+      (redisService.ttl as jest.Mock).mockResolvedValue(60);
+      (redisService.get as jest.Mock).mockResolvedValue('0');
+
       await guard.canActivate(contextWithResponse);
 
       expect(mockResponse.setHeader).toHaveBeenCalledWith('X-RateLimit-Limit', '60');
@@ -139,41 +153,80 @@ describe('RateLimitGuard', () => {
       expect(mockResponse.setHeader).toHaveBeenCalledWith('X-RateLimit-Burst-Limit', '120');
       expect(mockResponse.setHeader).toHaveBeenCalledWith('X-RateLimit-Burst-Remaining', '119');
     });
-  });
 
-  describe('getRateLimitStats', () => {
-    it('should return null when no data exists', () => {
-      const stats = guard.getRateLimitStats('company-123');
-      expect(stats).toBeNull();
+    it('should handle Redis connection failure gracefully', async () => {
+      // Mock Redis connection failure
+      (redisService.isConnected as jest.Mock).mockResolvedValue(false);
+      (redisService.incr as jest.Mock).mockRejectedValue(new Error('Redis connection failed'));
+
+      // Should allow request when Redis fails (fail-open strategy)
+      const result = await guard.canActivate(mockContext);
+      expect(result).toBe(true);
     });
 
-    it('should return stats when data exists', async () => {
-      await guard.canActivate(mockContext);
+    it('should use custom rate limit config from AuthService', async () => {
+      const customConfig = {
+        rps: 30,
+        burst: 60,
+        windowMs: 2000,
+      };
       
-      const stats = guard.getRateLimitStats('company-123');
-      expect(stats).toEqual({
-        current: 1,
-        limit: 60,
-        remaining: 59,
-        resetTime: expect.any(Number),
-        burstCurrent: 1,
-        burstLimit: 120,
-        burstRemaining: 119,
-      });
+      (authService.getRateLimitConfig as jest.Mock).mockReturnValue(customConfig);
+      (redisService.incr as jest.Mock).mockResolvedValue(1);
+      (redisService.expire as jest.Mock).mockResolvedValue(1);
+      (redisService.ttl as jest.Mock).mockResolvedValue(120);
+      (redisService.get as jest.Mock).mockResolvedValue('0');
+
+      const mockResponse = { setHeader: jest.fn() };
+      const contextWithResponse = {
+        ...mockContext,
+        switchToHttp: () => ({
+          getRequest: () => mockRequest,
+          getResponse: () => mockResponse,
+        }),
+      } as ExecutionContext;
+
+      await guard.canActivate(contextWithResponse);
+
+      expect(mockResponse.setHeader).toHaveBeenCalledWith('X-RateLimit-Limit', '30');
+      expect(mockResponse.setHeader).toHaveBeenCalledWith('X-RateLimit-Remaining', '29');
+      expect(mockResponse.setHeader).toHaveBeenCalledWith('X-RateLimit-Burst-Limit', '60');
+      expect(mockResponse.setHeader).toHaveBeenCalledWith('X-RateLimit-Burst-Remaining', '59');
     });
   });
 
-  describe('cleanup', () => {
-    it('should clean up expired entries', async () => {
-      // Make some requests
+  describe('Redis integration', () => {
+    it('should call Redis incr with correct key', async () => {
+      (redisService.incr as jest.Mock).mockResolvedValue(1);
+      (redisService.expire as jest.Mock).mockResolvedValue(1);
+      (redisService.ttl as jest.Mock).mockResolvedValue(60);
+      (redisService.get as jest.Mock).mockResolvedValue('0');
+
       await guard.canActivate(mockContext);
-      
-      // Manually expire the data
-      const key = 'rate_limit:company-123';
-      // Redis-based rate limiting doesn't use in-memory store
-      
-      // Redis-based rate limiting doesn't need manual cleanup
-      // Data expires automatically via TTL
+
+      expect(redisService.incr).toHaveBeenCalledWith('rate_limit:company-123');
+    });
+
+    it('should call Redis expire with correct TTL', async () => {
+      (redisService.incr as jest.Mock).mockResolvedValue(1);
+      (redisService.expire as jest.Mock).mockResolvedValue(1);
+      (redisService.ttl as jest.Mock).mockResolvedValue(60);
+      (redisService.get as jest.Mock).mockResolvedValue('0');
+
+      await guard.canActivate(mockContext);
+
+      expect(redisService.expire).toHaveBeenCalledWith('rate_limit:company-123', 60);
+    });
+
+    it('should call Redis get for burst counter', async () => {
+      (redisService.incr as jest.Mock).mockResolvedValue(1);
+      (redisService.expire as jest.Mock).mockResolvedValue(1);
+      (redisService.ttl as jest.Mock).mockResolvedValue(60);
+      (redisService.get as jest.Mock).mockResolvedValue('0');
+
+      await guard.canActivate(mockContext);
+
+      expect(redisService.get).toHaveBeenCalledWith('burst_limit:company-123');
     });
   });
 });

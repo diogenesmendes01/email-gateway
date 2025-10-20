@@ -43,6 +43,20 @@ enum EventType {
   VALIDATION_FAILED // Pipeline: Falha na validação
 }
 
+// TASK 6.2: Domain Management Enums
+enum DomainVerificationStatus {
+  PENDING
+  VERIFIED
+  FAILED
+  TEMPORARY_FAILURE
+}
+
+enum DKIMVerificationStatus {
+  PENDING
+  VERIFIED
+  FAILED
+}
+
 // ============================================
 // MODELS
 // ============================================
@@ -68,6 +82,7 @@ model Company {
   emailLogs    EmailLog[]
   idempotencyKeys IdempotencyKey[]
   auditLogs   AuditLog[]
+  domains     Domain[]
 
   @@map("companies")
 }
@@ -212,4 +227,32 @@ model AuditLog {
   @@index([action, createdAt])
   @@index([resource, resourceId])
   @@map("audit_logs")
+}
+
+// TASK 6.2: Domain Management Model
+model Domain {
+  id                    String                    @id @default(cuid())
+  companyId             String                    @map("company_id")
+  domain                String                    @db.VarChar(253)
+  status                DomainVerificationStatus  @default(PENDING)
+  dkimStatus            DKIMVerificationStatus    @default(PENDING)
+  dkimTokens            String[]                  @default([]) @map("dkim_tokens")
+  spfRecord             String?                   @map("spf_record") @db.VarChar(255)
+  dkimRecords           Json?                     @map("dkim_records")
+  dmarcRecord           String?                   @map("dmarc_record") @db.VarChar(255)
+  lastChecked           DateTime?                 @map("last_checked")
+  lastVerified          DateTime?                 @map("last_verified")
+  errorMessage          String?                   @map("error_message") @db.Text
+  warmupConfig          Json?                     @map("warmup_config")
+  isProductionReady     Boolean                   @default(false) @map("is_production_ready")
+  createdAt             DateTime                  @default(now()) @map("created_at")
+  updatedAt             DateTime                  @updatedAt @map("updated_at")
+
+  // Relations
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, domain])
+  @@index([companyId, status])
+  @@index([domain])
+  @@map("domains")
 }

@@ -15,6 +15,10 @@ export * from './schemas/email-job-retry.types';
 
 // Types
 export * from './types/email-pipeline.types';
+export * from './types/domain.types';
+
+// Services
+export * from './services/domain-management.service';
 
 // Utils
 export * from './utils/masking.util';

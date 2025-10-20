@@ -8,6 +8,7 @@ import { EmailModule } from './modules/email/email.module';
 import { RecipientModule } from './modules/recipient/recipient.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
+import { DomainModule } from './modules/domain/domain.module';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
     EmailModule,
     RecipientModule,
     DashboardModule,
+    DomainModule,
   ],
 })
 export class AppModule {}
