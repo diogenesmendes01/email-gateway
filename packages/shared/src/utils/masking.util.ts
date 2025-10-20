@@ -34,12 +34,12 @@ export function maskCPF(cpf: string | null | undefined): string {
 /**
  * Mascara um CNPJ (formato: 00.000.000/0000-00)
  *
- * Exemplos:
- * - "12345678000195" -> "**.***.***/****-95"
- * - "12.345.678/0001-95" -> "**.***.***/****-95"
+ * @example
+ * maskCNPJ("12345678000195") // Returns masked CNPJ
+ * maskCNPJ("12.345.678/0001-95") // Returns masked CNPJ
  *
- * @param cnpj - CNPJ com ou sem formatacao
- * @returns CNPJ mascarado
+ * @param cnpj - CNPJ with or without formatting
+ * @returns Masked CNPJ
  */
 export function maskCNPJ(cnpj: string | null | undefined): string {
   if (!cnpj) return '**.***.***/****-**';
@@ -167,7 +167,7 @@ export function maskObject<T extends Record<string, any>>(
 
   // Lista de chaves que devem ser mascaradas
   const documentKeys = ['cpf', 'cnpj', 'cpfCnpj', 'cpf_cnpj'];
-  const emailKeys = ['email', 'to'];
+  const emailKeys = ['email', 'to', 'cc', 'bcc'];
   const nameKeys = maskNames ? ['nome', 'name', 'razaoSocial', 'razao_social'] : [];
   const customKeys = keysToMask;
 
@@ -182,9 +182,15 @@ export function maskObject<T extends Record<string, any>>(
     if (documentKeys.includes(key)) {
       masked[key] = maskCPFOrCNPJ(String(value)) as any;
     }
-    // Mascara emails
+    // Mascara emails (pode ser string ou array de strings)
     else if (emailKeys.includes(key)) {
-      masked[key] = maskEmail(String(value)) as any;
+      if (Array.isArray(value)) {
+        masked[key] = value.map((email: any) =>
+          typeof email === 'string' ? maskEmail(email) : email,
+        ) as any;
+      } else {
+        masked[key] = maskEmail(String(value)) as any;
+      }
     }
     // Mascara nomes (se habilitado)
     else if (nameKeys.includes(key)) {
@@ -194,14 +200,16 @@ export function maskObject<T extends Record<string, any>>(
     else if (customKeys.includes(key)) {
       masked[key] = '***' as any;
     }
-    // Processa objetos aninhados recursivamente
-    else if (typeof value === 'object' && !Array.isArray(value)) {
+    // Processa objetos aninhados recursivamente (apenas plain objects)
+    else if (typeof value === 'object' && !Array.isArray(value) && value.constructor === Object) {
       masked[key] = maskObject(value, options);
     }
     // Processa arrays recursivamente
     else if (Array.isArray(value)) {
       masked[key] = value.map((item: any) =>
-        typeof item === 'object' ? maskObject(item, options) : item,
+        typeof item === 'object' && item !== null && item.constructor === Object
+          ? maskObject(item, options)
+          : item,
       ) as any;
     }
   }

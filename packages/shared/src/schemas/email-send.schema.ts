@@ -552,31 +552,15 @@ export function normalizeCpfCnpj(cpfCnpj: string): string {
 }
 
 /**
- * Mascara CPF (XXX.XXX.XXX-XX)
- */
-export function maskCPF(cpf: string): string {
-  if (cpf.length !== LIMITS.CPF_LENGTH) return cpf;
-  return `***.${cpf.substring(3, 6)}.${cpf.substring(6, 9)}-**`;
-}
-
-/**
- * Mascara CNPJ (formato: XX.XXX.XXX/XXXX-XX com asteriscos)
- */
-export function maskCNPJ(cnpj: string): string {
-  if (cnpj.length !== LIMITS.CNPJ_LENGTH) return cnpj;
-  return `**.${cnpj.substring(2, 5)}.${cnpj.substring(5, 8)}/${cnpj.substring(8, 12)}-**`;
-}
-
-/**
  * Mascara CPF ou CNPJ automaticamente
  */
 export function maskCpfCnpj(cpfCnpj: string): string {
   const normalized = normalizeCpfCnpj(cpfCnpj);
 
   if (normalized.length === LIMITS.CPF_LENGTH) {
-    return maskCPF(normalized);
+    return `***.${normalized.substring(3, 6)}.${normalized.substring(6, 9)}-**`;
   } else if (normalized.length === LIMITS.CNPJ_LENGTH) {
-    return maskCNPJ(normalized);
+    return `**.${normalized.substring(2, 5)}.${normalized.substring(5, 8)}/${normalized.substring(8, 12)}-**`;
   }
 
   return cpfCnpj; // Retorna original se não for CPF nem CNPJ válido

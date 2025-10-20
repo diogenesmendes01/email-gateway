@@ -7,8 +7,8 @@
  * Gravação de email_logs e email_events com requestId/jobId/messageId
  */
 
-import { PrismaClient, EmailStatus, EventType } from '@email-gateway/database';
-import { EmailSendJobData, EmailPipelineState } from '@email-gateway/shared';
+import { PrismaClient, EmailStatus, EventType } from '@prisma/client';
+import { EmailSendJobData, EmailPipelineState, maskObject } from '@email-gateway/shared';
 import type { MappedError } from './error-mapping.service';
 
 /**
@@ -51,42 +51,45 @@ export class LoggingService {
    * @returns Email log criado/atualizado
    */
   async upsertEmailLog(data: CreateEmailLogData) {
+    // Aplicar masking para proteger PII nos logs
+    const maskedData = maskObject(data, { maskNames: false });
+    
     const logData: any = {
-      companyId: data.companyId,
-      recipientId: data.recipientId,
-      to: data.to,
-      subject: data.subject,
-      status: data.status,
-      attempts: data.attempts,
-      requestId: data.requestId,
+      companyId: maskedData.companyId,
+      recipientId: maskedData.recipientId,
+      to: maskedData.to,
+      subject: maskedData.subject,
+      status: maskedData.status,
+      attempts: maskedData.attempts,
+      requestId: maskedData.requestId,
     };
 
     // Campos opcionais
-    if (data.sesMessageId) {
-      logData.sesMessageId = data.sesMessageId;
+    if (maskedData.sesMessageId) {
+      logData.sesMessageId = maskedData.sesMessageId;
     }
-    if (data.errorCode) {
-      logData.errorCode = data.errorCode;
+    if (maskedData.errorCode) {
+      logData.errorCode = maskedData.errorCode;
     }
-    if (data.errorReason) {
-      logData.errorReason = data.errorReason;
+    if (maskedData.errorReason) {
+      logData.errorReason = maskedData.errorReason;
     }
-    if (data.durationMs !== undefined) {
-      logData.durationMs = data.durationMs;
+    if (maskedData.durationMs !== undefined) {
+      logData.durationMs = maskedData.durationMs;
     }
 
     // Define timestamps baseado no status
-    if (data.status === 'SENT') {
+    if (maskedData.status === 'SENT') {
       logData.sentAt = new Date();
-    } else if (data.status === 'FAILED') {
+    } else if (maskedData.status === 'FAILED') {
       logData.failedAt = new Date();
     }
 
     return await this.prisma.emailLog.upsert({
-      where: { outboxId: data.outboxId },
+      where: { outboxId: maskedData.outboxId },
       create: {
         ...logData,
-        outboxId: data.outboxId,
+        outboxId: maskedData.outboxId,
       },
       update: logData,
     });

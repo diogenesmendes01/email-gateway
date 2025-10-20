@@ -128,10 +128,13 @@ main() {
   # Buscar quota do SES
   echo -e "${BLUE}Buscando quota do SES...${NC}"
 
+  set +e
   QUOTA_JSON=$(aws sesv2 get-account --region "$REGION" --output json 2>&1)
+  AWS_EXIT_CODE=$?
+  set -e
 
-  if [[ $? -ne 0 ]]; then
-    echo -e "${RED}Erro ao buscar quota do SES:${NC}"
+  if [[ $AWS_EXIT_CODE -ne 0 ]]; then
+    echo -e "${RED}Erro: AWS CLI falhou (código de saída: $AWS_EXIT_CODE)${NC}"
     echo "$QUOTA_JSON"
     exit 1
   fi

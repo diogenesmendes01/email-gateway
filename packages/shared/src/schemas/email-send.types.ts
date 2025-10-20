@@ -71,9 +71,9 @@ export enum EmailEventType {
 }
 
 /**
- * Códigos de erro internos
+ * Códigos de erro da API
  */
-export enum ErrorCode {
+export enum ApiErrorCode {
   // Erros de cliente (4xx)
   BAD_REQUEST = 'BAD_REQUEST',
   UNAUTHORIZED = 'UNAUTHORIZED',

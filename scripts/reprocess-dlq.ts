@@ -80,10 +80,20 @@ function parseArgs(): Options {
         options.filter = args[++i];
         break;
       case '--limit':
-        options.limit = parseInt(args[++i], 10);
+        const limit = parseInt(args[++i], 10);
+        if (isNaN(limit) || limit <= 0) {
+          console.error(`${COLORS.red}Erro: --limit deve ser um número positivo${COLORS.reset}`);
+          process.exit(1);
+        }
+        options.limit = limit;
         break;
       case '--delay':
-        options.delay = parseInt(args[++i], 10);
+        const delay = parseInt(args[++i], 10);
+        if (isNaN(delay) || delay < 0) {
+          console.error(`${COLORS.red}Erro: --delay deve ser um número não negativo${COLORS.reset}`);
+          process.exit(1);
+        }
+        options.delay = delay;
         break;
       case '--help':
         console.log(`
@@ -264,6 +274,15 @@ async function main() {
         console.log('');
       }
 
+      // Aviso sobre quota SES para lotes grandes
+      if (jobsToReprocess.length > 100) {
+        console.log(`${COLORS.yellow}⚠️  PROCESSAMENTO EM MASSA DETECTADO${COLORS.reset}`);
+        console.log(`${COLORS.yellow}Você está prestes a reprocessar ${jobsToReprocess.length} jobs${COLORS.reset}`);
+        console.log(`${COLORS.yellow}Considere verificar a quota SES antes de continuar:${COLORS.reset}`);
+        console.log(`${COLORS.cyan}  ./scripts/monitor-ses-quota.sh${COLORS.reset}`);
+        console.log('');
+      }
+
       console.log(`${COLORS.yellow}Deseja continuar com o reprocessamento? (y/n)${COLORS.reset}`);
 
       // Aguardar input do usuário
@@ -296,6 +315,8 @@ async function main() {
 
       let reprocessed = 0;
       let failed = 0;
+      let consecutiveFailures = 0;
+      const MAX_CONSECUTIVE_FAILURES = 5;
 
       for (const job of jobsToReprocess) {
         try {
@@ -310,6 +331,7 @@ async function main() {
 
           console.log(`${COLORS.green}✓${COLORS.reset} Job ${job.id} reprocessado`);
           reprocessed++;
+          consecutiveFailures = 0; // Reset on success
 
           // Delay entre reprocessamentos
           if (options.delay > 0) {
@@ -318,6 +340,17 @@ async function main() {
         } catch (error) {
           console.log(`${COLORS.red}✗${COLORS.reset} Job ${job.id} falhou: ${error}`);
           failed++;
+          consecutiveFailures++;
+
+          // Circuit breaker: abortar se muitas falhas consecutivas
+          if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+            console.log('');
+            console.log(`${COLORS.red}🚨 CIRCUIT BREAKER ATIVADO${COLORS.reset}`);
+            console.log(`${COLORS.red}Detectadas ${consecutiveFailures} falhas consecutivas${COLORS.reset}`);
+            console.log(`${COLORS.red}Abortando reprocessamento para evitar falhas sistêmicas${COLORS.reset}`);
+            console.log('');
+            break;
+          }
         }
       }
 
