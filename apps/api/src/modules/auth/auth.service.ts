@@ -1,5 +1,6 @@
 import { Injectable, UnauthorizedException, ForbiddenException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { prisma } from '@email-gateway/database';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 
@@ -10,6 +11,7 @@ export interface ApiKeyPayload {
   lastUsedAt?: Date;
   allowedIps?: string[];
   rateLimitConfig?: RateLimitConfig;
+  isActive: boolean;
 }
 
 export interface RateLimitConfig {
@@ -56,11 +58,43 @@ export class AuthService {
       // Extrai prefixo da API Key
       const prefix = apiKey.split('_')[0] + '_' + apiKey.split('_')[1];
       
-      // Aqui seria feita a consulta ao banco de dados
-      // Por enquanto, retorna null para indicar que precisa ser implementado
-      // TODO: Implementar consulta ao banco de dados
+      // Busca todas as empresas para verificar o hash da API Key
+      const companies = await prisma.company.findMany({
+        where: {
+          apiKeyPrefix: prefix,
+          isActive: true,
+        },
+      });
+
+      // Verifica se alguma empresa tem a API Key válida
+      for (const company of companies) {
+        const isValid = await bcrypt.compare(apiKey, company.apiKeyHash);
+        if (isValid) {
+          // Verifica se a API Key não expirou
+          if (this.isApiKeyExpired(company.apiKeyExpiresAt)) {
+            throw new UnauthorizedException('API Key has expired');
+          }
+
+          // Atualiza lastUsedAt
+          await this.updateLastUsedAt(company.id);
+
+          return {
+            companyId: company.id,
+            prefix: company.apiKeyPrefix,
+            expiresAt: company.apiKeyExpiresAt,
+            lastUsedAt: company.lastUsedAt,
+            allowedIps: company.allowedIps,
+            rateLimitConfig: company.rateLimitConfig as RateLimitConfig,
+            isActive: company.isActive,
+          };
+        }
+      }
+
       return null;
     } catch (error) {
+      if (error instanceof UnauthorizedException) {
+        throw error;
+      }
       throw new UnauthorizedException('Invalid API Key format');
     }
   }
@@ -72,17 +106,32 @@ export class AuthService {
     companyId: string,
     clientIp: string,
   ): Promise<boolean> {
-    // TODO: Implementar verificação de IP allowlist
-    // Por enquanto, retorna true para permitir todos os IPs
-    return true;
+    const company = await prisma.company.findUnique({
+      where: { id: companyId },
+      select: { allowedIps: true },
+    });
+
+    if (!company) {
+      return false;
+    }
+
+    // Se não há IPs na allowlist, permite todos
+    if (!company.allowedIps || company.allowedIps.length === 0) {
+      return true;
+    }
+
+    // Verifica se o IP está na allowlist
+    return company.allowedIps.includes(clientIp);
   }
 
   /**
    * Atualiza lastUsedAt da API Key
    */
   async updateLastUsedAt(companyId: string): Promise<void> {
-    // TODO: Implementar atualização do lastUsedAt no banco
-    console.log(`Updating lastUsedAt for company: ${companyId}`);
+    await prisma.company.update({
+      where: { id: companyId },
+      data: { lastUsedAt: new Date() },
+    });
   }
 
   /**
@@ -128,8 +177,18 @@ export class AuthService {
     userAgent?: string;
     metadata?: any;
   }): Promise<void> {
-    // TODO: Implementar logging de auditoria no banco
-    console.log('Audit Event:', data);
+    await prisma.auditLog.create({
+      data: {
+        companyId: data.companyId,
+        userId: data.userId,
+        action: data.action,
+        resource: data.resource,
+        resourceId: data.resourceId,
+        ipAddress: data.ipAddress,
+        userAgent: data.userAgent,
+        metadata: data.metadata,
+      },
+    });
   }
 
   /**

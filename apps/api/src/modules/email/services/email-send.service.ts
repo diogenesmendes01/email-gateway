@@ -177,7 +177,7 @@ export class EmailSendService {
   private async processRecipient(
     companyId: string,
     recipient: EmailSendBody['recipient'],
-  ): Promise<string> {
+  ): Promise<string | undefined> {
     if (!recipient) {
       return undefined;
     }

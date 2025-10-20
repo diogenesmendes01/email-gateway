@@ -4,6 +4,7 @@ import {
   ExecutionContext,
   UnauthorizedException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Request } from 'express';
 import { AuthService } from './auth.service';
 
@@ -14,7 +15,10 @@ interface BasicAuthCredentials {
 
 @Injectable()
 export class BasicAuthGuard implements CanActivate {
-  constructor(private authService: AuthService) {}
+  constructor(
+    private authService: AuthService,
+    private configService: ConfigService,
+  ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<Request>();
@@ -58,25 +62,21 @@ export class BasicAuthGuard implements CanActivate {
   }
 
   private async validateCredentials(credentials: BasicAuthCredentials): Promise<boolean> {
-    // TODO: Implementar validação contra banco de dados ou configuração
-    // Por enquanto, usa credenciais hardcoded para desenvolvimento
-    const validCredentials = [
-      {
-        username: 'admin',
-        password: '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewdBPj8j/7qJ2V9O', // 'admin123'
-      },
-      {
-        username: 'operator',
-        password: '$2b$12$8KQj7F8tN3vR2mP9qL5sCOYz6TtxMQJqhN8/LewdBPj8j/7qJ2V9O', // 'operator123'
-      },
-    ];
+    // Obtém credenciais das variáveis de ambiente
+    const dashboardUsername = this.configService.get<string>('DASHBOARD_USERNAME', 'admin');
+    const dashboardPasswordHash = this.configService.get<string>('DASHBOARD_PASSWORD_HASH');
+    
+    if (!dashboardPasswordHash) {
+      throw new UnauthorizedException('Dashboard authentication not configured');
+    }
 
-    const user = validCredentials.find(u => u.username === credentials.username);
-    if (!user) {
+    // Verifica se o usuário corresponde
+    if (credentials.username !== dashboardUsername) {
       return false;
     }
 
-    return this.authService.validateBasicAuth(credentials.password, user.password);
+    // Valida a senha
+    return this.authService.validateBasicAuth(credentials.password, dashboardPasswordHash);
   }
 
   /**

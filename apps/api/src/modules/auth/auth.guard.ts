@@ -28,7 +28,7 @@ export class ApiKeyGuard implements CanActivate {
     }
 
     // Verifica se a empresa está ativa
-    if (!payload) {
+    if (!payload.isActive) {
       throw new ForbiddenException('Company is inactive');
     }
 
@@ -52,8 +52,8 @@ export class ApiKeyGuard implements CanActivate {
     await this.authService.updateLastUsedAt(payload.companyId);
 
     // Adiciona informações da empresa ao request
-    request['company'] = payload;
-    request['companyId'] = payload.companyId;
+    (request as any)['company'] = payload;
+    (request as any)['companyId'] = payload.companyId;
 
     return true;
   }

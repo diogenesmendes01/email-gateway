@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 
 // Services
 import { AuthService } from './auth.service';
+import { RedisService } from './redis.service';
 
 // Guards
 import { ApiKeyGuard } from './auth.guard';
@@ -17,6 +18,7 @@ import { AuditInterceptor } from './audit.interceptor';
   controllers: [],
   providers: [
     AuthService,
+    RedisService,
     ApiKeyGuard,
     RateLimitGuard,
     BasicAuthGuard,
@@ -24,6 +26,7 @@ import { AuditInterceptor } from './audit.interceptor';
   ],
   exports: [
     AuthService,
+    RedisService,
     ApiKeyGuard,
     RateLimitGuard,
     BasicAuthGuard,
