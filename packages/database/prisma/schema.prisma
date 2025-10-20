@@ -43,17 +43,17 @@ enum EventType {
   VALIDATION_FAILED // Pipeline: Falha na validação
 }
 
+// TASK 6.2: Domain Management Enums
 enum DomainVerificationStatus {
   PENDING
-  SUCCESS
+  VERIFIED
   FAILED
   TEMPORARY_FAILURE
 }
 
 enum DKIMVerificationStatus {
-  NOT_STARTED
   PENDING
-  SUCCESS
+  VERIFIED
   FAILED
 }
 
@@ -229,24 +229,30 @@ model AuditLog {
   @@map("audit_logs")
 }
 
+// TASK 6.2: Domain Management Model
 model Domain {
-  id               String                   @id @default(cuid())
-  companyId        String                   @map("company_id")
-  name             String                   @unique @db.VarChar(255)
-  status           DomainVerificationStatus @default(PENDING)
-  verificationToken String?                 @map("verification_token") @db.VarChar(255)
-  dkimEnabled      Boolean                  @default(false) @map("dkim_enabled")
-  dkimTokens       String[]                 @map("dkim_tokens") @default([])
-  dkimStatus       DKIMVerificationStatus   @default(NOT_STARTED) @map("dkim_status")
-  lastChecked      DateTime?                @map("last_checked")
-  createdAt        DateTime                 @default(now()) @map("created_at")
-  updatedAt        DateTime                 @updatedAt @map("updated_at")
+  id                    String                    @id @default(cuid())
+  companyId             String                    @map("company_id")
+  domain                String                    @db.VarChar(253)
+  status                DomainVerificationStatus  @default(PENDING)
+  dkimStatus            DKIMVerificationStatus    @default(PENDING)
+  dkimTokens            String[]                  @default([]) @map("dkim_tokens")
+  spfRecord             String?                   @map("spf_record") @db.VarChar(255)
+  dkimRecords           Json?                     @map("dkim_records")
+  dmarcRecord           String?                   @map("dmarc_record") @db.VarChar(255)
+  lastChecked           DateTime?                 @map("last_checked")
+  lastVerified          DateTime?                 @map("last_verified")
+  errorMessage          String?                   @map("error_message") @db.Text
+  warmupConfig          Json?                     @map("warmup_config")
+  isProductionReady     Boolean                   @default(false) @map("is_production_ready")
+  createdAt             DateTime                  @default(now()) @map("created_at")
+  updatedAt             DateTime                  @updatedAt @map("updated_at")
 
   // Relations
   company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
-  @@index([companyId])
-  @@index([status])
-  @@index([lastChecked])
+  @@unique([companyId, domain])
+  @@index([companyId, status])
+  @@index([domain])
   @@map("domains")
 }

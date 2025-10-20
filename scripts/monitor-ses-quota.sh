@@ -1,342 +1,232 @@
 #!/bin/bash
 
-# =============================================================================
-# Monitor SES Quota Script
-# 
-# Script para monitorar quota SES e alertar quando próxima do limite
-# 
-# TASK 6.2 — SES, domínio e DNS (SPF/DKIM)
-# Monitoramento de quota para prevenção de estouro
-# =============================================================================
+# SES Quota Monitoring Script
+# TASK 6.2 - SES Domain and DNS Management
+#
+# Usage:
+#   ./monitor-ses-quota.sh [threshold_percentage]
+#
+# Default threshold: 80%
+# Sends alert when quota usage exceeds threshold
 
 set -e
 
-# Configurações
-REGION="${AWS_REGION:-us-east-1}"
-THRESHOLD="${SES_QUOTA_THRESHOLD:-80}"
-LOG_FILE="${SES_QUOTA_LOG:-/var/log/ses-quota.log}"
-ALERT_EMAIL="${SES_ALERT_EMAIL:-}"
+# Configuration
+THRESHOLD=${1:-80}
+LOG_FILE="/var/log/ses-quota-monitor.log"
+ALERT_EMAIL="${ALERT_EMAIL:-admin@example.com}"
 
-# Cores para output
+# Colors for output
 RED='\033[0;31m'
-YELLOW='\033[1;33m'
 GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-# Função para logging
+# Log function
 log() {
-    local level=$1
-    shift
-    local message="$*"
-    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
-    
-    echo "[$timestamp] [$level] $message" | tee -a "$LOG_FILE"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG_FILE"
 }
 
-log_info() {
-    log "INFO" "$@"
-}
-
-log_warn() {
-    log "WARN" "$@"
-}
-
-log_error() {
-    log "ERROR" "$@"
-}
-
-# Função para verificar se AWS CLI está disponível
-check_aws_cli() {
-    if ! command -v aws &> /dev/null; then
-        log_error "AWS CLI não encontrado. Instale o AWS CLI primeiro."
-        exit 1
-    fi
-}
-
-# Função para verificar credenciais AWS
-check_aws_credentials() {
-    if ! aws sts get-caller-identity &> /dev/null; then
-        log_error "Credenciais AWS não configuradas ou inválidas."
-        exit 1
-    fi
-}
-
-# Função para obter quota SES
-get_ses_quota() {
-    log_info "Verificando quota SES na região $REGION..."
-    
-    local quota_output
-    quota_output=$(aws sesv2 get-account --region "$REGION" --query 'SendQuota' --output json 2>/dev/null)
-    
-    if [ $? -ne 0 ]; then
-        log_error "Falha ao obter quota SES. Verifique permissões e região."
-        exit 1
-    fi
-    
-    echo "$quota_output"
-}
-
-# Função para calcular percentual de uso
-calculate_usage_percentage() {
-    local sent=$1
-    local max=$2
-    
-    if [ "$max" -eq 0 ]; then
-        echo "0"
-        return
-    fi
-    
-    local percentage=$(echo "scale=2; $sent * 100 / $max" | bc -l)
-    echo "$percentage"
-}
-
-# Função para formatar números
-format_number() {
-    local num=$1
-    printf "%'d" "$num"
-}
-
-# Função para enviar alerta por email
+# Alert function
 send_alert() {
-    local subject="$1"
-    local body="$2"
+    local message="$1"
+    log "🚨 ALERT: $message"
     
-    if [ -n "$ALERT_EMAIL" ]; then
-        log_info "Enviando alerta para $ALERT_EMAIL..."
-        
-        # Tenta usar mail se disponível
-        if command -v mail &> /dev/null; then
-            echo "$body" | mail -s "$subject" "$ALERT_EMAIL" 2>/dev/null || log_warn "Falha ao enviar email via mail"
-        # Tenta usar sendmail se disponível
-        elif command -v sendmail &> /dev/null; then
-            {
-                echo "Subject: $subject"
-                echo "To: $ALERT_EMAIL"
-                echo ""
-                echo "$body"
-            } | sendmail "$ALERT_EMAIL" 2>/dev/null || log_warn "Falha ao enviar email via sendmail"
-        else
-            log_warn "Nenhum cliente de email encontrado. Configure mail ou sendmail."
-        fi
+    # Send email alert if configured
+    if [ -n "$ALERT_EMAIL" ] && command -v mail >/dev/null 2>&1; then
+        echo "$message" | mail -s "SES Quota Alert" "$ALERT_EMAIL"
+    fi
+    
+    # Send to Slack if webhook is configured
+    if [ -n "$SLACK_WEBHOOK_URL" ] && command -v curl >/dev/null 2>&1; then
+        curl -X POST -H 'Content-type: application/json' \
+            --data "{\"text\":\"🚨 SES Quota Alert: $message\"}" \
+            "$SLACK_WEBHOOK_URL"
     fi
 }
 
-# Função para exibir status da quota
-display_quota_status() {
-    local quota_data="$1"
-    
-    local max_24h=$(echo "$quota_data" | jq -r '.Max24HourSend // 0')
-    local sent_24h=$(echo "$quota_data" | jq -r '.SentLast24Hours // 0')
-    local max_rate=$(echo "$quota_data" | jq -r '.MaxSendRate // 0')
-    
-    local percentage=$(calculate_usage_percentage "$sent_24h" "$max_24h")
-    local remaining=$((max_24h - sent_24h))
-    
-    echo ""
-    echo "=========================================="
-    echo "📊 Status da Quota SES"
-    echo "=========================================="
-    echo "Região: $REGION"
-    echo "Quota máxima (24h): $(format_number $max_24h) emails"
-    echo "Enviados (24h): $(format_number $sent_24h) emails"
-    echo "Taxa máxima: $max_rate emails/segundo"
-    echo "Uso: ${percentage}%"
-    echo "Restante: $(format_number $remaining) emails"
-    echo "=========================================="
-    
-    # Determina cor baseada no percentual
-    if (( $(echo "$percentage > $THRESHOLD" | bc -l) )); then
-        echo -e "${RED}⚠️  QUOTA PRÓXIMA DO LIMITE!${NC}"
-        return 1
-    elif (( $(echo "$percentage > 60" | bc -l) )); then
-        echo -e "${YELLOW}⚠️  Quota em uso moderado${NC}"
-        return 0
-    else
-        echo -e "${GREEN}✅ Quota em uso normal${NC}"
-        return 0
-    fi
-}
-
-# Função para verificar reputação de domínios
-check_domain_reputation() {
-    log_info "Verificando reputação de domínios..."
-    
-    local domains
-    domains=$(aws sesv2 list-verified-email-addresses --region "$REGION" --output text --query 'VerifiedEmailAddresses' 2>/dev/null || echo "")
-    
-    if [ -z "$domains" ]; then
-        log_warn "Nenhum domínio verificado encontrado."
-        return
-    fi
-    
-    echo ""
-    echo "=========================================="
-    echo "🌐 Reputação de Domínios"
-    echo "=========================================="
-    
-    for domain in $domains; do
-        local reputation_output
-        reputation_output=$(aws sesv2 get-account --region "$REGION" --query "ReputationMetrics" --output json 2>/dev/null || echo "{}")
+# Check quota using Node.js script
+check_quota() {
+    local quota_info
+    quota_info=$(node -e "
+        const { DomainManagementService } = require('@email-gateway/shared');
+        const service = new DomainManagementService();
         
-        local reputation_score=$(echo "$reputation_output" | jq -r '.ReputationScore // "N/A"')
-        local bounce_rate=$(echo "$reputation_output" | jq -r '.BounceRate // "N/A"')
-        local complaint_rate=$(echo "$reputation_output" | jq -r '.ComplaintRate // "N/A"')
-        
-        echo "Domínio: $domain"
-        echo "  Reputação: $reputation_score"
-        echo "  Taxa de bounce: $bounce_rate"
-        echo "  Taxa de complaints: $complaint_rate"
-        echo ""
-    done
-    
-    echo "=========================================="
-}
-
-# Função para gerar relatório completo
-generate_report() {
-    local quota_data="$1"
-    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
-    
-    log_info "Gerando relatório de quota SES..."
-    
-    local max_24h=$(echo "$quota_data" | jq -r '.Max24HourSend // 0')
-    local sent_24h=$(echo "$quota_data" | jq -r '.SentLast24Hours // 0')
-    local percentage=$(calculate_usage_percentage "$sent_24h" "$max_24h")
-    
-    # Salva relatório em arquivo
-    local report_file="/tmp/ses-quota-report-$(date +%Y%m%d-%H%M%S).txt"
-    
-    {
-        echo "Relatório de Quota SES - $timestamp"
-        echo "=========================================="
-        echo "Região: $REGION"
-        echo "Quota máxima (24h): $(format_number $max_24h)"
-        echo "Enviados (24h): $(format_number $sent_24h)"
-        echo "Uso: ${percentage}%"
-        echo "=========================================="
-    } > "$report_file"
-    
-    log_info "Relatório salvo em: $report_file"
-}
-
-# Função principal
-main() {
-    log_info "Iniciando monitoramento de quota SES..."
-    
-    # Verificações prévias
-    check_aws_cli
-    check_aws_credentials
-    
-    # Obtém dados da quota
-    local quota_data
-    quota_data=$(get_ses_quota)
+        service.getSESQuota().then(quota => {
+            console.log(JSON.stringify(quota));
+        }).catch(err => {
+            console.error('Error:', err.message);
+            process.exit(1);
+        });
+    ")
     
     if [ $? -ne 0 ]; then
-        log_error "Falha ao obter dados de quota."
-        exit 1
+        log "❌ Failed to get SES quota information"
+        return 1
     fi
     
-    # Exibe status
-    local max_24h=$(echo "$quota_data" | jq -r '.Max24HourSend // 0')
-    local sent_24h=$(echo "$quota_data" | jq -r '.SentLast24Hours // 0')
-    local percentage=$(calculate_usage_percentage "$sent_24h" "$max_24h")
+    echo "$quota_info"
+}
+
+# Parse quota information
+parse_quota() {
+    local quota_json="$1"
     
-    display_quota_status "$quota_data"
-    local quota_status=$?
+    local max_24h=$(echo "$quota_json" | jq -r '.max24HourSend')
+    local sent_24h=$(echo "$quota_json" | jq -r '.sentLast24Hours')
+    local max_rate=$(echo "$quota_json" | jq -r '.maxSendRate')
+    local remaining=$(echo "$quota_json" | jq -r '.remainingQuota')
+    local percentage=$(echo "$quota_json" | jq -r '.quotaPercentage')
     
-    # Verifica se precisa enviar alerta
-    if (( $(echo "$percentage > $THRESHOLD" | bc -l) )); then
-        local subject="🚨 ALERTA: Quota SES próxima do limite ($percentage%)"
-        local body="Quota SES em $REGION está em ${percentage}% de uso. Limite: $(format_number $max_24h), Usado: $(format_number $sent_24h)"
+    echo "$max_24h $sent_24h $max_rate $remaining $percentage"
+}
+
+# Format numbers with commas
+format_number() {
+    printf "%'d" "$1"
+}
+
+# Main monitoring function
+monitor_quota() {
+    log "🔍 Checking SES quota..."
+    
+    # Get quota information
+    local quota_info
+    quota_info=$(check_quota)
+    
+    if [ $? -ne 0 ]; then
+        log "❌ Failed to retrieve quota information"
+        return 1
+    fi
+    
+    # Parse quota data
+    local quota_data
+    quota_data=$(parse_quota "$quota_info")
+    
+    local max_24h=$(echo "$quota_data" | cut -d' ' -f1)
+    local sent_24h=$(echo "$quota_data" | cut -d' ' -f2)
+    local max_rate=$(echo "$quota_data" | cut -d' ' -f3)
+    local remaining=$(echo "$quota_data" | cut -d' ' -f4)
+    local percentage=$(echo "$quota_data" | cut -d' ' -f5)
+    
+    # Format numbers
+    local max_24h_formatted=$(format_number "$max_24h")
+    local sent_24h_formatted=$(format_number "$sent_24h")
+    local remaining_formatted=$(format_number "$remaining")
+    
+    # Log quota status
+    log "📊 SES Quota Status:"
+    log "   Max 24h Send: $max_24h_formatted"
+    log "   Sent Last 24h: $sent_24h_formatted"
+    log "   Max Send Rate: $max_rate/sec"
+    log "   Remaining: $remaining_formatted"
+    log "   Usage: ${percentage}%"
+    
+    # Check threshold
+    local percentage_int=$(echo "$percentage" | cut -d'.' -f1)
+    
+    if [ "$percentage_int" -ge "$THRESHOLD" ]; then
+        local alert_message="SES quota usage is ${percentage}% (threshold: ${THRESHOLD}%). Remaining quota: $remaining_formatted emails."
+        send_alert "$alert_message"
         
-        log_warn "Quota próxima do limite! Enviando alerta..."
-        send_alert "$subject" "$body"
+        # Color output for terminal
+        echo -e "${RED}⚠️  WARNING: Quota usage is ${percentage}%${NC}"
+        echo -e "${RED}   Threshold: ${THRESHOLD}%${NC}"
+        echo -e "${RED}   Remaining: $remaining_formatted emails${NC}"
+    else
+        log "✅ Quota usage is within acceptable limits"
+        echo -e "${GREEN}✅ Quota usage: ${percentage}% (OK)${NC}"
     fi
     
-    # Verifica reputação de domínios
-    check_domain_reputation
+    # Additional warnings
+    if [ "$remaining" -lt 1000 ]; then
+        local warning_message="Low remaining quota: $remaining_formatted emails remaining."
+        send_alert "$warning_message"
+        echo -e "${YELLOW}⚠️  Low remaining quota: $remaining_formatted emails${NC}"
+    fi
     
-    # Gera relatório
-    generate_report "$quota_data"
+    # Check send rate
+    if [ "$max_rate" -lt 14 ]; then
+        echo -e "${YELLOW}⚠️  Low send rate: $max_rate/sec (consider requesting increase)${NC}"
+    fi
+}
+
+# Health check function
+health_check() {
+    log "🏥 Performing SES health check..."
     
-    log_info "Monitoramento concluído."
+    # Check if Node.js is available
+    if ! command -v node >/dev/null 2>&1; then
+        log "❌ Node.js is not installed"
+        return 1
+    fi
     
-    # Retorna status para uso em cron
-    if [ $quota_status -eq 0 ]; then
+    # Check if jq is available
+    if ! command -v jq >/dev/null 2>&1; then
+        log "❌ jq is not installed (required for JSON parsing)"
+        return 1
+    fi
+    
+    # Check if shared package is available
+    if ! node -e "require('@email-gateway/shared')" >/dev/null 2>&1; then
+        log "❌ @email-gateway/shared package not found"
+        return 1
+    fi
+    
+    log "✅ Health check passed"
+    return 0
+}
+
+# Show usage information
+show_usage() {
+    echo "SES Quota Monitoring Script"
+    echo ""
+    echo "Usage:"
+    echo "  $0 [threshold_percentage]"
+    echo ""
+    echo "Arguments:"
+    echo "  threshold_percentage  Alert threshold (default: 80)"
+    echo ""
+    echo "Environment Variables:"
+    echo "  ALERT_EMAIL          Email address for alerts"
+    echo "  SLACK_WEBHOOK_URL   Slack webhook URL for alerts"
+    echo ""
+    echo "Examples:"
+    echo "  $0 90                # Alert at 90% usage"
+    echo "  ALERT_EMAIL=admin@example.com $0 75"
+    echo ""
+}
+
+# Main execution
+main() {
+    # Check for help flag
+    if [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+        show_usage
         exit 0
-    else
+    fi
+    
+    # Validate threshold
+    if ! [[ "$THRESHOLD" =~ ^[0-9]+$ ]] || [ "$THRESHOLD" -lt 1 ] || [ "$THRESHOLD" -gt 100 ]; then
+        echo "❌ Invalid threshold: $THRESHOLD. Must be a number between 1 and 100."
         exit 1
     fi
+    
+    log "🚀 Starting SES quota monitoring (threshold: ${THRESHOLD}%)"
+    
+    # Perform health check
+    if ! health_check; then
+        log "❌ Health check failed"
+        exit 1
+    fi
+    
+    # Monitor quota
+    if ! monitor_quota; then
+        log "❌ Quota monitoring failed"
+        exit 1
+    fi
+    
+    log "✅ SES quota monitoring completed"
 }
 
-# Função para mostrar ajuda
-show_help() {
-    echo "Uso: $0 [opções]"
-    echo ""
-    echo "Opções:"
-    echo "  -h, --help              Mostra esta ajuda"
-    echo "  -r, --region REGION     Região AWS (padrão: us-east-1)"
-    echo "  -t, --threshold PERCENT Threshold para alerta (padrão: 80)"
-    echo "  -l, --log-file FILE     Arquivo de log (padrão: /var/log/ses-quota.log)"
-    echo "  -e, --email EMAIL       Email para alertas"
-    echo ""
-    echo "Variáveis de ambiente:"
-    echo "  AWS_REGION              Região AWS"
-    echo "  SES_QUOTA_THRESHOLD     Threshold para alerta (padrão: 80)"
-    echo "  SES_QUOTA_LOG           Arquivo de log"
-    echo "  SES_ALERT_EMAIL         Email para alertas"
-    echo ""
-    echo "Exemplos:"
-    echo "  $0                                    # Monitoramento básico"
-    echo "  $0 -r us-west-2 -t 90                # Região específica com threshold 90%"
-    echo "  $0 -e admin@example.com              # Com alertas por email"
-    echo ""
-    echo "Para uso em cron (executa a cada 30 minutos):"
-    echo "  */30 * * * * $0 >> /var/log/ses-quota.log 2>&1"
-}
-
-# Processa argumentos da linha de comando
-while [[ $# -gt 0 ]]; do
-    case $1 in
-        -h|--help)
-            show_help
-            exit 0
-            ;;
-        -r|--region)
-            REGION="$2"
-            shift 2
-            ;;
-        -t|--threshold)
-            THRESHOLD="$2"
-            shift 2
-            ;;
-        -l|--log-file)
-            LOG_FILE="$2"
-            shift 2
-            ;;
-        -e|--email)
-            ALERT_EMAIL="$2"
-            shift 2
-            ;;
-        *)
-            log_error "Opção desconhecida: $1"
-            show_help
-            exit 1
-            ;;
-    esac
-done
-
-# Verifica se bc está disponível para cálculos
-if ! command -v bc &> /dev/null; then
-    log_error "Comando 'bc' não encontrado. Instale o pacote bc para cálculos."
-    exit 1
-fi
-
-# Verifica se jq está disponível para processamento JSON
-if ! command -v jq &> /dev/null; then
-    log_error "Comando 'jq' não encontrado. Instale o pacote jq para processamento JSON."
-    exit 1
-fi
-
-# Executa função principal
+# Run main function
 main "$@"

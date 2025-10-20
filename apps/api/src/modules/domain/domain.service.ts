@@ -11,6 +11,7 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { prisma } from '@email-gateway/database';
+import { DomainVerificationStatus as PrismaDomainVerificationStatus } from '@prisma/client';
 
 // DTOs
 import {
@@ -29,8 +30,8 @@ import {
   ChecklistItem,
 } from './dto/domain.dto';
 
-// Worker service (será implementado via queue)
-import { DomainManagementService } from '../../../worker/src/services/domain-management.service';
+// Domain management service from worker (TODO: move to shared package)
+import { DomainManagementService } from '../../../../worker/src/services/domain-management.service';
 
 /**
  * Service de gerenciamento de domínios
@@ -58,9 +59,9 @@ export class DomainService {
     const domainResponses: DomainVerificationResponse[] = await Promise.all(
       domains.map(async (domain) => {
         try {
-          const status = await this.domainManagementService.verifyDomainStatus(domain.name);
+          const status = await this.domainManagementService.verifyDomainStatus(domain.domain);
           return {
-            domain: domain.name,
+            domain: domain.domain,
             status: status.status,
             verificationToken: status.verificationToken,
             dnsRecords: status.dnsRecords,
@@ -71,7 +72,7 @@ export class DomainService {
           };
         } catch (error) {
           return {
-            domain: domain.name,
+            domain: domain.domain,
             status: DomainVerificationStatus.FAILED,
             dnsRecords: [],
             errorMessage: error instanceof Error ? error.message : 'Unknown error',
@@ -109,7 +110,7 @@ export class DomainService {
     const existingDomain = await prisma.domain.findFirst({
       where: {
         companyId,
-        name: request.domain,
+        domain: request.domain,
       },
     });
 
@@ -125,10 +126,8 @@ export class DomainService {
       await prisma.domain.create({
         data: {
           companyId,
-          name: request.domain,
-          status: verificationInfo.status,
-          verificationToken: verificationInfo.verificationToken,
-          dkimEnabled: request.enableDKIM || false,
+          domain: request.domain,
+          status: verificationInfo.status as unknown as PrismaDomainVerificationStatus,
           dkimTokens: verificationInfo.dkimTokens || [],
         },
       });
@@ -167,7 +166,7 @@ export class DomainService {
     const dbDomain = await prisma.domain.findFirst({
       where: {
         companyId,
-        name: domain,
+        domain: domain,
       },
     });
 
@@ -180,11 +179,12 @@ export class DomainService {
       const verificationInfo = await this.domainManagementService.verifyDomainStatus(domain);
 
       // Atualiza status no banco se mudou
-      if (verificationInfo.status !== dbDomain.status) {
+      const newStatus = verificationInfo.status as unknown as PrismaDomainVerificationStatus;
+      if (newStatus !== dbDomain.status) {
         await prisma.domain.update({
           where: { id: dbDomain.id },
           data: {
-            status: verificationInfo.status,
+            status: newStatus,
             lastChecked: new Date(),
           },
         });
@@ -222,7 +222,7 @@ export class DomainService {
     const dbDomain = await prisma.domain.findFirst({
       where: {
         companyId,
-        name: domain,
+        domain: domain,
       },
     });
 
@@ -238,8 +238,7 @@ export class DomainService {
       await prisma.domain.update({
         where: { id: dbDomain.id },
         data: {
-          status: verificationInfo.status,
-          verificationToken: verificationInfo.verificationToken,
+          status: verificationInfo.status as unknown as PrismaDomainVerificationStatus,
           lastChecked: new Date(),
         },
       });
@@ -273,7 +272,7 @@ export class DomainService {
     const dbDomain = await prisma.domain.findFirst({
       where: {
         companyId,
-        name: domain,
+        domain: domain,
       },
     });
 
@@ -311,7 +310,7 @@ export class DomainService {
     const dbDomain = await prisma.domain.findFirst({
       where: {
         companyId,
-        name: domain,
+        domain: domain,
       },
     });
 
@@ -327,7 +326,7 @@ export class DomainService {
       await prisma.domain.update({
         where: { id: dbDomain.id },
         data: {
-          dkimEnabled: true,
+          dkimStatus: 'PENDING',
           dkimTokens,
         },
       });
@@ -362,7 +361,7 @@ export class DomainService {
     const dbDomain = await prisma.domain.findFirst({
       where: {
         companyId,
-        name: domain,
+        domain: domain,
       },
     });
 
@@ -425,7 +424,7 @@ export class DomainService {
     const dbDomain = await prisma.domain.findFirst({
       where: {
         companyId,
-        name: domain,
+        domain: domain,
       },
     });
 
@@ -513,7 +512,7 @@ export class DomainService {
     const dbDomain = await prisma.domain.findFirst({
       where: {
         companyId,
-        name: domain,
+        domain: domain,
       },
     });
 

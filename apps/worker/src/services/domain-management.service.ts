@@ -8,8 +8,8 @@
  * validação de região/quota e warm-up de volumetria
  */
 
-import { SESClient, SESV2Client } from '@aws-sdk/client-ses';
-import { SESClient as SESV2ClientType } from '@aws-sdk/client-sesv2';
+import { SESClient } from '@aws-sdk/client-ses';
+import { SESv2Client } from '@aws-sdk/client-sesv2';
 
 /**
  * Status de verificação de domínio
@@ -83,13 +83,13 @@ export interface SESQuotaStatus {
  */
 export class DomainManagementService {
   private sesClient: SESClient;
-  private sesv2Client: SESV2ClientType;
+  private sesv2Client: SESv2Client;
   private region: string;
 
   constructor(region: string) {
     this.region = region;
     this.sesClient = new SESClient({ region });
-    this.sesv2Client = new SESV2ClientType({ region });
+    this.sesv2Client = new SESv2Client({ region });
   }
 
   /**
@@ -211,20 +211,25 @@ export class DomainManagementService {
    */
   async enableDKIM(domain: string): Promise<string[]> {
     try {
-      const { PutIdentityDkimAttributesCommand } = await import('@aws-sdk/client-ses');
-      
-      const command = new PutIdentityDkimAttributesCommand({
-        Identity: domain,
-        DkimEnabled: true,
+      const { CreateEmailIdentityCommand, GetEmailIdentityCommand } = await import('@aws-sdk/client-sesv2');
+
+      // Create email identity with DKIM enabled
+      const createCommand = new CreateEmailIdentityCommand({
+        EmailIdentity: domain,
+        DkimSigningAttributes: {
+          NextSigningKeyLength: 'RSA_2048_BIT',
+        },
       });
 
-      await this.sesClient.send(command);
-      
-      // Aguarda um pouco para que os tokens sejam gerados
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      const dkimInfo = await this.getDKIMTokens(domain);
-      return dkimInfo.tokens;
+      await this.sesv2Client.send(createCommand);
+
+      // Get DKIM tokens
+      const getCommand = new GetEmailIdentityCommand({
+        EmailIdentity: domain,
+      });
+
+      const response = await this.sesv2Client.send(getCommand);
+      return response.DkimAttributes?.Tokens || [];
     } catch (error) {
       console.error(`Failed to enable DKIM for ${domain}:`, error);
       throw error;
@@ -342,22 +347,19 @@ export class DomainManagementService {
    */
   async configureDomainWarmup(config: WarmupConfig): Promise<void> {
     try {
-      const { PutConfigurationSetCommand } = await import('@aws-sdk/client-sesv2');
-      
-      // Cria ou atualiza configuration set para warm-up
-      const command = new PutConfigurationSetCommand({
+      const { CreateConfigurationSetCommand } = await import('@aws-sdk/client-sesv2');
+
+      // Cria configuration set para warm-up
+      const command = new CreateConfigurationSetCommand({
         ConfigurationSetName: `warmup-${config.domain}`,
         DeliveryOptions: {
-          TlsPolicy: 'Require',
+          TlsPolicy: 'REQUIRE',
         },
         ReputationOptions: {
           ReputationMetricsEnabled: true,
         },
         SendingOptions: {
           SendingEnabled: true,
-        },
-        SuppressionOptions: {
-          SuppressedReasons: [],
         },
       });
 

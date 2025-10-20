@@ -35,15 +35,15 @@ export enum DKIMVerificationStatus {
 export class DNSRecord {
   @ApiProperty({ description: 'Tipo do registro DNS', example: 'TXT' })
   @IsString()
-  type: 'TXT' | 'CNAME' | 'MX';
+  type!: 'TXT' | 'CNAME' | 'MX';
 
   @ApiProperty({ description: 'Nome do registro', example: '_amazonses.example.com' })
   @IsString()
-  name: string;
+  name!: string;
 
   @ApiProperty({ description: 'Valor do registro', example: 'verification-token' })
   @IsString()
-  value: string;
+  value!: string;
 
   @ApiPropertyOptional({ description: 'TTL do registro', example: 300 })
   @IsOptional()
@@ -57,7 +57,7 @@ export class DNSRecord {
 export class DomainVerificationRequest {
   @ApiProperty({ description: 'Nome do domínio', example: 'example.com' })
   @IsString()
-  domain: string;
+  domain!: string;
 
   @ApiPropertyOptional({ description: 'Habilitar DKIM automaticamente', example: true })
   @IsOptional()
@@ -70,16 +70,16 @@ export class DomainVerificationRequest {
  */
 export class DomainVerificationResponse {
   @ApiProperty({ description: 'Nome do domínio', example: 'example.com' })
-  domain: string;
+  domain!: string;
 
   @ApiProperty({ description: 'Status de verificação', enum: DomainVerificationStatus })
-  status: DomainVerificationStatus;
+  status!: DomainVerificationStatus;
 
   @ApiPropertyOptional({ description: 'Token de verificação' })
   verificationToken?: string;
 
   @ApiProperty({ description: 'Registros DNS necessários', type: [DNSRecord] })
-  dnsRecords: DNSRecord[];
+  dnsRecords!: DNSRecord[];
 
   @ApiPropertyOptional({ description: 'Tokens DKIM' })
   dkimTokens?: string[];
@@ -99,10 +99,10 @@ export class DomainVerificationResponse {
  */
 export class DNSRecordsResponse {
   @ApiProperty({ description: 'Nome do domínio', example: 'example.com' })
-  domain: string;
+  domain!: string;
 
   @ApiProperty({ description: 'Registros DNS necessários', type: [DNSRecord] })
-  records: DNSRecord[];
+  records!: DNSRecord[];
 
   @ApiPropertyOptional({ description: 'Registros DNS ausentes', type: [DNSRecord] })
   missingRecords?: DNSRecord[];
@@ -111,7 +111,7 @@ export class DNSRecordsResponse {
   incorrectRecords?: DNSRecord[];
 
   @ApiProperty({ description: 'Se os registros DNS estão válidos', example: false })
-  isValid: boolean;
+  isValid!: boolean;
 
   @ApiPropertyOptional({ description: 'Mensagem de erro' })
   errorMessage?: string;
@@ -122,22 +122,22 @@ export class DNSRecordsResponse {
  */
 export class SESQuotaStatusResponse {
   @ApiProperty({ description: 'Quota máxima de envio em 24h', example: 200 })
-  max24HourSend: number;
+  max24HourSend!: number;
 
   @ApiProperty({ description: 'Taxa máxima de envio por segundo', example: 14 })
-  maxSendRate: number;
+  maxSendRate!: number;
 
   @ApiProperty({ description: 'Emails enviados nas últimas 24h', example: 150 })
-  sentLast24Hours: number;
+  sentLast24Hours!: number;
 
   @ApiProperty({ description: 'Percentual de quota usada', example: 75.0 })
-  percentageUsed: number;
+  percentageUsed!: number;
 
   @ApiProperty({ description: 'Se está próximo do limite', example: false })
-  isNearLimit: boolean;
+  isNearLimit!: boolean;
 
   @ApiProperty({ description: 'Região AWS', example: 'us-east-1' })
-  region: string;
+  region!: string;
 
   @ApiPropertyOptional({ description: 'Espaço disponível restante', example: 50 })
   remainingQuota?: number;
@@ -154,23 +154,23 @@ export class WarmupConfigRequest {
   @IsNumber()
   @Min(1)
   @Max(10000)
-  dailyVolume: number;
+  dailyVolume!: number;
 
   @ApiProperty({ description: 'Data de início do warm-up' })
   @IsDateString()
-  startDate: string;
+  startDate!: string;
 
   @ApiProperty({ description: 'Duração do warm-up em dias', example: 30 })
   @IsNumber()
   @Min(1)
   @Max(90)
-  durationDays: number;
+  durationDays!: number;
 
   @ApiProperty({ description: 'Percentual de incremento diário', example: 20 })
   @IsNumber()
   @Min(5)
   @Max(100)
-  incrementPercentage: number;
+  incrementPercentage!: number;
 }
 
 /**
@@ -178,13 +178,13 @@ export class WarmupConfigRequest {
  */
 export class WarmupConfigResponse {
   @ApiProperty({ description: 'Nome do domínio', example: 'example.com' })
-  domain: string;
+  domain!: string;
 
   @ApiProperty({ description: 'Configuração de warm-up aplicada' })
-  config: WarmupConfigRequest;
+  config!: WarmupConfigRequest;
 
   @ApiProperty({ description: 'Se o warm-up foi configurado com sucesso', example: true })
-  success: boolean;
+  success!: boolean;
 
   @ApiPropertyOptional({ description: 'Mensagem de erro' })
   errorMessage?: string;
@@ -195,16 +195,16 @@ export class WarmupConfigResponse {
  */
 export class ChecklistItem {
   @ApiProperty({ description: 'ID do item', example: 'domain-verification' })
-  id: string;
+  id!: string;
 
   @ApiProperty({ description: 'Descrição do item', example: 'Verificar se todos os domínios estão verificados' })
-  description: string;
+  description!: string;
 
   @ApiProperty({ description: 'Status do item', example: 'pending' })
-  status: 'pending' | 'completed' | 'failed';
+  status!: 'pending' | 'completed' | 'failed';
 
   @ApiProperty({ description: 'Prioridade do item', example: 'high' })
-  priority: 'high' | 'medium' | 'low';
+  priority!: 'high' | 'medium' | 'low';
 
   @ApiPropertyOptional({ description: 'Data de conclusão' })
   completedAt?: string;
@@ -218,19 +218,19 @@ export class ChecklistItem {
  */
 export class SandboxChecklistResponse {
   @ApiProperty({ description: 'Itens do checklist', type: [ChecklistItem] })
-  items: ChecklistItem[];
+  items!: ChecklistItem[];
 
   @ApiProperty({ description: 'Percentual de conclusão', example: 25.0 })
-  completionPercentage: number;
+  completionPercentage!: number;
 
   @ApiProperty({ description: 'Itens pendentes', example: 6 })
-  pendingItems: number;
+  pendingItems!: number;
 
   @ApiProperty({ description: 'Itens concluídos', example: 2 })
-  completedItems: number;
+  completedItems!: number;
 
   @ApiProperty({ description: 'Itens com falha', example: 0 })
-  failedItems: number;
+  failedItems!: number;
 }
 
 /**
@@ -238,13 +238,13 @@ export class SandboxChecklistResponse {
  */
 export class RegionValidationResponse {
   @ApiProperty({ description: 'Região validada', example: 'us-east-1' })
-  region: string;
+  region!: string;
 
   @ApiProperty({ description: 'Se a região é válida', example: true })
-  isValid: boolean;
+  isValid!: boolean;
 
   @ApiProperty({ description: 'Se a região é recomendada', example: true })
-  isRecommended: boolean;
+  isRecommended!: boolean;
 
   @ApiPropertyOptional({ description: 'Informações de quota da região' })
   quotaInfo?: SESQuotaStatusResponse;
@@ -258,17 +258,17 @@ export class RegionValidationResponse {
  */
 export class DomainListResponse {
   @ApiProperty({ description: 'Lista de domínios', type: [DomainVerificationResponse] })
-  domains: DomainVerificationResponse[];
+  domains!: DomainVerificationResponse[];
 
   @ApiProperty({ description: 'Total de domínios', example: 5 })
-  total: number;
+  total!: number;
 
   @ApiProperty({ description: 'Domínios verificados', example: 3 })
-  verified: number;
+  verified!: number;
 
   @ApiProperty({ description: 'Domínios pendentes', example: 2 })
-  pending: number;
+  pending!: number;
 
   @ApiProperty({ description: 'Domínios com falha', example: 0 })
-  failed: number;
+  failed!: number;
 }
