@@ -42,6 +42,7 @@ import { TracingService, TraceContext } from '../services/tracing.service';
  * Processador do job email:send
  *
  * Implementa o pipeline completo de estados e validações
+ * TASK 7.1: Integrado com métricas e tracing
  */
 export class EmailSendProcessor {
   private validationService: ValidationService;
@@ -75,18 +76,18 @@ export class EmailSendProcessor {
     const startTime = Date.now();
     const jobData = job.data;
 
-    // Extract or create trace context
+    // TASK 7.1: Extract or create trace context
     let traceContext: TraceContext = this.tracingService.extractContextFromJob(jobData) ||
       this.tracingService.createTrace(jobData.companyId);
 
-    // Record queue age metric (time from enqueue to processing start)
+    // TASK 7.1: Record queue age metric (time from enqueue to processing start)
     const enqueuedAt = job.timestamp || startTime;
     await this.metricsService.recordQueueAge(enqueuedAt);
 
-    // Record tenant job allocation
+    // TASK 7.1: Record tenant job allocation
     await this.metricsService.recordTenantJob(jobData.companyId);
 
-    // Log job start with trace context
+    // TASK 7.1: Log job start with trace context
     this.tracingService.logStart(traceContext, 'email-send-job', {
       jobId: job.id,
       outboxId: jobData.outboxId,
@@ -151,11 +152,11 @@ export class EmailSendProcessor {
           durationMs,
         );
 
-        // Record success metrics
+        // TASK 7.1: Record success metrics
         await this.metricsService.recordSuccess(jobData.companyId);
         await this.metricsService.recordSendLatency(durationMs, jobData.companyId);
 
-        // Log success with trace
+        // TASK 7.1: Log success with trace
         this.tracingService.logComplete(traceContext, 'email-send-job', startTime, {
           sesMessageId: sendResult.messageId,
           status: 'success',
@@ -177,10 +178,10 @@ export class EmailSendProcessor {
           durationMs,
         );
 
-        // Record error metrics
+        // TASK 7.1: Record error metrics
         await this.metricsService.recordError(jobData.companyId, sendResult.error!.code);
 
-        // Log error with trace
+        // TASK 7.1: Log error with trace
         this.tracingService.logError(
           traceContext,
           'email-send-job',
@@ -199,10 +200,10 @@ export class EmailSendProcessor {
       const durationMs = Date.now() - startTime;
       const mappedError = ErrorMappingService.mapGenericError(error);
 
-      // Record error metrics
+      // TASK 7.1: Record error metrics
       await this.metricsService.recordError(jobData.companyId, mappedError.code);
 
-      // Log error with trace
+      // TASK 7.1: Log error with trace
       this.tracingService.logError(
         traceContext,
         'email-send-job',

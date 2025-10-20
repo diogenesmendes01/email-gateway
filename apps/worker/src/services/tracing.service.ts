@@ -1,7 +1,7 @@
 import { randomUUID } from 'crypto';
 
 /**
- * Tracing Service
+ * Tracing Service - TASK 7.1
  *
  * Provides distributed tracing capabilities with standardized correlation IDs
  * that flow through API → Queue → Worker → SES

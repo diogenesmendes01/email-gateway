@@ -6,6 +6,7 @@
  * - Audit logs monitoring
  * - Rate limiting statistics
  * - API key management
+ * - Metrics from worker (TASK 7.1)
  */
 
 import { Injectable } from '@nestjs/common';
@@ -67,7 +68,7 @@ export class DashboardService {
   private redis: Redis;
 
   constructor(private authService: AuthService) {
-    // Initialize Redis connection for metrics
+    // TASK 7.1: Initialize Redis connection for metrics
     this.redis = new Redis({
       host: process.env.REDIS_HOST || 'localhost',
       port: parseInt(process.env.REDIS_PORT || '6379', 10),

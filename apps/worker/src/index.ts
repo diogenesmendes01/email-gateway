@@ -5,6 +5,7 @@
  *
  * TASK 4.1 — Pipeline de estados, validações e envio SES
  * TASK 4.2 — Concorrência, fairness e desligamento gracioso
+ * TASK 7.1 — Métricas, logs e tracing
  */
 
 import { Worker, Job, Queue } from 'bullmq';
@@ -38,7 +39,7 @@ class EmailWorker {
     // Carrega configurações
     const config = loadWorkerConfig();
 
-    // Inicializa Redis para métricas
+    // TASK 7.1: Inicializa Redis para métricas
     this.redis = new Redis({
       host: config.redis.host,
       port: config.redis.port,
@@ -46,12 +47,12 @@ class EmailWorker {
       db: config.redis.db,
     });
 
-    // Inicializa Queue para métricas
+    // TASK 7.1: Inicializa Queue para métricas
     this.queue = new Queue(EMAIL_JOB_CONFIG.QUEUE_NAME, {
       connection: this.redis,
     });
 
-    // Inicializa serviços de métricas e tracing
+    // TASK 7.1: Inicializa serviços de métricas e tracing
     this.metricsService = new MetricsService(this.redis, this.queue);
     this.tracingService = new TracingService('email-worker');
 
@@ -61,7 +62,7 @@ class EmailWorker {
 
     const sesService = new SESService(sesConfig);
 
-    // Inicializa o processador
+    // Inicializa o processador com métricas e tracing (TASK 7.1)
     this.processor = new EmailSendProcessor(
       this.prisma,
       sesService,
@@ -158,7 +159,7 @@ class EmailWorker {
     // Setup graceful shutdown
     this.setupGracefulShutdown();
 
-    // Setup metrics alert monitoring (check every 5 minutes)
+    // TASK 7.1: Setup metrics alert monitoring (check every 5 minutes)
     this.setupMetricsAlertMonitoring();
 
     console.log(

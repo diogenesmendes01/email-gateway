@@ -2,7 +2,7 @@ import { Redis } from 'ioredis';
 import { Queue } from 'bullmq';
 
 /**
- * Metrics Service
+ * Metrics Service - TASK 7.1
  *
  * Collects and exposes metrics for monitoring:
  * - queue_depth: Number of jobs waiting in queue
@@ -278,21 +278,32 @@ export class MetricsService {
   }
 
   /**
-   * Get error breakdown by error code
+   * Check if metrics exceed alert thresholds (TASK 7.1)
+   * - DLQ > 100
+   * - Queue age P95 > 120s
    */
-  async getErrorBreakdown(): Promise<Record<string, number>> {
-    const windows = this.getRecentWindows(3);
-    const errorCounts: Record<string, number> = {};
+  async checkAlerts(): Promise<{
+    dlqAlert: boolean;
+    queueAgeAlert: boolean;
+    message?: string;
+  }> {
+    const [dlqDepth, queueAgeP95] = await Promise.all([
+      this.getDLQDepth(),
+      this.getQueueAgeP95(),
+    ]);
 
-    for (const window of windows) {
-      const errors = await this.redis.hgetall(`${this.ERROR_COUNT_KEY}:${window}:by_code`);
+    const dlqAlert = dlqDepth > 100;
+    const queueAgeAlert = queueAgeP95 > 120000; // 120 seconds in ms
 
-      for (const [errorCode, count] of Object.entries(errors)) {
-        errorCounts[errorCode] = (errorCounts[errorCode] || 0) + parseInt(count, 10);
-      }
+    let message: string | undefined;
+    if (dlqAlert || queueAgeAlert) {
+      const alerts: string[] = [];
+      if (dlqAlert) alerts.push(`DLQ depth: ${dlqDepth} (threshold: 100)`);
+      if (queueAgeAlert) alerts.push(`Queue age P95: ${Math.round(queueAgeP95 / 1000)}s (threshold: 120s)`);
+      message = `ALERT: ${alerts.join(', ')}`;
     }
 
-    return errorCounts;
+    return { dlqAlert, queueAgeAlert, message };
   }
 
   /**
@@ -319,32 +330,5 @@ export class MetricsService {
     }
 
     return windows;
-  }
-
-  /**
-   * Check if metrics exceed alert thresholds
-   */
-  async checkAlerts(): Promise<{
-    dlqAlert: boolean;
-    queueAgeAlert: boolean;
-    message?: string;
-  }> {
-    const [dlqDepth, queueAgeP95] = await Promise.all([
-      this.getDLQDepth(),
-      this.getQueueAgeP95(),
-    ]);
-
-    const dlqAlert = dlqDepth > 100;
-    const queueAgeAlert = queueAgeP95 > 120000; // 120 seconds in ms
-
-    let message: string | undefined;
-    if (dlqAlert || queueAgeAlert) {
-      const alerts: string[] = [];
-      if (dlqAlert) alerts.push(`DLQ depth: ${dlqDepth} (threshold: 100)`);
-      if (queueAgeAlert) alerts.push(`Queue age P95: ${Math.round(queueAgeP95 / 1000)}s (threshold: 120s)`);
-      message = `ALERT: ${alerts.join(', ')}`;
-    }
-
-    return { dlqAlert, queueAgeAlert, message };
   }
 }
