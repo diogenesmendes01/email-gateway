@@ -56,6 +56,11 @@ export class SESService {
     htmlContent: string,
   ): Promise<SESSendResult> {
     try {
+      // Chaos flag: SIMULAR SES 429/THROTTLING
+      if (process.env.CHAOS_SES_429 === 'true') {
+        throw new Error('Throttling: Simulated SES 429');
+      }
+
       // Prepara os parâmetros do comando
       const command = new SendEmailCommand({
         Source: this.config.fromAddress,
