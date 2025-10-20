@@ -9,16 +9,19 @@ Este documento garante que agentes de IA (como Claude, GitHub Copilot, ChatGPT) 
 Você **DEVE** ler e seguir **TODOS** esses documentos antes de qualquer ação:
 
 ### 1️⃣ Configuração Básica
+
 - [CONTRIBUTING.md](../CONTRIBUTING.md) - Guia completo de contribuição
 - [README.md](../README.md) - Visão geral do projeto
 - [.clauderc](../.clauderc) - Configurações específicas para Claude
 
 ### 2️⃣ Regras de PR e Review
+
 - [.github/pull_request_template.md](../.github/pull_request_template.md) - Template obrigatório de PR
 - [PR_REVIEW_RULES.md](PR_REVIEW_RULES.md) - Como revisar PRs (severidades, eixos)
 - [PR_ADJUSTMENTS.md](PR_ADJUSTMENTS.md) - Como tratar comentários de review
 
 ### 3️⃣ Templates e Automações
+
 - [task/TEMPLATE-PR-TASK.md](../task/TEMPLATE-PR-TASK.md) - Template para registrar tarefas fora de escopo
 - [.github/workflows/semantic-pr.yml](../.github/workflows/semantic-pr.yml) - Validação de título de PR
 - [.github/labeler.yml](../.github/labeler.yml) - Aplicação automática de labels
@@ -26,6 +29,7 @@ Você **DEVE** ler e seguir **TODOS** esses documentos antes de qualquer ação:
 ## 🔒 Regras Críticas de Segurança
 
 ### ❌ NUNCA FAÇA ISSO
+
 - Commitar arquivos `.env`, `.env.local`, `.env.*.local`
 - Expor secrets, API keys, tokens no código
 - Commitar `node_modules/`, `dist/`, arquivos de build
@@ -33,6 +37,7 @@ Você **DEVE** ler e seguir **TODOS** esses documentos antes de qualquer ação:
 - Fazer push de arquivos temporários (`nul`, `*.tmp`, `*.log`)
 
 ### ✅ SEMPRE FAÇA ISSO
+
 - Verificar `.gitignore` está configurado corretamente
 - Executar `git status` antes de commitar
 - Validar que não há informações sensíveis
@@ -55,6 +60,7 @@ Use **APENAS** esses prefixos:
 ## 📝 Conventional Commits (OBRIGATÓRIO)
 
 **Formato:**
+
 ```
 <tipo>(<escopo-opcional>): <descrição curta em minúsculo>
 
@@ -66,6 +72,7 @@ Co-Authored-By: Claude <noreply@anthropic.com>
 ```
 
 **Tipos permitidos:**
+
 - `feat` - Nova funcionalidade
 - `fix` - Correção de bug
 - `chore` - Tarefas de manutenção
@@ -78,6 +85,7 @@ Co-Authored-By: Claude <noreply@anthropic.com>
 - `ci` - CI/CD
 
 **Exemplos:**
+
 ```bash
 feat(api): adiciona endpoint de health check
 
@@ -102,6 +110,7 @@ Co-Authored-By: Claude <noreply@anthropic.com>
 ## 🔄 Workflow Completo para Criar uma PR
 
 ### Fase 1: Planejamento
+
 1. **Ler o escopo** da tarefa/issue completamente
 2. **Consultar documentação** de arquitetura relacionada
 3. **Identificar impactos:**
@@ -111,7 +120,9 @@ Co-Authored-By: Claude <noreply@anthropic.com>
 4. **Criar TODO list** mental ou no código do que será feito
 
 ### Fase 2: Desenvolvimento
+
 1. **Criar branch** com nomenclatura correta:
+
    ```bash
    git checkout -b feature/nome-descritivo
    ```
@@ -122,18 +133,21 @@ Co-Authored-By: Claude <noreply@anthropic.com>
    - Se surgir algo importante fora do escopo, registrar em `/task`
 
 3. **Fazer commits incrementais:**
+
    ```bash
    git add <arquivos>
    git commit -m "feat: descrição clara"
    ```
 
 ### Fase 3: Validação
+
 1. **Validar manualmente:**
    - Testar todas as mudanças
    - Verificar se não quebrou nada
    - Validar critérios de aceite
 
 2. **Verificar segurança:**
+
    ```bash
    git status  # Ver o que será commitado
    git diff    # Ver mudanças exatas
@@ -145,7 +159,9 @@ Co-Authored-By: Claude <noreply@anthropic.com>
    - Documentação atualizada se necessário?
 
 ### Fase 4: Abrir PR
+
 1. **Push da branch:**
+
    ```bash
    git push -u origin feature/nome-descritivo
    ```
@@ -189,17 +205,20 @@ Antes de abrir a PR, verifique:
 ## 🏷️ Sistema de Labels
 
 Labels são aplicadas **automaticamente** via [.github/labeler.yml](../.github/labeler.yml) baseado em:
+
 - Caminho dos arquivos modificados
 - Prefixo da branch
 
 Você pode **sugerir** labels na PR:
 
 ### Tipo
+
 - `tipo:feature` - Nova funcionalidade
 - `tipo:bug` - Correção de bug
 - `tipo:refactor` - Refatoração
 
 ### Prioridade
+
 - `prioridade:1-urgente` - Crítico, resolver imediatamente
 - `prioridade:2-alta` - Alta prioridade
 - `prioridade:3-media` - Prioridade média
@@ -207,6 +226,7 @@ Você pode **sugerir** labels na PR:
 - `prioridade:5-baixa` - Muito baixa prioridade
 
 ### Escopo
+
 - `escopo:aderente` - Mudanças dentro do escopo
 - `escopo:fora` - Mudanças fora do escopo (registrar em `/task`)
 
@@ -214,16 +234,19 @@ Você pode **sugerir** labels na PR:
 
 PRs com branch `hotfix/*` têm processo **acelerado**, mas:
 
-### ✅ Pode ter requisitos reduzidos:
+### ✅ Pode ter requisitos reduzidos
+
 - Documentação pode ser mínima
 - Testes podem ser adicionados depois
 
-### ❌ NÃO pode comprometer:
+### ❌ NÃO pode comprometer
+
 - **Segurança** - continua obrigatória
 - **Riscos documentados** - devem estar explícitos
 - **Plano de rollback** - obrigatório e claro
 
-### 📝 Template hotfix simplificado:
+### 📝 Template hotfix simplificado
+
 ```markdown
 ## Problema
 <Descrever o problema crítico>
@@ -256,16 +279,19 @@ Uma PR **NÃO PODE** ser mergeada se:
 Quando receber comentários de review:
 
 ### 🔴 Critical
+
 - **Bloqueia merge**
 - Corrigir **imediatamente**
 - Exemplos: quebra funcional, segurança, compliance, performance grave
 
 ### 🟡 Moderate
+
 - **Deve ser feito** antes do merge
 - Corrigir antes de mergar
 - Exemplos: qualidade, manutenibilidade, testabilidade
 
 ### 🟢 Suggestion
+
 - **Opcional**, não bloqueia
 - Avaliar se é importante e aderente ao escopo
 - Se não for urgente ou estiver fora do escopo, registrar em `/task`
@@ -275,6 +301,7 @@ Quando receber comentários de review:
 Quando algo surgir que **não** faz parte do escopo atual:
 
 1. **Criar arquivo:**
+
    ```
    /task/PR<numero>-TASK<id>.md
    ```
@@ -282,6 +309,7 @@ Quando algo surgir que **não** faz parte do escopo atual:
 2. **Usar template:** [task/TEMPLATE-PR-TASK.md](../task/TEMPLATE-PR-TASK.md)
 
 3. **Conteúdo mínimo:**
+
    ```markdown
    # PR<numero> - TASK <id> - <resumo>
 
@@ -320,6 +348,7 @@ Antes de **qualquer** ação de commit/push/PR, verifique:
 ---
 
 **⚡ TL;DR para IAs:**
+
 1. Leia CONTRIBUTING.md, PR_REVIEW_RULES.md, PR_ADJUSTMENTS.md
 2. Use branches `feature/*`, `fix/*`, `hotfix/*`, etc
 3. Commits: Conventional Commits

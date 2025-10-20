@@ -80,6 +80,7 @@ sequenceDiagram
 ### 1️⃣ Cliente envia requisição de email
 
 **Request:**
+
 ```http
 POST /v1/email/send HTTP/1.1
 Host: api.certshift.com
@@ -104,6 +105,7 @@ X-Request-Id: req_1737329400_abc123
 ```
 
 **Response:**
+
 ```http
 HTTP/1.1 202 Accepted
 Content-Type: application/json
@@ -126,6 +128,7 @@ X-Request-Id: req_1737329400_abc123
 ### 2️⃣ API processa a requisição
 
 **`apps/api/src/modules/email/controllers/email.controller.ts`**
+
 ```typescript
 @Post('send')
 @HttpCode(202)
@@ -162,6 +165,7 @@ async sendEmail(
 ```
 
 **`apps/api/src/modules/email/services/email.service.ts`**
+
 ```typescript
 async enqueueEmail(data: EnqueueEmailDto): Promise<string> {
   const { companyId, requestId, idempotencyKey, ...emailData } = data;
@@ -218,6 +222,7 @@ async enqueueEmail(data: EnqueueEmailDto): Promise<string> {
 ```
 
 **Estado do banco após enfileiramento:**
+
 ```sql
 SELECT id, company_id, status, to_email, subject, attempts, created_at
 FROM email_outbox
@@ -233,6 +238,7 @@ WHERE id = '550e8400-e29b-41d4-a716-446655440000';
 ### 3️⃣ Worker processa o job
 
 **`apps/worker/src/processors/email.processor.ts`**
+
 ```typescript
 @Processor('email:send')
 export class EmailProcessor {
@@ -348,6 +354,7 @@ export class EmailProcessor {
 #### ✅ Caso 1: Sucesso no primeiro envio
 
 **Worker logs:**
+
 ```
 [EmailProcessor] Processing job 550e8400-e29b-41d4-a716-446655440000 (attempt 1/5)
 [SESService] Sending email to cliente@example.com
@@ -356,6 +363,7 @@ export class EmailProcessor {
 ```
 
 **Estado do banco após sucesso:**
+
 ```sql
 SELECT id, status, sent_at, ses_message_id, attempts
 FROM email_outbox
@@ -371,6 +379,7 @@ WHERE id = '550e8400-e29b-41d4-a716-446655440000';
 #### 🔄 Caso 2: Erro retryable (throttling)
 
 **Worker logs (tentativa 1):**
+
 ```
 [EmailProcessor] Processing job 550e8400-e29b-41d4-a716-446655440000 (attempt 1/5)
 [SESService] Sending email to cliente@example.com
@@ -380,6 +389,7 @@ WHERE id = '550e8400-e29b-41d4-a716-446655440000';
 ```
 
 **Estado do banco após erro:**
+
 ```sql
 SELECT id, status, attempts, last_failure_reason, last_failure_code
 FROM email_outbox
@@ -391,6 +401,7 @@ WHERE id = '550e8400-e29b-41d4-a716-446655440000';
 ```
 
 **Worker logs (tentativa 2 - após 1s de backoff):**
+
 ```
 [EmailProcessor] Processing job 550e8400-e29b-41d4-a716-446655440000 (attempt 2/5)
 [SESService] Sending email to cliente@example.com
@@ -399,6 +410,7 @@ WHERE id = '550e8400-e29b-41d4-a716-446655440000';
 ```
 
 **Estado final:**
+
 ```sql
 -- status    | sent_at                  | attempts
 -- SENT      | 2025-01-19 19:30:06.189  | 2
@@ -409,6 +421,7 @@ WHERE id = '550e8400-e29b-41d4-a716-446655440000';
 #### ❌ Caso 3: Erro permanente (email inválido)
 
 **Worker logs:**
+
 ```
 [EmailProcessor] Processing job 550e8400-e29b-41d4-a716-446655440000 (attempt 1/5)
 [SESService] Sending email to invalidemail@nonexistent-domain-xyz.com
@@ -417,6 +430,7 @@ WHERE id = '550e8400-e29b-41d4-a716-446655440000';
 ```
 
 **Estado do banco:**
+
 ```sql
 SELECT id, status, failed_at, attempts, last_failure_reason, last_failure_code
 FROM email_outbox
@@ -428,6 +442,7 @@ WHERE id = '550e8400-e29b-41d4-a716-446655440000';
 ```
 
 **DLQ entry:**
+
 ```typescript
 {
   jobId: '550e8400-e29b-41d4-a716-446655440000',
@@ -460,6 +475,7 @@ WHERE id = '550e8400-e29b-41d4-a716-446655440000';
 | -         | -         | 19:30:15.012     | **Movido para DLQ**          |
 
 **Worker logs (tentativa 5):**
+
 ```
 [EmailProcessor] Processing job 550e8400-e29b-41d4-a716-446655440000 (attempt 5/5)
 [SESService] Error: 450 Mailbox busy
@@ -467,6 +483,7 @@ WHERE id = '550e8400-e29b-41d4-a716-446655440000';
 ```
 
 **Estado final:**
+
 ```sql
 SELECT id, status, failed_at, attempts, last_failure_reason
 FROM email_outbox
@@ -482,6 +499,7 @@ WHERE id = '550e8400-e29b-41d4-a716-446655440000';
 ### 5️⃣ Cliente consulta o status
 
 **Request:**
+
 ```http
 GET /v1/emails/550e8400-e29b-41d4-a716-446655440000 HTTP/1.1
 Host: api.certshift.com
@@ -489,6 +507,7 @@ X-API-Key: live_abc123xyz789
 ```
 
 **Response (sucesso):**
+
 ```http
 HTTP/1.1 200 OK
 Content-Type: application/json
@@ -508,6 +527,7 @@ Content-Type: application/json
 ```
 
 **Response (falha):**
+
 ```http
 HTTP/1.1 200 OK
 Content-Type: application/json
@@ -534,6 +554,7 @@ Content-Type: application/json
 ### Métricas Importantes
 
 **1. Latência de enfileiramento (API):**
+
 ```typescript
 const startTime = Date.now();
 await this.emailService.enqueueEmail(data);
@@ -544,6 +565,7 @@ this.metrics.histogram('email.enqueue.duration_ms', enqueueLatency);
 ```
 
 **2. Latência de processamento (Worker):**
+
 ```typescript
 const processingTime = Date.now() - job.timestamp;
 
@@ -552,6 +574,7 @@ this.metrics.histogram('email.processing.duration_ms', processingTime);
 ```
 
 **3. Taxa de sucesso/falha:**
+
 ```typescript
 // Métrica: email.send.result (success | retryable_error | permanent_error)
 this.metrics.counter('email.send.result', {
@@ -562,6 +585,7 @@ this.metrics.counter('email.send.result', {
 ```
 
 **4. Tamanho da fila:**
+
 ```typescript
 // Métrica: email.queue.size
 const queueSize = await this.emailQueue.count();
@@ -569,6 +593,7 @@ this.metrics.gauge('email.queue.size', queueSize);
 ```
 
 **5. Jobs em DLQ:**
+
 ```typescript
 // Métrica: email.dlq.size
 const dlqSize = await this.emailQueue.getDlqSize();
@@ -578,6 +603,7 @@ this.metrics.gauge('email.dlq.size', dlqSize);
 ### Logs Estruturados
 
 **Exemplo de log de sucesso:**
+
 ```json
 {
   "timestamp": "2025-01-19T19:30:05.234Z",
@@ -596,6 +622,7 @@ this.metrics.gauge('email.dlq.size', dlqSize);
 ```
 
 **Exemplo de log de erro:**
+
 ```json
 {
   "timestamp": "2025-01-19T19:30:05.123Z",
@@ -616,6 +643,7 @@ this.metrics.gauge('email.dlq.size', dlqSize);
 ### Alertas Recomendados
 
 **1. Taxa de erro elevada:**
+
 ```yaml
 alert: HighEmailFailureRate
 expr: |
@@ -627,6 +655,7 @@ description: "Email failure rate above 5% for 5 minutes"
 ```
 
 **2. DLQ crescendo:**
+
 ```yaml
 alert: DLQSizeIncreasing
 expr: |
@@ -638,6 +667,7 @@ description: "DLQ size is increasing rapidly"
 ```
 
 **3. Latência alta de processamento:**
+
 ```yaml
 alert: HighProcessingLatency
 expr: |
@@ -656,22 +686,26 @@ description: "95th percentile processing latency above 5 seconds"
 **Passos de diagnóstico:**
 
 1. **Verificar se o job foi enfileirado:**
+
    ```sql
    SELECT * FROM email_outbox WHERE id = '<outboxId>';
    ```
 
 2. **Verificar jobs na fila Redis:**
+
    ```bash
    redis-cli LLEN bull:email:send:wait
    redis-cli LRANGE bull:email:send:wait 0 10
    ```
 
 3. **Verificar workers ativos:**
+
    ```bash
    redis-cli SMEMBERS bull:email:send:workers
    ```
 
 4. **Verificar logs do worker:**
+
    ```bash
    kubectl logs -f deployment/email-worker --tail=100
    ```
@@ -681,6 +715,7 @@ description: "95th percentile processing latency above 5 seconds"
 **Investigação:**
 
 1. **Verificar tentativas:**
+
    ```sql
    SELECT id, attempts, last_failure_reason, last_failure_code, last_failure_at
    FROM email_outbox
@@ -689,11 +724,13 @@ description: "95th percentile processing latency above 5 seconds"
    ```
 
 2. **Verificar próximo retry:**
+
    ```bash
    redis-cli ZRANGEBYSCORE bull:email:send:delayed -inf +inf WITHSCORES
    ```
 
 3. **Forçar reprocessamento (se necessário):**
+
    ```typescript
    // Via BullMQ Board ou código
    await emailQueue.getJob(jobId).retry();
@@ -704,6 +741,7 @@ description: "95th percentile processing latency above 5 seconds"
 **Análise:**
 
 1. **Verificar causas mais comuns:**
+
    ```sql
    SELECT last_failure_code, COUNT(*) as count
    FROM email_outbox
@@ -713,6 +751,7 @@ description: "95th percentile processing latency above 5 seconds"
    ```
 
 2. **Identificar tenants afetados:**
+
    ```sql
    SELECT company_id, COUNT(*) as failed_count
    FROM email_outbox
@@ -722,6 +761,7 @@ description: "95th percentile processing latency above 5 seconds"
    ```
 
 3. **Reprocessar jobs da DLQ (após correção):**
+
    ```typescript
    // Script de reprocessamento
    const dlqJobs = await emailQueue.getDlqJobs();

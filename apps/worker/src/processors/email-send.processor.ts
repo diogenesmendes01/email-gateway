@@ -190,7 +190,7 @@ export class EmailSendProcessor {
       if (emailLog) {
         await this.loggingService.createEvent({
           emailLogId: emailLog.id,
-          type: 'VALIDATION_FAILED',
+          type: 'FAILED',
           metadata: {
             failedValidation: firstFailure?.type,
             errorCode: firstFailure?.errorCode,
@@ -237,18 +237,20 @@ export class EmailSendProcessor {
         requestId: jobData.requestId,
         status: this.pipelineStateToEmailStatus(newState),
         attempts: jobData.attempt,
-      });
+      }) as any;
     }
 
     // Registra transição de estado como evento
-    await this.loggingService.logPipelineState(
-      jobData,
-      newState,
-      emailLog.id,
-      {
-        timestamp: new Date().toISOString(),
-      },
-    );
+    if (emailLog) {
+      await this.loggingService.logPipelineState(
+        jobData,
+        newState,
+        emailLog.id,
+        {
+          timestamp: new Date().toISOString(),
+        },
+      );
+    }
   }
 
   /**

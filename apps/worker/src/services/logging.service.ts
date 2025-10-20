@@ -7,8 +7,8 @@
  * Gravação de email_logs e email_events com requestId/jobId/messageId
  */
 
-import { PrismaClient, EmailStatus, EventType } from '@email-gateway/database';
-import { EmailSendJobData, EmailPipelineState } from '@email-gateway/shared';
+import { PrismaClient, EmailStatus, EventType } from '@prisma/client';
+import { EmailSendJobData, EmailPipelineState, maskObject } from '@email-gateway/shared';
 import type { MappedError } from './error-mapping.service';
 
 /**
@@ -51,42 +51,45 @@ export class LoggingService {
    * @returns Email log criado/atualizado
    */
   async upsertEmailLog(data: CreateEmailLogData) {
+    // Aplicar masking para proteger PII nos logs
+    const maskedData = maskObject(data, { maskNames: false });
+    
     const logData: any = {
-      companyId: data.companyId,
-      recipientId: data.recipientId,
-      to: data.to,
-      subject: data.subject,
-      status: data.status,
-      attempts: data.attempts,
-      requestId: data.requestId,
+      companyId: maskedData.companyId,
+      recipientId: maskedData.recipientId,
+      to: maskedData.to,
+      subject: maskedData.subject,
+      status: maskedData.status,
+      attempts: maskedData.attempts,
+      requestId: maskedData.requestId,
     };
 
     // Campos opcionais
-    if (data.sesMessageId) {
-      logData.sesMessageId = data.sesMessageId;
+    if (maskedData.sesMessageId) {
+      logData.sesMessageId = maskedData.sesMessageId;
     }
-    if (data.errorCode) {
-      logData.errorCode = data.errorCode;
+    if (maskedData.errorCode) {
+      logData.errorCode = maskedData.errorCode;
     }
-    if (data.errorReason) {
-      logData.errorReason = data.errorReason;
+    if (maskedData.errorReason) {
+      logData.errorReason = maskedData.errorReason;
     }
-    if (data.durationMs !== undefined) {
-      logData.durationMs = data.durationMs;
+    if (maskedData.durationMs !== undefined) {
+      logData.durationMs = maskedData.durationMs;
     }
 
     // Define timestamps baseado no status
-    if (data.status === 'SENT') {
+    if (maskedData.status === 'SENT') {
       logData.sentAt = new Date();
-    } else if (data.status === 'FAILED') {
+    } else if (maskedData.status === 'FAILED') {
       logData.failedAt = new Date();
     }
 
     return await this.prisma.emailLog.upsert({
-      where: { outboxId: data.outboxId },
+      where: { outboxId: maskedData.outboxId },
       create: {
         ...logData,
-        outboxId: data.outboxId,
+        outboxId: maskedData.outboxId,
       },
       update: logData,
     });
@@ -103,7 +106,7 @@ export class LoggingService {
       data: {
         emailLogId: data.emailLogId,
         type: data.type,
-        metadata: data.metadata || {},
+        metadata: data.metadata as any || {},
       },
     });
   }
@@ -128,7 +131,7 @@ export class LoggingService {
       updatedAt: new Date(),
     };
 
-    if (status === 'SENT' || status === 'SENT_ATTEMPT') {
+    if (status === 'SENT') {
       updateData.processedAt = new Date();
     }
 
@@ -248,7 +251,7 @@ export class LoggingService {
     durationMs: number,
     willRetry: boolean,
   ) {
-    const status: EmailStatus = willRetry ? 'RETRY_SCHEDULED' : 'FAILED';
+    const status: EmailStatus = willRetry ? 'RETRYING' : 'FAILED';
 
     // 1. Atualiza outbox
     await this.updateOutboxStatus(jobData.outboxId, status, {
@@ -272,7 +275,7 @@ export class LoggingService {
     });
 
     // 3. Cria evento apropriado
-    const eventType: EventType = willRetry ? 'RETRY_SCHEDULED' : 'FAILED';
+    const eventType: EventType = willRetry ? 'RETRYING' : 'FAILED';
     await this.createEvent({
       emailLogId: emailLog.id,
       type: eventType,
@@ -295,12 +298,12 @@ export class LoggingService {
    */
   private pipelineStateToEventType(state: EmailPipelineState): EventType {
     const mapping: Record<EmailPipelineState, EventType> = {
-      [EmailPipelineState.RECEIVED]: 'RECEIVED',
-      [EmailPipelineState.VALIDATED]: 'VALIDATED',
-      [EmailPipelineState.SENT_ATTEMPT]: 'SENT_ATTEMPT',
+      [EmailPipelineState.RECEIVED]: 'PROCESSING',
+      [EmailPipelineState.VALIDATED]: 'PROCESSING',
+      [EmailPipelineState.SENT_ATTEMPT]: 'PROCESSING',
       [EmailPipelineState.SENT]: 'SENT',
       [EmailPipelineState.FAILED]: 'FAILED',
-      [EmailPipelineState.RETRY_SCHEDULED]: 'RETRY_SCHEDULED',
+      [EmailPipelineState.RETRY_SCHEDULED]: 'RETRYING',
     };
 
     return mapping[state];

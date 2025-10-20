@@ -35,9 +35,11 @@ O worker implementa um pipeline de estados completo para processamento de emails
 ## Estados do Pipeline
 
 ### 1. RECEIVED
+
 **Descrição:** Job foi recebido do BullMQ e está iniciando o processamento.
 
 **Ações:**
+
 - Incrementa contador de tentativas no `email_outbox`
 - Cria/atualiza registro no `email_logs`
 - Registra evento `RECEIVED` no `email_events`
@@ -47,15 +49,18 @@ O worker implementa um pipeline de estados completo para processamento de emails
 ---
 
 ### 2. VALIDATED
+
 **Descrição:** Todas as validações foram executadas com sucesso.
 
 **Validações executadas:**
+
 1. **INTEGRITY** - Validação do payload do job (Zod schema)
 2. **OUTBOX** - Verificação de existência do registro em `email_outbox`
 3. **RECIPIENT** - Validação dos dados do destinatário
 4. **TEMPLATE** - Validação do HTML e subject
 
 **Ações:**
+
 - Registra evento `VALIDATED` no `email_events`
 - Registra metadados das validações
 
@@ -66,15 +71,18 @@ O worker implementa um pipeline de estados completo para processamento de emails
 ---
 
 ### 3. SENT_ATTEMPT
+
 **Descrição:** Tentativa de envio ao AWS SES em andamento.
 
 **Ações:**
+
 - Busca HTML do `email_outbox`
 - Chama AWS SES `SendEmailCommand`
 - Timeout de 30 segundos
 - Registra evento `SENT_ATTEMPT`
 
 **Próximos estados:**
+
 - `SENT` - Envio bem-sucedido
 - `FAILED` - Erro permanente (não será retentado)
 - `RETRY_SCHEDULED` - Erro transiente (será retentado)
@@ -82,9 +90,11 @@ O worker implementa um pipeline de estados completo para processamento de emails
 ---
 
 ### 4a. SENT (Estado Final - Sucesso)
+
 **Descrição:** Email enviado com sucesso ao AWS SES.
 
 **Ações:**
+
 - Atualiza `email_outbox.status = 'SENT'`
 - Atualiza `email_outbox.processedAt`
 - Cria/atualiza `email_logs`:
@@ -102,9 +112,11 @@ O worker implementa um pipeline de estados completo para processamento de emails
 ---
 
 ### 4b. FAILED (Estado Final - Erro Permanente)
+
 **Descrição:** Falha permanente que não será retentada.
 
 **Causas comuns:**
+
 - Validação falhou
 - Erro de configuração (domínio não verificado)
 - Email rejeitado (destinatário inválido)
@@ -112,6 +124,7 @@ O worker implementa um pipeline de estados completo para processamento de emails
 - Máximo de tentativas atingido (5 tentativas)
 
 **Ações:**
+
 - Atualiza `email_outbox.status = 'FAILED'`
 - Atualiza `email_outbox.lastError`
 - Cria/atualiza `email_logs`:
@@ -131,9 +144,11 @@ O worker implementa um pipeline de estados completo para processamento de emails
 ---
 
 ### 4c. RETRY_SCHEDULED (Estado Intermediário)
+
 **Descrição:** Falha transiente, job será retentado.
 
 **Causas comuns:**
+
 - Throttling / Rate limit do SES
 - Quota diária excedida
 - Serviço SES temporariamente indisponível
@@ -141,6 +156,7 @@ O worker implementa um pipeline de estados completo para processamento de emails
 - Erro de conexão
 
 **Ações:**
+
 - Atualiza `email_outbox.status = 'RETRY_SCHEDULED'`
 - Atualiza `email_outbox.lastError`
 - Cria/atualiza `email_logs`:
@@ -167,11 +183,13 @@ O worker implementa um pipeline de estados completo para processamento de emails
 ## Validações Detalhadas
 
 ### 1. INTEGRITY Validation
+
 ```typescript
 validateEmailJobData(jobData)
 ```
 
 **Verifica:**
+
 - Todos os campos obrigatórios presentes
 - Tipos corretos (UUID, email, string, number)
 - Limites de tamanho respeitados
@@ -183,11 +201,13 @@ validateEmailJobData(jobData)
 ---
 
 ### 2. OUTBOX Validation
+
 ```typescript
 await validateOutbox(jobData)
 ```
 
 **Verifica:**
+
 - Registro existe em `email_outbox` com `outboxId`
 - `companyId` do job coincide com o do outbox
 
@@ -196,11 +216,13 @@ await validateOutbox(jobData)
 ---
 
 ### 3. RECIPIENT Validation
+
 ```typescript
 await validateRecipient(jobData)
 ```
 
 **Verifica:**
+
 - Se `recipientId` fornecido:
   - Registro existe em `recipients`
   - Não foi deletado (`deletedAt IS NULL`)
@@ -213,11 +235,13 @@ await validateRecipient(jobData)
 ---
 
 ### 4. TEMPLATE Validation
+
 ```typescript
 await validateTemplate(jobData)
 ```
 
 **Verifica:**
+
 - HTML existe no `email_outbox.html`
 - HTML não está vazio
 - Tamanho do HTML ≤ 512 KB
@@ -258,6 +282,7 @@ await validateTemplate(jobData)
 ## Gravação de Logs e Eventos
 
 ### email_logs
+
 Registro principal do envio, contém:
 
 ```typescript
@@ -281,6 +306,7 @@ Registro principal do envio, contém:
 ```
 
 ### email_events
+
 Histórico de todos os eventos/transições:
 
 ```typescript
@@ -293,6 +319,7 @@ Histórico de todos os eventos/transições:
 ```
 
 **Eventos criados:**
+
 - `RECEIVED` - Job recebido
 - `VALIDATED` - Validações passaram
 - `VALIDATION_FAILED` - Validação falhou
@@ -312,6 +339,7 @@ Três IDs são usados para correlação:
 3. **sesMessageId** - ID da mensagem no AWS SES (quando enviado)
 
 **Fluxo:**
+
 ```
 HTTP Request → requestId
     ↓
@@ -331,17 +359,20 @@ email_logs → sesMessageId
 ## Retry e Backoff (Trilha 3.2)
 
 ### Configuração
+
 ```typescript
 MAX_ATTEMPTS: 5
 BACKOFF_DELAYS: [1s, 5s, 30s, 2min, 10min]
 ```
 
 ### Estratégia
+
 - **Backoff exponencial** com **jitter** (±25%)
 - Jitter previne "thundering herd" problem
 - Após 5 tentativas → move para `FAILED`
 
 ### Implementação
+
 ```typescript
 backoffStrategy: (attemptsMade: number) => {
   const baseDelay = BACKOFF_DELAYS[attemptsMade - 1]
@@ -355,7 +386,8 @@ backoffStrategy: (attemptsMade: number) => {
 
 ## Exemplo de Fluxo Completo
 
-### Sucesso na primeira tentativa:
+### Sucesso na primeira tentativa
+
 ```
 1. RECEIVED (t=0ms)
    → Incrementa attempts
@@ -375,7 +407,8 @@ backoffStrategy: (attemptsMade: number) => {
    → Job completed
 ```
 
-### Falha transiente com retry:
+### Falha transiente com retry
+
 ```
 Tentativa 1:
 1. RECEIVED (t=0ms)
@@ -394,7 +427,8 @@ Tentativa 2 (após ~1.2s):
    → sesMessageId = "0100018c..."
 ```
 
-### Falha permanente:
+### Falha permanente
+
 ```
 1. RECEIVED (t=0ms)
 2. VALIDATED (t=50ms)
@@ -411,6 +445,7 @@ Tentativa 2 (após ~1.2s):
 ## Monitoramento
 
 ### Métricas Recomendadas
+
 - `pipeline.state.transitions` - Counter de transições por estado
 - `pipeline.validation.failures` - Counter de falhas por tipo de validação
 - `pipeline.processing.duration` - Histogram de duração por estado
@@ -418,7 +453,9 @@ Tentativa 2 (após ~1.2s):
 - `pipeline.final.state` - Counter de estados finais (SENT/FAILED)
 
 ### Logs Estruturados
+
 Todos os logs incluem:
+
 - `outboxId`
 - `requestId`
 - `companyId`

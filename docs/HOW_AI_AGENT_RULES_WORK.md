@@ -11,11 +11,13 @@ Este documento explica **como** os agentes de IA (Claude Code, GitHub Copilot, C
 **Arquivo:** [CONTRIBUTING.md](../CONTRIBUTING.md)
 
 **Como funciona:**
+
 - Padrão **universal** do GitHub/GitLab/Bitbucket
 - Agentes de IA são **treinados** para procurar e ler este arquivo
 - Claude Code, GitHub Copilot, ChatGPT **automaticamente** consideram este arquivo
 
 **Quando é lido:**
+
 - Quando o agente explora o repositório pela primeira vez
 - Antes de fazer commits (em agentes bem treinados)
 - Quando solicitado a contribuir com código
@@ -29,8 +31,10 @@ Este documento explica **como** os agentes de IA (Claude Code, GitHub Copilot, C
 **Arquivo:** [README.md](../README.md)
 
 **Como funciona:**
+
 - **Primeiro** arquivo lido por qualquer pessoa ou IA
 - Contém destaque visual para agentes de IA:
+
   ```markdown
   ## 📋 Para Contribuidores (Humanos e IAs)
 
@@ -38,6 +42,7 @@ Este documento explica **como** os agentes de IA (Claude Code, GitHub Copilot, C
   ```
 
 **Quando é lido:**
+
 - **Sempre** ao abrir o repositório
 - Primeiro contexto que o agente recebe
 
@@ -48,16 +53,19 @@ Este documento explica **como** os agentes de IA (Claude Code, GitHub Copilot, C
 ### 3️⃣ .claude/commands/*.md (✅ Funciona - Claude Code Específico)
 
 **Arquivos criados:**
+
 - [.claude/commands/rules.md](../.claude/commands/rules.md)
 - [.claude/commands/pre-commit-check.md](../.claude/commands/pre-commit-check.md)
 - [.claude/commands/pre-pr-check.md](../.claude/commands/pre-pr-check.md)
 
 **Como funciona:**
+
 - Claude Code permite criar **slash commands** customizados
 - Você ou outro agente pode executar `/rules`, `/pre-commit-check`, `/pre-pr-check`
 - Esses comandos exibem as regras diretamente no contexto
 
 **Como usar:**
+
 ```bash
 # No Claude Code, digite:
 /rules                # Ver regras gerais
@@ -66,6 +74,7 @@ Este documento explica **como** os agentes de IA (Claude Code, GitHub Copilot, C
 ```
 
 **Quando usar:**
+
 - **Manualmente:** Quando você quiser revisar as regras
 - **Antes de commits:** Execute `/pre-commit-check`
 - **Antes de PRs:** Execute `/pre-pr-check`
@@ -79,11 +88,13 @@ Este documento explica **como** os agentes de IA (Claude Code, GitHub Copilot, C
 **Arquivo:** [.claude/settings.json](../.claude/settings.json)
 
 **Como funciona:**
+
 - **Convenção** que você pode usar para documentar regras em formato JSON
 - Não é lido **automaticamente** pelo Claude Code (ainda)
 - Serve como **documentação estruturada** das regras
 
 **Quando é útil:**
+
 - Para ferramentas que você criar que processem JSON
 - Como referência rápida estruturada
 - Para futuras integrações
@@ -97,17 +108,20 @@ Este documento explica **como** os agentes de IA (Claude Code, GitHub Copilot, C
 **Arquivo:** [.clauderc](../.clauderc)
 
 **Como funciona:**
+
 - **NÃO é lido automaticamente** pelo Claude Code nativamente
 - É uma **convenção/prática recomendada** similar a `.editorconfig`
 - Você precisa **instruir manualmente** o agente para lê-lo
 
 **Limitações:**
+
 - Claude Code não tem (ainda) suporte nativo para `.clauderc`
 - Funciona apenas se você explicitamente pedir: "Leia o arquivo .clauderc"
 
 **Garantia:** ⭐ (Muito baixa - requer ação manual)
 
 **Por que criar então?**
+
 - Pode ser útil no futuro se Claude adicionar suporte
 - Serve como documentação consolidada
 - Você pode instruir agentes: "Sempre leia .clauderc antes de commitar"
@@ -119,11 +133,13 @@ Este documento explica **como** os agentes de IA (Claude Code, GitHub Copilot, C
 **Arquivo:** [docs/AI_AGENT_GUIDE.md](AI_AGENT_GUIDE.md)
 
 **Como funciona:**
+
 - Guia **completo e detalhado** para agentes de IA
 - Referenciado pelo CONTRIBUTING.md e README.md
 - Contém workflows passo-a-passo, exemplos, checklists
 
 **Quando é lido:**
+
 - Quando o agente segue links do CONTRIBUTING.md
 - Quando você explicitamente pede: "Leia docs/AI_AGENT_GUIDE.md"
 
@@ -136,17 +152,20 @@ Este documento explica **como** os agentes de IA (Claude Code, GitHub Copilot, C
 **Arquivo:** [.husky/pre-commit](../.husky/pre-commit)
 
 **Como funciona:**
+
 - Hook do Git que **executa automaticamente** antes de cada commit
 - **Bloqueia** commits que violam regras (ex: tentar commitar `.env`)
 - Funciona para **humanos e IAs** que usam `git commit`
 
 **Quando é executado:**
+
 - **Automaticamente** antes de CADA `git commit`
 - Valida segurança (sem .env, sem credenciais)
 
 **Garantia:** ⭐⭐⭐⭐⭐ (Altíssima - é automático e bloqueia)
 
 **Como ativar:**
+
 ```bash
 npm install --save-dev husky
 npx husky install
@@ -158,10 +177,12 @@ chmod +x .husky/pre-commit
 ### 8️⃣ GitHub Actions Workflows (✅ Funciona - Validação em PRs)
 
 **Arquivos:**
+
 - [.github/workflows/semantic-pr.yml](../.github/workflows/semantic-pr.yml)
 - [.github/workflows/labeler.yml](../.github/workflows/labeler.yml)
 
 **Como funciona:**
+
 - Executam **automaticamente** quando uma PR é aberta
 - **Validam:**
   - Título da PR segue Conventional Commits
@@ -169,6 +190,7 @@ chmod +x .husky/pre-commit
 - **Bloqueiam merge** se validação falhar
 
 **Quando executam:**
+
 - Ao abrir PR
 - Ao atualizar título da PR
 - Ao fazer push na branch da PR
@@ -194,28 +216,31 @@ chmod +x .husky/pre-commit
 
 ## 🎯 Estratégia Recomendada
 
-### Para Garantir Máxima Conformidade:
+### Para Garantir Máxima Conformidade
 
 #### **Camada 1: Educação (Leitura)**
+
 1. ✅ **CONTRIBUTING.md** - Agente lê automaticamente
 2. ✅ **README.md** - Destaque visual para IAs
 3. ✅ **docs/AI_AGENT_GUIDE.md** - Guia detalhado
 
 #### **Camada 2: Ferramentas (Comandos)**
-4. ✅ **.claude/commands/** - Slash commands para revisar regras
+
+1. ✅ **.claude/commands/** - Slash commands para revisar regras
    - `/rules` - Ver regras
    - `/pre-commit-check` - Antes de commitar
    - `/pre-pr-check` - Antes de abrir PR
 
 #### **Camada 3: Validação (Bloqueio)**
-5. ✅ **.husky/pre-commit** - Bloqueia commits ruins
-6. ✅ **GitHub Actions** - Valida PRs
+
+1. ✅ **.husky/pre-commit** - Bloqueia commits ruins
+2. ✅ **GitHub Actions** - Valida PRs
 
 ---
 
 ## 🚀 Como Usar Este Sistema
 
-### Para Agentes de IA (como Claude Code):
+### Para Agentes de IA (como Claude Code)
 
 **Antes de QUALQUER ação de commit/PR:**
 
@@ -224,6 +249,7 @@ chmod +x .husky/pre-commit
    - README.md (primeira coisa que viu)
 
 2. **Execute comandos:**
+
    ```
    /pre-commit-check    # Antes de commitar
    /pre-pr-check        # Antes de abrir PR
@@ -233,7 +259,7 @@ chmod +x .husky/pre-commit
    - Git hook vai impedir commits ruins
    - GitHub Actions vai validar PR
 
-### Para Desenvolvedores Humanos:
+### Para Desenvolvedores Humanos
 
 **Instruindo um agente de IA:**
 
@@ -270,6 +296,7 @@ chmod +x .husky/pre-commit
 ```
 
 Agora, **toda vez** que você ou um agente tentar commitar, o hook vai validar:
+
 - ❌ Bloqueia se tentar commitar `.env`
 - ❌ Avisa se encontrar arquivos suspeitos de credenciais
 
@@ -314,21 +341,27 @@ gh pr create --title "mudanca qualquer"
 ## 📝 FAQ
 
 ### P: O .clauderc funciona automaticamente?
+
 **R:** Não. É uma convenção que você precisa instruir o agente a ler.
 
 ### P: Qual arquivo é mais importante?
+
 **R:** CONTRIBUTING.md - é o padrão universal reconhecido por todos os agentes.
 
 ### P: Como garantir que o agente sempre siga as regras?
+
 **R:** Use as 3 camadas:
+
 1. CONTRIBUTING.md (educação)
 2. Slash commands (ferramentas)
 3. Git hooks + GitHub Actions (bloqueio)
 
 ### P: E se o agente não ler CONTRIBUTING.md?
+
 **R:** Os git hooks e GitHub Actions vão bloquear commits/PRs ruins mesmo assim.
 
 ### P: Preciso instalar Husky?
+
 **R:** Não é obrigatório, mas **altamente recomendado** para máxima segurança.
 
 ---
@@ -350,7 +383,8 @@ gh pr create --title "mudanca qualquer"
 
 **Status:** ✅ **Sistema completamente implementado e testado!**
 
-### Testes Realizados:
+### Testes Realizados
+
 - ✅ Hook bloqueia commits de `.env`
 - ✅ Hook bloqueia commits de `node_modules/`
 - ✅ Hook bloqueia commits de `dist/`

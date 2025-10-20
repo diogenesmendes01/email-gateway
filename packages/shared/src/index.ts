@@ -16,8 +16,8 @@ export * from './schemas/email-job-retry.types';
 // Types
 export * from './types/email-pipeline.types';
 
-// Utils (quando criados)
-// export * from './utils';
+// Utils
+export * from './utils/masking.util';
 
 // Constants (quando criados)
 // export * from './constants';

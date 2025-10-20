@@ -193,6 +193,7 @@ X-API-Key: sk_live_abc123xyz
 | `sort` | string | `createdAt:desc` | Campo:direção (`asc`/`desc`) |
 
 **Campos Ordenáveis:**
+
 - `createdAt`
 - `sentAt`
 - `status`
@@ -298,6 +299,7 @@ GET /v1/emails?status=PENDING,ENQUEUED,PROCESSING
 ```
 
 **Valores aceitos:**
+
 - `PENDING` - Criado, aguardando enfileiramento
 - `ENQUEUED` - Na fila aguardando worker
 - `PROCESSING` - Sendo processado pelo worker
@@ -319,6 +321,7 @@ GET /v1/emails?dateTo=2025-10-18T23:59:59.999Z
 ```
 
 **Regras:**
+
 - Sempre usar ISO 8601 com timezone (UTC recomendado)
 - `dateFrom` é inclusive
 - `dateTo` é inclusive
@@ -345,6 +348,7 @@ GET /v1/emails?razaoSocial=Silva
 ```
 
 **Regras:**
+
 - `cpfCnpj`: aceita apenas dígitos, será hasheado antes da busca
 - `nome` e `razaoSocial`: busca parcial (LIKE/ILIKE)
 - Busca case-insensitive
@@ -356,6 +360,7 @@ GET /v1/emails?externalId=SEND-2025-001
 ```
 
 **Regras:**
+
 - Exato match
 - Diferente de `recipientExternalId`
 
@@ -373,6 +378,7 @@ GET /v1/emails?tags=boleto&tags=trimestral
 ```
 
 **Regras:**
+
 - Vírgula (`,`): operador AND (possui todas as tags)
 - Múltiplos parâmetros: operador OR (possui qualquer tag)
 
@@ -396,6 +402,7 @@ GET /v1/emails?page=2&pageSize=50
 ```
 
 **Limitações:**
+
 - `pageSize` máximo: 100
 - `pageSize` mínimo: 1
 - `page` mínimo: 1
@@ -426,6 +433,7 @@ GET /v1/emails?cursor=eyJpZCI6IjY2MGU5NTAwLi4uIn0&pageSize=20
 ```
 
 **Vantagens:**
+
 - Mais eficiente para grandes datasets
 - Evita problemas de paginação instável (novos items inseridos)
 
@@ -443,6 +451,7 @@ GET /v1/emails?cursor=eyJpZCI6IjY2MGU5NTAwLi4uIn0&pageSize=20
 ```
 
 **Regras:**
+
 - Cursor é opaco (base64)
 - Não combinar `cursor` com `page`
 - Cursor expira em 24 horas
@@ -458,6 +467,7 @@ sort={campo}:{direção}
 ```
 
 **Direções:**
+
 - `asc` - Ascendente (A-Z, 0-9, antigo→recente)
 - `desc` - Descendente (Z-A, 9-0, recente→antigo)
 
@@ -487,6 +497,7 @@ GET /v1/emails?sort=sentAt:desc
 | `to` | String | E-mail do destinatário (alfabético) |
 
 **Regras:**
+
 - Apenas um campo por vez
 - Default: `createdAt:desc`
 - Valores `null` aparecem no final
@@ -508,10 +519,12 @@ Sempre mascarado nas respostas:
 ```
 
 **Padrão de Masking:**
+
 - **CPF** (11 dígitos): `***.456.789-**` (mostra apenas 6 dígitos centrais)
 - **CNPJ** (14 dígitos): `**.345.678/****-**` (mostra apenas 6 dígitos centrais)
 
 **Regras:**
+
 - Masking aplicado em **todas as respostas** (list e detail)
 - Campo `cpfCnpjHash` **nunca** retornado
 - Campo `cpfCnpjEnc` **nunca** retornado
