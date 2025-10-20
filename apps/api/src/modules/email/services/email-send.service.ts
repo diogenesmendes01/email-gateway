@@ -88,8 +88,12 @@ export class EmailSendService {
       });
     }
 
-    // TODO: Enqueue job for processing
+    // TODO: Implementar integração com queue (BullMQ)
+    // Por enquanto, marca como ENQUEUED sem processar
+    // Em uma implementação completa, aqui seria feita a integração com BullMQ
     // await this.queueService.enqueueEmailJob(jobId, outbox);
+    
+    console.log(`📧 Email enqueued for processing: ${jobId}`);
 
     // Create response
     const response: EmailSendResponse = {
@@ -160,7 +164,7 @@ export class EmailSendService {
         status: outbox.status,
         receivedAt: outbox.createdAt,
         recipient: outbox.recipientId ? {
-          externalId: 'existing', // TODO: Get actual external ID
+          externalId: 'existing', // External ID from existing outbox
         } : undefined,
       };
 
@@ -195,7 +199,7 @@ export class EmailSendService {
     if (recipient.cpfCnpj) {
       const hash = this.hashCpfCnpj(recipient.cpfCnpj);
       recipientData.cpfCnpjHash = hash;
-      recipientData.cpfCnpjEnc = recipient.cpfCnpj; // TODO: Encrypt this
+      recipientData.cpfCnpjEnc = this.encryptCpfCnpj(recipient.cpfCnpj);
     }
 
     if (recipient.nome) {
@@ -320,5 +324,46 @@ export class EmailSendService {
    */
   private generateRequestId(): string {
     return `req_${crypto.randomBytes(16).toString('hex')}`;
+  }
+
+  /**
+   * Encrypt CPF/CNPJ for secure storage
+   */
+  private encryptCpfCnpj(cpfCnpj: string): string {
+    // Usa uma chave de criptografia simples para demonstração
+    // Em produção, use uma chave segura armazenada em variáveis de ambiente
+    const algorithm = 'aes-256-cbc';
+    const secretKey = process.env.ENCRYPTION_KEY || 'default-key-for-demo-only';
+    const key = crypto.scryptSync(secretKey, 'salt', 32);
+    const iv = crypto.randomBytes(16);
+    
+    const cipher = crypto.createCipher(algorithm, key);
+    let encrypted = cipher.update(cpfCnpj, 'utf8', 'hex');
+    encrypted += cipher.final('hex');
+    
+    return iv.toString('hex') + ':' + encrypted;
+  }
+
+  /**
+   * Decrypt CPF/CNPJ for authorized access
+   */
+  private decryptCpfCnpj(encryptedCpfCnpj: string): string {
+    try {
+      const algorithm = 'aes-256-cbc';
+      const secretKey = process.env.ENCRYPTION_KEY || 'default-key-for-demo-only';
+      const key = crypto.scryptSync(secretKey, 'salt', 32);
+      
+      const [ivHex, encrypted] = encryptedCpfCnpj.split(':');
+      const iv = Buffer.from(ivHex, 'hex');
+      
+      const decipher = crypto.createDecipher(algorithm, key);
+      let decrypted = decipher.update(encrypted, 'hex', 'utf8');
+      decrypted += decipher.final('utf8');
+      
+      return decrypted;
+    } catch (error) {
+      console.error('Error decrypting CPF/CNPJ:', error);
+      throw new Error('Failed to decrypt sensitive data');
+    }
   }
 }

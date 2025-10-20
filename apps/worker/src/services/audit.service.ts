@@ -82,24 +82,27 @@ export class AuditService {
         breakGlassRequestId: auditEvent.breakGlassRequestId,
       });
 
-      // TODO: Implementar salvamento no banco de dados
-      // await this.prisma.auditEvent.create({
-      //   data: {
-      //     id: auditEvent.id,
-      //     userId: auditEvent.userId,
-      //     profile: auditEvent.profile,
-      //     action: auditEvent.action,
-      //     resource: auditEvent.resource,
-      //     resourceId: auditEvent.resourceId,
-      //     timestamp: auditEvent.timestamp,
-      //     ipAddress: auditEvent.ipAddress,
-      //     userAgent: auditEvent.userAgent,
-      //     success: auditEvent.success,
-      //     errorMessage: auditEvent.errorMessage,
-      //     metadata: auditEvent.metadata,
-      //     breakGlassRequestId: auditEvent.breakGlassRequestId,
-      //   },
-      // });
+      // Salva no banco de dados
+      await this.prisma.auditLog.create({
+        data: {
+          id: auditEvent.id,
+          companyId: auditEvent.userId, // Assumindo que userId é companyId
+          userId: auditEvent.userId,
+          action: auditEvent.action,
+          resource: auditEvent.resource,
+          resourceId: auditEvent.resourceId,
+          ipAddress: auditEvent.ipAddress,
+          userAgent: auditEvent.userAgent,
+          metadata: {
+            ...auditEvent.metadata,
+            profile: auditEvent.profile,
+            success: auditEvent.success,
+            errorMessage: auditEvent.errorMessage,
+            breakGlassRequestId: auditEvent.breakGlassRequestId,
+            timestamp: auditEvent.timestamp,
+          },
+        },
+      });
     } catch (error) {
       console.error('❌ Erro ao registrar evento de auditoria:', error);
       // Não falhar a operação principal por erro de auditoria
@@ -145,20 +148,27 @@ export class AuditService {
         ipAddress: request.ipAddress,
       });
 
-      // TODO: Implementar salvamento no banco de dados
-      // await this.prisma.breakGlassRequest.create({
-      //   data: {
-      //     id: request.id,
-      //     userId: request.userId,
-      //     profile: request.profile,
-      //     justification: request.justification,
-      //     requestedAt: request.requestedAt,
-      //     expiresAt: request.expiresAt,
-      //     status: request.status,
-      //     ipAddress: request.ipAddress,
-      //     userAgent: request.userAgent,
-      //   },
-      // });
+      // Salva solicitação break-glass como evento de auditoria
+      await this.prisma.auditLog.create({
+        data: {
+          id: request.id,
+          companyId: request.userId,
+          userId: request.userId,
+          action: 'break_glass_request',
+          resource: 'break_glass',
+          resourceId: request.id,
+          ipAddress: request.ipAddress,
+          userAgent: request.userAgent,
+          metadata: {
+            profile: request.profile,
+            justification: request.justification,
+            requestedAt: request.requestedAt,
+            expiresAt: request.expiresAt,
+            status: request.status,
+            durationMinutes: request.durationMinutes,
+          },
+        },
+      });
 
       return request;
     } catch (error) {
@@ -181,15 +191,21 @@ export class AuditService {
         approvedAt: new Date(),
       });
 
-      // TODO: Implementar atualização no banco de dados
-      // await this.prisma.breakGlassRequest.update({
-      //   where: { id: requestId },
-      //   data: {
-      //     status: 'approved',
-      //     approvedBy,
-      //     approvedAt: new Date(),
-      //   },
-      // });
+      // Atualiza solicitação break-glass no audit log
+      await this.prisma.auditLog.update({
+        where: { id: requestId },
+        data: {
+          metadata: {
+            ...(await this.prisma.auditLog.findUnique({
+              where: { id: requestId },
+              select: { metadata: true },
+            }))?.metadata as any,
+            status: 'approved',
+            approvedBy,
+            approvedAt: new Date(),
+          },
+        },
+      });
 
       return true;
     } catch (error) {
@@ -203,19 +219,25 @@ export class AuditService {
    */
   async validateBreakGlassRequest(requestId: string): Promise<boolean> {
     try {
-      // TODO: Implementar busca no banco de dados
-      // const request = await this.prisma.breakGlassRequest.findUnique({
-      //   where: { id: requestId },
-      // });
+      // Busca solicitação break-glass no audit log
+      const request = await this.prisma.auditLog.findUnique({
+        where: { id: requestId },
+      });
 
-      // if (!request) {
-      //   return false;
-      // }
+      if (!request || request.action !== 'break_glass_request') {
+        return false;
+      }
 
-      // return isBreakGlassRequestValid(request);
+      // Verifica se a solicitação é válida
+      const metadata = request.metadata as any;
+      if (!metadata || !metadata.expiresAt) {
+        return false;
+      }
 
-      // Por enquanto, sempre retorna false para simular
-      return false;
+      const expiresAt = new Date(metadata.expiresAt);
+      const now = new Date();
+      
+      return expiresAt > now && metadata.status === 'approved';
     } catch (error) {
       console.error('❌ Erro ao validar solicitação break-glass:', error);
       return false;
@@ -354,19 +376,16 @@ export class AuditService {
 
       console.log(`🧹 Limpando eventos de auditoria anteriores a ${cutoffDate.toISOString()}`);
 
-      // TODO: Implementar limpeza no banco de dados
-      // const result = await this.prisma.auditEvent.deleteMany({
-      //   where: {
-      //     timestamp: {
-      //       lt: cutoffDate,
-      //     },
-      //   },
-      // });
+      // Limpa eventos de auditoria antigos
+      const result = await this.prisma.auditLog.deleteMany({
+        where: {
+          createdAt: {
+            lt: cutoffDate,
+          },
+        },
+      });
 
-      // return result.count;
-
-      // Por enquanto, retorna 0
-      return 0;
+      return result.count;
     } catch (error) {
       console.error('❌ Erro ao limpar eventos de auditoria:', error);
       return 0;
@@ -390,31 +409,51 @@ export class AuditService {
     try {
       console.log(`📊 Gerando relatório de auditoria de ${startDate.toISOString()} a ${endDate.toISOString()}`);
 
-      // TODO: Implementar geração de relatório do banco de dados
-      // const events = await this.prisma.auditEvent.findMany({
-      //   where: {
-      //     timestamp: {
-      //       gte: startDate,
-      //       lte: endDate,
-      //     },
-      //   },
-      // });
-
-      // return generateAuditReport(events, startDate, endDate);
-
-      // Por enquanto, retorna dados vazios
-      return {
-        totalEvents: 0,
-        successfulEvents: 0,
-        failedEvents: 0,
-        breakGlassEvents: 0,
-        eventsByProfile: {
-          [AccessProfile.OPERATIONS]: 0,
-          [AccessProfile.AUDIT]: 0,
-          [AccessProfile.ADMIN]: 0,
-          [AccessProfile.READONLY]: 0,
+      // Gera relatório de auditoria do banco de dados
+      const events = await this.prisma.auditLog.findMany({
+        where: {
+          createdAt: {
+            gte: startDate,
+            lte: endDate,
+          },
         },
-        eventsByAction: {},
+      });
+
+      // Processa os dados para gerar o relatório
+      const totalEvents = events.length;
+      const successfulEvents = events.filter(e => {
+        const metadata = e.metadata as any;
+        return metadata?.success === true;
+      }).length;
+      const failedEvents = totalEvents - successfulEvents;
+      const breakGlassEvents = events.filter(e => e.action === 'break_glass_request').length;
+
+      const eventsByProfile = {
+        [AccessProfile.OPERATIONS]: 0,
+        [AccessProfile.AUDIT]: 0,
+        [AccessProfile.ADMIN]: 0,
+        [AccessProfile.READONLY]: 0,
+      };
+
+      const eventsByAction: Record<string, number> = {};
+
+      events.forEach(event => {
+        const metadata = event.metadata as any;
+        const profile = metadata?.profile;
+        if (profile && eventsByProfile.hasOwnProperty(profile)) {
+          eventsByProfile[profile as AccessProfile]++;
+        }
+
+        eventsByAction[event.action] = (eventsByAction[event.action] || 0) + 1;
+      });
+
+      return {
+        totalEvents,
+        successfulEvents,
+        failedEvents,
+        breakGlassEvents,
+        eventsByProfile,
+        eventsByAction,
       };
     } catch (error) {
       console.error('❌ Erro ao gerar relatório de auditoria:', error);
