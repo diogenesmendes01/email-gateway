@@ -34,7 +34,13 @@ done
 
 # Adicionar IPs personalizados se fornecidos como argumentos
 for ip in "$@"; do
-    echo "    $ip 1;" >> "$ALLOWLIST_FILE"
+    # Validar formato de IP
+    if [[ $ip =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}(/[0-9]{1,2})?$ ]] || [[ $ip =~ ^[a-fA-F0-9:]+(/[0-9]{1,3})?$ ]]; then
+        echo "    $ip 1;" >> "$ALLOWLIST_FILE"
+        echo "[ALLOWLIST] IP adicionado: $ip"
+    else
+        echo "[ALLOWLIST] AVISO: IP inválido ignorado: $ip"
+    fi
 done
 
 cat >> "$ALLOWLIST_FILE" << EOF

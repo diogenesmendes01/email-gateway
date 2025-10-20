@@ -14,7 +14,7 @@ mkdir -p "$SSL_DIR"
 
 # Gerar chave privada
 echo "[SSL] Gerando chave privada..."
-openssl genrsa -out "$SSL_DIR/key.pem" 2048
+openssl genrsa -out "$SSL_DIR/key.pem" 4096
 
 # Gerar certificado auto-assinado
 echo "[SSL] Gerando certificado auto-assinado..."

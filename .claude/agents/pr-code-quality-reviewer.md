@@ -1,3 +1,12 @@
+---
+name: pr-code-quality-reviewer
+description: Review PRs for code quality, TypeScript best practices, and clean code principles
+tags: [code-quality, typescript, logging, error-handling, clean-code, dependency-injection]
+version: 1.0
+author: Architecture Team
+lastUpdated: 2025-10-20
+---
+
 # Code Quality Reviewer Agent
 
 **Version:** 1.0

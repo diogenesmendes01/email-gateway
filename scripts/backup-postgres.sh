@@ -152,8 +152,8 @@ fi
 cleanup_old_backups "$RETENTION_DAYS"
 
 # Estatísticas finais
-local total_backups=$(find "$OUT_DIR" -name "email-gateway-*.sql.gz" -type f | wc -l)
-local total_size=$(find "$OUT_DIR" -name "email-gateway-*.sql.gz" -type f -exec stat -f%z {} \; 2>/dev/null | awk '{sum+=$1} END {print sum}' || find "$OUT_DIR" -name "email-gateway-*.sql.gz" -type f -exec stat -c%s {} \; 2>/dev/null | awk '{sum+=$1} END {print sum}' || echo "0")
+total_backups=$(find "$OUT_DIR" -name "email-gateway-*.sql.gz" -type f | wc -l)
+total_size=$(find "$OUT_DIR" -name "email-gateway-*.sql.gz" -type f -exec stat -f%z {} \; 2>/dev/null | awk '{sum+=$1} END {print sum}' || find "$OUT_DIR" -name "email-gateway-*.sql.gz" -type f -exec stat -c%s {} \; 2>/dev/null | awk '{sum+=$1} END {print sum}' || echo "0")
 
 log "=== Backup $BACKUP_TYPE concluído ==="
 log "Total de backups: $total_backups"

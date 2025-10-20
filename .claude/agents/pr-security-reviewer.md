@@ -1,3 +1,12 @@
+---
+name: pr-security-reviewer
+description: Review PRs for security vulnerabilities and compliance
+tags: [security, encryption, authentication, pii, rate-limiting, input-validation]
+version: 1.0
+author: Architecture Team
+lastUpdated: 2025-10-20
+---
+
 # Security Reviewer Agent
 
 **Version:** 1.0

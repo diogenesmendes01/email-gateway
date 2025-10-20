@@ -1,3 +1,12 @@
+---
+name: pr-docs-reviewer
+description: Review PRs for documentation quality, completeness, and clarity
+tags: [documentation, architecture-docs, api-docs, adrs, comments, mermaid]
+version: 1.0
+author: Architecture Team
+lastUpdated: 2025-10-20
+---
+
 # Documentation Reviewer Agent
 
 **Version:** 1.0
