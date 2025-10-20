@@ -18,7 +18,10 @@ log() {
 redis_cmd() {
   local cmd=$1
   if [[ -n "$REDIS_PASSWORD" ]]; then
-    redis-cli -h "$REDIS_HOST" -p "$REDIS_PORT" -a "$REDIS_PASSWORD" "$cmd"
+    # Usar variável de ambiente para evitar exposição da senha no process list
+    export REDISCLI_AUTH="$REDIS_PASSWORD"
+    redis-cli -h "$REDIS_HOST" -p "$REDIS_PORT" "$cmd"
+    unset REDISCLI_AUTH
   else
     redis-cli -h "$REDIS_HOST" -p "$REDIS_PORT" "$cmd"
   fi

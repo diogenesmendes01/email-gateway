@@ -73,7 +73,8 @@ main() {
   
   # Aguardar save completar
   log "Aguardando save completar..."
-  while [[ $(redis_cmd "LASTSAVE") == $(redis_cmd "LASTSAVE") ]]; do
+  local last_save_before=$(redis_cmd "LASTSAVE")
+  while [[ $(redis_cmd "LASTSAVE") == "$last_save_before" ]]; do
     sleep 1
   done
   
