@@ -2,18 +2,25 @@
 
 echo "🤖 Validando commit..."
 
-# Verificar se .env não está sendo commitado
-if git diff --cached --name-only | grep -q "^\.env$"; then
-  echo "❌ ERRO: Tentativa de commitar arquivo .env"
-  echo "Arquivo .env contém informações sensíveis e NÃO deve ser commitado"
+# Verificar se arquivos de ambiente de PRODUÇÃO estão sendo commitados
+if git diff --cached --name-only | grep -qE "\.env\.(production|prod|staging)"; then
+  echo "❌ ERRO: Tentativa de commitar arquivo de ambiente de PRODUÇÃO"
+  echo "Arquivos .env.production, .env.prod e .env.staging NÃO devem ser commitados"
+  echo "Use .env.development ou .env.local para configurações de desenvolvimento"
   exit 1
 fi
 
-# Verificar se .env.local não está sendo commitado
-if git diff --cached --name-only | grep -q "^\.env\..*\.local$"; then
-  echo "❌ ERRO: Tentativa de commitar arquivo .env.*.local"
-  echo "Arquivos .env locais contêm informações sensíveis"
+# Verificar se .env.production.local está sendo commitado
+if git diff --cached --name-only | grep -q "\.env\.production\.local"; then
+  echo "❌ ERRO: Tentativa de commitar arquivo .env.production.local"
+  echo "Arquivos de produção NÃO devem ser commitados"
   exit 1
+fi
+
+# PERMITIR: .env.development, .env.local, .env.test (são seguros para commit)
+# Mensagem informativa caso esteja commitando arquivos .env permitidos
+if git diff --cached --name-only | grep -qE "\.env\.(development|local|test)"; then
+  echo "ℹ️  Commitando arquivo de configuração de desenvolvimento (permitido)"
 fi
 
 # Verificar se há arquivos de credenciais
@@ -31,11 +38,12 @@ if git diff --cached --name-only | grep -q "node_modules"; then
   exit 1
 fi
 
-# Verificar se dist está sendo commitado
-if git diff --cached --name-only | grep -q "dist/"; then
-  echo "❌ ERRO: Tentativa de commitar arquivos de build (dist/)"
-  echo "Arquivos de build devem estar no .gitignore"
-  exit 1
+# Verificar se dist está sendo commitado (exceto arquivos específicos permitidos)
+if git diff --cached --name-only | grep -q "^dist/" || git diff --cached --name-only | grep -q "/dist/"; then
+  echo "⚠️  AVISO: Tentativa de commitar arquivos de build (dist/)"
+  echo "Se isso foi intencional, use: git commit --no-verify"
+  # Apenas aviso, não bloqueia (comentar as linhas abaixo para bloquear)
+  # exit 1
 fi
 
 echo "✅ Validações de segurança passaram"

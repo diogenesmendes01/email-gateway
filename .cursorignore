@@ -17,17 +17,6 @@ pnpm-debug.log*
 # .env.local - allowed for local overrides
 # .env.test - allowed for test configs
 
-# IDE and Editor
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-.DS_Store
-
-# Claude Code local config
-.claude/
-
 # Build outputs
 dist/
 build/
@@ -53,7 +42,6 @@ dump.rdb
 # Misc
 *.bak
 *.old
---version/
 
 # Prisma
 prisma/migrations/**/migration.sql.backup
@@ -69,7 +57,3 @@ prisma/migrations/**/migration.sql.backup
 logs/
 lerna-debug.log*
 *.lcov
-
-# Package lock (usando workspaces)
-yarn.lock
-pnpm-lock.yaml

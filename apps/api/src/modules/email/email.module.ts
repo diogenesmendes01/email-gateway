@@ -1,12 +1,14 @@
 import { Module } from '@nestjs/common';
 import { EmailController } from './controllers/email.controller';
+import { EmailSendController } from './controllers/email-send.controller';
 import { EmailService } from './services/email.service';
+import { EmailSendService } from './services/email-send.service';
+import { AuthModule } from '../auth/auth.module';
 
-// TODO: Add Bull Queue integration for async email processing (POST endpoint)
-// TODO: Add AWS SES or Nodemailer provider (Worker implementation)
 @Module({
-  controllers: [EmailController],
-  providers: [EmailService],
-  exports: [EmailService],
+  imports: [AuthModule],
+  controllers: [EmailController, EmailSendController],
+  providers: [EmailService, EmailSendService],
+  exports: [EmailService, EmailSendService],
 })
 export class EmailModule {}

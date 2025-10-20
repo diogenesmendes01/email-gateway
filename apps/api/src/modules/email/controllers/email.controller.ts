@@ -15,7 +15,6 @@ import {
   Query,
   HttpCode,
   HttpStatus,
-  UseGuards,
   Request,
 } from '@nestjs/common';
 import { EmailService } from '../services/email.service';
@@ -27,6 +26,7 @@ import {
   EmailListQuery,
   EmailByIdParams,
 } from '@email-gateway/shared';
+import { ApiKeyOnly } from '../../auth/decorators';
 
 @Controller('emails')
 export class EmailController {
@@ -42,6 +42,7 @@ export class EmailController {
    * @returns Paginated list of emails
    */
   @Get()
+  @ApiKeyOnly()
   @HttpCode(HttpStatus.OK)
   async listEmails(
     @Query() query: EmailListQuery,
@@ -68,6 +69,7 @@ export class EmailController {
    * @returns Email details with events
    */
   @Get(':id')
+  @ApiKeyOnly()
   @HttpCode(HttpStatus.OK)
   async getEmailById(
     @Param() params: EmailByIdParams,

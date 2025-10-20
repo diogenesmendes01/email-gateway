@@ -7,6 +7,7 @@ import { HealthModule } from './modules/health/health.module';
 import { EmailModule } from './modules/email/email.module';
 import { RecipientModule } from './modules/recipient/recipient.module';
 import { AuthModule } from './modules/auth/auth.module';
+import { DashboardModule } from './modules/dashboard/dashboard.module';
 
 @Module({
   imports: [
@@ -16,7 +17,7 @@ import { AuthModule } from './modules/auth/auth.module';
       envFilePath: '.env',
     }),
 
-    // Rate limiting
+    // Rate limiting (configuração global - será sobrescrito pelos guards customizados)
     ThrottlerModule.forRoot([
       {
         ttl: parseInt(process.env.RATE_LIMIT_TTL || '60', 10) * 1000,
@@ -29,6 +30,7 @@ import { AuthModule } from './modules/auth/auth.module';
     AuthModule,
     EmailModule,
     RecipientModule,
+    DashboardModule,
   ],
 })
 export class AppModule {}
