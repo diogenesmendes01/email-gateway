@@ -1,0 +1,63 @@
+# Multi-stage build para Worker
+FROM node:18-alpine AS base
+
+# Instalar dependências necessárias
+RUN apk add --no-cache \
+    dumb-init \
+    && addgroup -g 1001 -S nodejs \
+    && adduser -S nestjs -u 1001
+
+# Definir diretório de trabalho
+WORKDIR /app
+
+# Copiar arquivos de dependências
+COPY package*.json ./
+COPY packages/*/package*.json ./packages/*/
+
+# Instalar dependências
+FROM base AS deps
+RUN npm ci --only=production && npm cache clean --force
+
+# Build da aplicação
+FROM base AS build
+RUN npm ci
+COPY . .
+RUN npm run build
+
+# Imagem de produção para Worker
+FROM node:18-alpine AS production
+
+# Instalar dumb-init para signal handling
+RUN apk add --no-cache dumb-init
+
+# Criar usuário não-root
+RUN addgroup -g 1001 -S nodejs \
+    && adduser -S nestjs -u 1001
+
+WORKDIR /app
+
+# Copiar dependências de produção
+COPY --from=deps --chown=nestjs:nodejs /app/node_modules ./node_modules
+COPY --from=deps --chown=nestjs:nodejs /app/packages ./packages
+
+# Copiar aplicação buildada
+COPY --from=build --chown=nestjs:nodejs /app/apps/worker/dist ./apps/worker/dist
+COPY --from=build --chown=nestjs:nodejs /app/packages/database/dist ./packages/database/dist
+COPY --from=build --chown=nestjs:nodejs /app/packages/shared/dist ./packages/shared/dist
+
+# Copiar arquivos necessários
+COPY --chown=nestjs:nodejs package*.json ./
+COPY --chown=nestjs:nodejs apps/worker/package.json ./apps/worker/
+COPY --chown=nestjs:nodejs packages/*/package.json ./packages/*/
+
+# Configurar permissões
+RUN chown -R nestjs:nodejs /app
+USER nestjs
+
+# Health check para worker (verifica se está processando jobs)
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+    CMD node -e "const Redis = require('ioredis'); const redis = new Redis(process.env.REDIS_URL); redis.ping().then(() => process.exit(0)).catch(() => process.exit(1))"
+
+# Comando de inicialização
+ENTRYPOINT ["dumb-init", "--"]
+CMD ["node", "apps/worker/dist/index.js"]
