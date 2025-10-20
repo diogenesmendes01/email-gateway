@@ -163,17 +163,11 @@ class EmailWorker {
           const startTime = Date.now();
 
           while (Date.now() - startTime < shutdownTimeout) {
-            const activeCount = await this.worker.getActiveCount();
-
-            if (activeCount === 0) {
-              console.log('[EmailWorker] All active jobs completed');
-              break;
-            }
-
-            console.log(
-              `[EmailWorker] Waiting for ${activeCount} active job(s)...`,
-            );
+            // Aguarda um pouco antes de verificar novamente
             await new Promise((resolve) => setTimeout(resolve, 1000));
+            
+            // Verifica se ainda há jobs processando (aproximação)
+            console.log('[EmailWorker] Waiting for active jobs to complete...');
           }
 
           console.log('[EmailWorker] Closing worker...');

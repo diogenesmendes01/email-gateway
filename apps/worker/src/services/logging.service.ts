@@ -106,7 +106,7 @@ export class LoggingService {
       data: {
         emailLogId: data.emailLogId,
         type: data.type,
-        metadata: data.metadata || {},
+        metadata: data.metadata as any || {},
       },
     });
   }
@@ -131,7 +131,7 @@ export class LoggingService {
       updatedAt: new Date(),
     };
 
-    if (status === 'SENT' || status === 'SENT_ATTEMPT') {
+    if (status === 'SENT') {
       updateData.processedAt = new Date();
     }
 
@@ -251,7 +251,7 @@ export class LoggingService {
     durationMs: number,
     willRetry: boolean,
   ) {
-    const status: EmailStatus = willRetry ? 'RETRY_SCHEDULED' : 'FAILED';
+    const status: EmailStatus = willRetry ? 'RETRYING' : 'FAILED';
 
     // 1. Atualiza outbox
     await this.updateOutboxStatus(jobData.outboxId, status, {
@@ -275,7 +275,7 @@ export class LoggingService {
     });
 
     // 3. Cria evento apropriado
-    const eventType: EventType = willRetry ? 'RETRY_SCHEDULED' : 'FAILED';
+    const eventType: EventType = willRetry ? 'RETRYING' : 'FAILED';
     await this.createEvent({
       emailLogId: emailLog.id,
       type: eventType,
@@ -298,12 +298,12 @@ export class LoggingService {
    */
   private pipelineStateToEventType(state: EmailPipelineState): EventType {
     const mapping: Record<EmailPipelineState, EventType> = {
-      [EmailPipelineState.RECEIVED]: 'RECEIVED',
-      [EmailPipelineState.VALIDATED]: 'VALIDATED',
-      [EmailPipelineState.SENT_ATTEMPT]: 'SENT_ATTEMPT',
+      [EmailPipelineState.RECEIVED]: 'PROCESSING',
+      [EmailPipelineState.VALIDATED]: 'PROCESSING',
+      [EmailPipelineState.SENT_ATTEMPT]: 'PROCESSING',
       [EmailPipelineState.SENT]: 'SENT',
       [EmailPipelineState.FAILED]: 'FAILED',
-      [EmailPipelineState.RETRY_SCHEDULED]: 'RETRY_SCHEDULED',
+      [EmailPipelineState.RETRY_SCHEDULED]: 'RETRYING',
     };
 
     return mapping[state];
