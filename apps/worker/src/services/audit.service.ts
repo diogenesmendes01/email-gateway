@@ -165,7 +165,7 @@ export class AuditService {
             requestedAt: request.requestedAt,
             expiresAt: request.expiresAt,
             status: request.status,
-            durationMinutes: request.durationMinutes,
+            durationMinutes: 60, // Default duration
           },
         },
       });

@@ -73,7 +73,7 @@ export class EmailSendController {
       return result;
     } catch (error) {
       // Handle idempotency conflicts
-      if (error.code === 'IDEMPOTENCY_CONFLICT') {
+      if ((error as any).code === 'IDEMPOTENCY_CONFLICT') {
         throw new ConflictException({
           error: {
             code: 'IDEMPOTENCY_CONFLICT',

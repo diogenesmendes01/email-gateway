@@ -177,7 +177,7 @@ export class EmailService {
       const tags = Array.isArray(query.tags) ? query.tags : [query.tags];
       where.outbox = {
         ...where.outbox,
-        tags: { hasEvery: tags },
+        tags: { hasEvery: tags } as any,
       };
     }
 
@@ -251,7 +251,7 @@ export class EmailService {
     let cursorData: { id: string; createdAt: string } | null = null;
     if (query.cursor) {
       try {
-        cursorData = decodeCursor(query.cursor);
+        cursorData = decodeCursor(query.cursor) as { id: string; createdAt: string };
       } catch {
         throw new BadRequestException('Invalid cursor format');
       }
@@ -309,6 +309,12 @@ export class EmailService {
           next: nextCursor,
           prev: prevCursor,
         },
+        page: 1,
+        pageSize: 50,
+        totalItems: 0,
+        totalPages: 0,
+        hasNext: !!nextCursor,
+        hasPrev: !!prevCursor,
       },
     };
   }

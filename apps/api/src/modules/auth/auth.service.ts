@@ -82,9 +82,9 @@ export class AuthService {
             companyId: company.id,
             prefix: company.apiKeyPrefix,
             expiresAt: company.apiKeyExpiresAt,
-            lastUsedAt: company.lastUsedAt,
+            lastUsedAt: company.lastUsedAt || undefined,
             allowedIps: company.allowedIps,
-            rateLimitConfig: company.rateLimitConfig as RateLimitConfig,
+            rateLimitConfig: company.rateLimitConfig as any as RateLimitConfig,
             isActive: company.isActive,
           };
         }

@@ -4,7 +4,7 @@ import Redis from 'ioredis';
 
 @Injectable()
 export class RedisService implements OnModuleInit, OnModuleDestroy {
-  private redis: Redis;
+  private redis!: Redis;
 
   constructor(private configService: ConfigService) {}
 
@@ -12,7 +12,6 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     const redisUrl = this.configService.get<string>('REDIS_URL', 'redis://localhost:6379');
     
     this.redis = new Redis(redisUrl, {
-      retryDelayOnFailover: 100,
       maxRetriesPerRequest: 3,
       lazyConnect: true,
     });

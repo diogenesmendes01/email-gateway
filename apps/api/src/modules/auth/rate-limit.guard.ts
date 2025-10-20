@@ -24,7 +24,7 @@ export class RateLimitGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<Request>();
-    const companyId = request['companyId'];
+    const companyId = (request as any)['companyId'];
 
     if (!companyId) {
       return true; // Se não há companyId, deixa passar (será bloqueado pelo AuthGuard)

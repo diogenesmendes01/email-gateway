@@ -101,7 +101,7 @@ export class EmailSendService {
       jobId,
       requestId: requestId || this.generateRequestId(),
       status: EmailStatus.ENQUEUED,
-      receivedAt,
+      receivedAt: receivedAt.toISOString(),
       recipient: body.recipient?.externalId ? {
         externalId: body.recipient.externalId,
       } : undefined,
@@ -161,8 +161,8 @@ export class EmailSendService {
         outboxId: outbox.id,
         jobId: outbox.jobId || outbox.id,
         requestId: outbox.requestId || this.generateRequestId(),
-        status: outbox.status,
-        receivedAt: outbox.createdAt,
+        status: outbox.status as any,
+        receivedAt: outbox.createdAt.toISOString(),
         recipient: outbox.recipientId ? {
           externalId: 'existing', // External ID from existing outbox
         } : undefined,

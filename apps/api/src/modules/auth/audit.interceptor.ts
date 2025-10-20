@@ -18,8 +18,8 @@ export class AuditInterceptor implements NestInterceptor {
     const response = context.switchToHttp().getResponse<Response>();
     
     const startTime = Date.now();
-    const companyId = request['companyId'];
-    const userId = request['userId']; // Para Basic Auth no dashboard
+    const companyId = (request as any)['companyId'];
+    const userId = (request as any)['userId']; // Para Basic Auth no dashboard
     const ipAddress = this.getClientIp(request);
     const userAgent = request.headers['user-agent'];
 

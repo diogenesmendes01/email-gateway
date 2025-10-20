@@ -240,7 +240,7 @@ export class DashboardService {
       name: company.name,
       apiKeyPrefix: company.apiKeyPrefix,
       isActive: company.isActive,
-      lastUsedAt: company.lastUsedAt,
+      lastUsedAt: company.lastUsedAt || undefined,
       expiresAt: company.apiKeyExpiresAt,
       isExpired: this.authService.isApiKeyExpired(company.apiKeyExpiresAt),
       isNearExpiration: this.authService.isApiKeyNearExpiration(company.apiKeyExpiresAt),

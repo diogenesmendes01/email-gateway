@@ -42,7 +42,7 @@ export class DashboardController {
   @Get('overview')
   @DashboardProtected() // Basic Auth + Audit
   @HttpCode(HttpStatus.OK)
-  async getOverview(@Request() req: any) {
+  async getOverview(@Request() req: any): Promise<any> {
     return this.dashboardService.getOverview();
   }
 
@@ -57,7 +57,7 @@ export class DashboardController {
   async getAuditLogs(
     @Query() query: AuditLogsQuery,
     @Request() req: any,
-  ) {
+  ): Promise<any> {
     const { user } = req;
     return this.dashboardService.getAuditLogs(query, user.username);
   }
@@ -82,7 +82,7 @@ export class DashboardController {
   @Get('companies')
   @DashboardProtected() // Basic Auth + Audit
   @HttpCode(HttpStatus.OK)
-  async getCompanies(@Request() req: any) {
+  async getCompanies(@Request() req: any): Promise<any> {
     return this.dashboardService.getCompanies();
   }
 

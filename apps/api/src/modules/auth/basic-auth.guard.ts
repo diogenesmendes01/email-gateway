@@ -37,11 +37,11 @@ export class BasicAuthGuard implements CanActivate {
       }
 
       // Adiciona informações do usuário ao request
-      request['user'] = {
+      (request as any)['user'] = {
         username: credentials.username,
         type: 'basic_auth',
       };
-      request['userId'] = credentials.username;
+      (request as any)['userId'] = credentials.username;
 
       return true;
     } catch (error) {
