@@ -97,4 +97,18 @@ export class DashboardController {
   async getApiKeyStatus(@Request() req: any) {
     return this.dashboardService.getApiKeyStatus();
   }
+
+  /**
+   * GET /dashboard/metrics
+   *
+   * Get real-time metrics from worker (TASK 7.1)
+   * Returns metrics: queue_depth, queue_age_p95, send_latency (p50/p95/p99),
+   * error_rate, dlq_depth, tenant_fairness_ratio
+   */
+  @Get('metrics')
+  @DashboardProtected() // Basic Auth + Audit
+  @HttpCode(HttpStatus.OK)
+  async getMetrics() {
+    return this.dashboardService.getMetrics();
+  }
 }
