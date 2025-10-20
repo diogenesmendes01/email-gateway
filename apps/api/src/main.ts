@@ -3,8 +3,18 @@ import { AppModule } from './app.module';
 import { Logger, ValidationPipe } from '@nestjs/common';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
   const logger = new Logger('Bootstrap');
+
+  // Validate critical environment variables
+  if (!process.env.ENCRYPTION_KEY || process.env.ENCRYPTION_KEY.length < 32) {
+    logger.error('❌ ENCRYPTION_KEY must be set and at least 32 characters');
+    logger.error('Generate with: openssl rand -base64 32');
+    process.exit(1);
+  }
+
+  logger.log('✅ Environment validation passed');
+
+  const app = await NestFactory.create(AppModule);
 
   // Global prefix
   const prefix = process.env.API_PREFIX || 'v1';

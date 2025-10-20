@@ -43,7 +43,8 @@
     "ci:audit": "npm audit --audit-level high",
     "cleanup:retention": "tsx scripts/cleanup-retention.ts",
     "cleanup:retention:dry": "tsx scripts/cleanup-retention.ts --dry-run",
-    "cleanup:retention:stats": "tsx scripts/cleanup-retention.ts --stats"
+    "cleanup:retention:stats": "tsx scripts/cleanup-retention.ts --stats",
+    "test:security": "tsx scripts/test-encryption.ts"
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",

@@ -20,6 +20,9 @@ import {
   EmailSendBody,
   EmailSendResponse,
   maskCpfCnpj,
+  encryptCpfCnpj,
+  decryptCpfCnpj,
+  hashCpfCnpjSha256,
 } from '@email-gateway/shared';
 import { Prisma, EmailStatus } from '@prisma/client';
 import * as crypto from 'crypto';
@@ -197,9 +200,11 @@ export class EmailSendService {
     }
 
     if (recipient.cpfCnpj) {
-      const hash = this.hashCpfCnpj(recipient.cpfCnpj);
+      const hash = hashCpfCnpjSha256(recipient.cpfCnpj);
+      const { encrypted, salt } = encryptCpfCnpj(recipient.cpfCnpj, this.getEncryptionKey());
       recipientData.cpfCnpjHash = hash;
-      recipientData.cpfCnpjEnc = this.encryptCpfCnpj(recipient.cpfCnpj);
+      recipientData.cpfCnpjEnc = encrypted;
+      recipientData.cpfCnpjSalt = salt;
     }
 
     if (recipient.nome) {
@@ -311,15 +316,6 @@ export class EmailSendService {
   }
 
   /**
-   * Hash CPF/CNPJ for searching
-   */
-  private hashCpfCnpj(cpfCnpj: string): string {
-    // Remove non-digits
-    const digits = cpfCnpj.replace(/\D/g, '');
-    return crypto.createHash('sha256').update(digits).digest('hex');
-  }
-
-  /**
    * Generate request ID
    */
   private generateRequestId(): string {
@@ -327,40 +323,22 @@ export class EmailSendService {
   }
 
   /**
-   * Encrypt CPF/CNPJ for secure storage
+   * Get encryption key with validation
    */
-  private encryptCpfCnpj(cpfCnpj: string): string {
-    // Usa uma chave de criptografia simples para demonstração
-    // Em produção, use uma chave segura armazenada em variáveis de ambiente
-    const algorithm = 'aes-256-cbc';
-    const secretKey = process.env.ENCRYPTION_KEY || 'default-key-for-demo-only';
-    const key = crypto.scryptSync(secretKey, 'salt', 32);
-    const iv = crypto.randomBytes(16);
-    
-    const cipher = crypto.createCipher(algorithm, key);
-    let encrypted = cipher.update(cpfCnpj, 'utf8', 'hex');
-    encrypted += cipher.final('hex');
-    
-    return iv.toString('hex') + ':' + encrypted;
+  private getEncryptionKey(): string {
+    const key = process.env.ENCRYPTION_KEY;
+    if (!key || key.length < 32) {
+      throw new Error('ENCRYPTION_KEY must be set and at least 32 characters');
+    }
+    return key;
   }
 
   /**
-   * Decrypt CPF/CNPJ for authorized access
+   * Decrypt CPF/CNPJ for authorized access (using secure implementation)
    */
-  private decryptCpfCnpj(encryptedCpfCnpj: string): string {
+  public decryptCpfCnpj(encryptedCpfCnpj: string, salt: string): string {
     try {
-      const algorithm = 'aes-256-cbc';
-      const secretKey = process.env.ENCRYPTION_KEY || 'default-key-for-demo-only';
-      const key = crypto.scryptSync(secretKey, 'salt', 32);
-      
-      const [ivHex, encrypted] = encryptedCpfCnpj.split(':');
-      const iv = Buffer.from(ivHex, 'hex');
-      
-      const decipher = crypto.createDecipher(algorithm, key);
-      let decrypted = decipher.update(encrypted, 'hex', 'utf8');
-      decrypted += decipher.final('utf8');
-      
-      return decrypted;
+      return decryptCpfCnpj(encryptedCpfCnpj, this.getEncryptionKey(), salt);
     } catch (error) {
       console.error('Error decrypting CPF/CNPJ:', error);
       throw new Error('Failed to decrypt sensitive data');

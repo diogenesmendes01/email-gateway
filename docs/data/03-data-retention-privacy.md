@@ -22,7 +22,7 @@ No contexto deste sistema, os seguintes campos são classificados como **PII sen
 
 | Campo | Tipo PII | Justificativa | Nível de Proteção |
 |-------|----------|---------------|-------------------|
-| `cpfCnpj` | **Alto** | Documento de identificação único | Hash SHA-256 + mascaramento |
+| `cpfCnpj` | **Alto** | Documento de identificação único | **AES-256-CBC + PBKDF2 + Salt + Hash SHA-256 + mascaramento** |
 | `to` (email) | **Alto** | Identifica pessoa específica | Mascaramento em logs |
 | `cc`, `bcc` | **Alto** | Identifica pessoas específicas | Mascaramento em logs |
 | `razaoSocial` | **Médio** | Identifica pessoa jurídica | Armazenado em plaintext |
@@ -30,6 +30,87 @@ No contexto deste sistema, os seguintes campos são classificados como **PII sen
 | `replyTo` | **Médio** | Pode identificar pessoa | Mascaramento em logs |
 | `htmlContent` | **Variável** | Pode conter PII no corpo | Sanitização obrigatória |
 | `subject` | **Baixo** | Geralmente não contém PII | Armazenado em plaintext |
+
+---
+
+## 🔒 Melhorias de Segurança Implementadas (TASK 8.1)
+
+### Problemas Críticos Corrigidos
+
+#### 1. Funções de Criptografia Deprecated Removidas
+
+**Problema:** Uso de `crypto.createCipher()` e `crypto.createDecipher()` que são inseguros e deprecated desde Node.js 10.x.
+
+**Solução:** Substituição por implementação segura usando AES-256-CBC com PBKDF2.
+
+```typescript
+// ❌ ANTES (Inseguro):
+const cipher = crypto.createCipher('aes-256-cbc', key);
+const decipher = crypto.createDecipher('aes-256-cbc', key);
+
+// ✅ DEPOIS (Seguro):
+import { encryptCpfCnpj, decryptCpfCnpj } from '@email-gateway/shared';
+const { encrypted, salt } = encryptCpfCnpj(cpfCnpj, password);
+const decrypted = decryptCpfCnpj(encrypted, password, salt);
+```
+
+#### 2. Validação de Chave de Criptografia
+
+**Problema:** Falta de validação da chave de criptografia no startup.
+
+**Solução:** Validação obrigatória no `main.ts` com falha rápida se inválida.
+
+```typescript
+// apps/api/src/main.ts
+if (!process.env.ENCRYPTION_KEY || process.env.ENCRYPTION_KEY.length < 32) {
+  logger.error('❌ ENCRYPTION_KEY must be set and at least 32 characters');
+  process.exit(1);
+}
+```
+
+#### 3. Armazenamento de Salt
+
+**Problema:** Salt não era armazenado, impossibilitando descriptografia.
+
+**Solução:** Campo `cpfCnpjSalt` adicionado ao schema do banco.
+
+```sql
+-- packages/database/prisma/migrations/20250120000002_add_cpf_cnpj_salt_field/migration.sql
+ALTER TABLE "recipients" ADD COLUMN "cpf_cnpj_salt" TEXT;
+```
+
+#### 4. Implementação Unificada
+
+**Problema:** Duas implementações diferentes de criptografia no sistema.
+
+**Solução:** Uso exclusivo da implementação segura em `@email-gateway/shared`.
+
+### Configuração de Ambiente
+
+**Arquivo `.env.example` atualizado:**
+
+```bash
+# Encryption (REQUIRED for production - generate with: openssl rand -base64 32)
+ENCRYPTION_KEY="your-secure-encryption-key-here"
+ENCRYPTION_SALT_SECRET="your-salt-secret-here"
+```
+
+**Geração de chave segura:**
+
+```bash
+# Gerar chave de 32 bytes (256 bits)
+openssl rand -base64 32
+```
+
+### Testes de Validação
+
+Script de teste criado em `scripts/test-encryption.ts` para validar:
+
+- ✅ Criptografia/descriptografia de CPF/CNPJ
+- ✅ Geração de hash SHA-256
+- ✅ Unicidade de salts
+- ✅ Determinismo de hashes
+- ✅ Remoção de funções deprecated
 
 ---
 
@@ -50,13 +131,17 @@ await prisma.recipient.create({
   },
 });
 
-// ✅ CORRETO:
-import { hashCpfCnpj } from '@email-gateway/shared';
+// ✅ CORRETO - Implementação Segura (TASK 8.1):
+import { encryptCpfCnpj, hashCpfCnpjSha256 } from '@email-gateway/shared';
 
-const cpfCnpjHash = await hashCpfCnpj('12345678901');
+const { encrypted, salt } = encryptCpfCnpj('12345678901', process.env.ENCRYPTION_KEY);
+const cpfCnpjHash = hashCpfCnpjSha256('12345678901');
+
 await prisma.recipient.create({
   data: {
-    cpfCnpjHash, // SHA-256: "5f4dcc3b5aa765d61d8327deb882cf99..."
+    cpfCnpjEnc: encrypted,    // AES-256-CBC encrypted
+    cpfCnpjSalt: salt,        // PBKDF2 salt for key derivation
+    cpfCnpjHash,              // SHA-256: "5f4dcc3b5aa765d61d8327deb882cf99..."
   },
 });
 ```
@@ -553,7 +638,10 @@ description: "User {{ $labels.user_id }} accessing PII at unusually high rate"
 
 ### Desenvolvimento
 
-- [x] CPF/CNPJ armazenado apenas como hash SHA-256
+- [x] **CPF/CNPJ armazenado com criptografia AES-256-CBC + PBKDF2 + Salt** (TASK 8.1)
+- [x] **Funções de criptografia deprecated removidas** (TASK 8.1)
+- [x] **Validação de chave de criptografia no startup** (TASK 8.1)
+- [x] **Campo cpfCnpjSalt adicionado ao schema** (TASK 8.1)
 - [x] Mascaramento de PII em todos os logs
 - [x] Sanitização de HTML antes de armazenar
 - [x] Funções utilitárias de mascaramento disponíveis

@@ -93,6 +93,7 @@ model Recipient {
   externalId    String?  @map("external_id")
   cpfCnpjHash   String?  @map("cpf_cnpj_hash") @db.VarChar(64)
   cpfCnpjEnc    String?  @map("cpf_cnpj_enc") // Encrypted CPF/CNPJ
+  cpfCnpjSalt   String?  @map("cpf_cnpj_salt") // Salt for encryption
   razaoSocial   String?  @map("razao_social") @db.VarChar(150)
   nome          String?  @db.VarChar(120)
   email         String   @db.VarChar(254)
