@@ -503,6 +503,6 @@ tail -f ./backups/backup.log
 
 ---
 
-**Última atualização:** 2025-01-20  
-**Próxima revisão:** 2025-02-20  
-**Aprovado por:** [Nome do Aprovador]
+**Última atualização:** 2025-01-20
+**Próxima revisão:** 2025-02-20
+**Aprovado por:** Equipe de Desenvolvimento

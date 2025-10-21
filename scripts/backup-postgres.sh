@@ -9,6 +9,7 @@ BACKUP_TYPE=${1:-"daily"}  # daily, weekly, monthly
 RETENTION_DAYS=${2:-7}     # dias para retenção (7 para daily, 30 para monthly)
 OUT_DIR=${3:-"./backups"}
 LOG_FILE="$OUT_DIR/backup.log"
+LOCK_FILE="$OUT_DIR/.backup-${BACKUP_TYPE}.lock"
 
 # Validar variáveis de ambiente
 if [[ -z "${DB_HOST:-}" || -z "${DB_PORT:-}" || -z "${DB_USER:-}" || -z "${DB_NAME:-}" ]]; then
@@ -67,28 +68,38 @@ validate_backup() {
 test_restore() {
   local backup_file=$1
   local test_db_name="email_gateway_backup_test_$(date +%Y%m%d_%H%M%S)"
-  
+
   log "Iniciando teste de restauração com banco: $test_db_name"
-  
+
+  # Garantir cleanup em caso de erro usando trap
+  cleanup_test_db() {
+    log "Limpando banco de teste: $test_db_name"
+    dropdb -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}" "$test_db_name" 2>/dev/null || true
+  }
+  trap cleanup_test_db EXIT ERR
+
   # Criar banco de teste
   if ! createdb -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}" "$test_db_name" 2>/dev/null; then
     log "ERRO: Falha ao criar banco de teste: $test_db_name"
+    trap - EXIT ERR
     return 1
   fi
-  
+
   # Restaurar backup no banco de teste
   if ! gunzip -c "$backup_file" | psql -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}" -d "$test_db_name" >/dev/null 2>&1; then
     log "ERRO: Falha ao restaurar backup no banco de teste"
-    dropdb -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}" "$test_db_name" 2>/dev/null || true
+    trap - EXIT ERR
+    cleanup_test_db
     return 1
   fi
-  
+
   # Verificar se as tabelas foram criadas
   local table_count=$(psql -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}" -d "$test_db_name" -t -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public';" 2>/dev/null | tr -d ' ')
-  
-  # Limpar banco de teste
-  dropdb -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}" "$test_db_name" 2>/dev/null || true
-  
+
+  # Limpar banco de teste e remover trap
+  trap - EXIT ERR
+  cleanup_test_db
+
   if [[ -n "$table_count" && "$table_count" -gt 0 ]]; then
     log "Teste de restauração bem-sucedido ($table_count tabelas encontradas)"
     return 0
@@ -98,6 +109,55 @@ test_restore() {
   fi
 }
 
+# Verificar espaço em disco antes de iniciar
+check_disk_space() {
+  local out_dir="$1"
+  local required_gb=10  # Espaço mínimo requerido em GB
+
+  # Obter espaço disponível (compatível com Linux e macOS)
+  local available_gb
+  if df -BG "$out_dir" >/dev/null 2>&1; then
+    # Linux
+    available_gb=$(df -BG "$out_dir" | awk 'NR==2 {print $4}' | sed 's/G//')
+  else
+    # macOS
+    available_gb=$(df -g "$out_dir" | awk 'NR==2 {print $4}')
+  fi
+
+  if [[ "$available_gb" -lt "$required_gb" ]]; then
+    log "ERRO: Espaço em disco insuficiente. Requerido: ${required_gb}GB, Disponível: ${available_gb}GB"
+    exit 1
+  fi
+
+  log "Espaço em disco: ${available_gb}GB disponível"
+}
+
+# Adquirir lock para prevenir backups concorrentes
+acquire_lock() {
+  local lock_file="$1"
+
+  # Criar diretório se não existir
+  mkdir -p "$(dirname "$lock_file")"
+
+  # Tentar adquirir lock
+  exec 200>"$lock_file"
+  if ! flock -n 200; then
+    log "ERRO: Outro backup $BACKUP_TYPE já está em execução"
+    exit 1
+  fi
+
+  log "Lock adquirido para backup $BACKUP_TYPE"
+}
+
+# Liberar lock
+release_lock() {
+  flock -u 200 2>/dev/null || true
+  log "Lock liberado"
+}
+
+# Garantir liberação do lock em caso de erro
+trap release_lock EXIT ERR
+
 # Iniciar backup
 TS=$(date +%Y%m%d-%H%M%S)
 BACKUP_FILE="$OUT_DIR/email-gateway-${BACKUP_TYPE}-${TS}.sql.gz"
@@ -106,6 +166,12 @@ log "=== Iniciando backup $BACKUP_TYPE ==="
 log "Tipo: $BACKUP_TYPE"
 log "Retenção: $RETENTION_DAYS dias"
 log "Arquivo: $BACKUP_FILE"
+
+# Verificar espaço em disco
+check_disk_space "$OUT_DIR"
+
+# Adquirir lock
+acquire_lock "$LOCK_FILE"
 
 # Evita exposição de credenciais no process list
 if [[ -n "${DB_PASSWORD:-}" ]]; then

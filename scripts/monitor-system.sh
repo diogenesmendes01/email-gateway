@@ -88,7 +88,13 @@ get_load_average() {
 # Função para verificar processos com alto uso de CPU
 get_top_cpu_processes() {
   if command -v ps >/dev/null 2>&1; then
-    ps aux --sort=-%cpu | head -6 | tail -5 | awk '{printf "%-20s %6.1f%% %s\n", $11, $3, $2}'
+    if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+      # Linux com --sort
+      ps aux --sort=-%cpu | head -6 | tail -5 | awk '{printf "%-20s %6.1f%% %s\n", $11, $3, $2}'
+    else
+      # macOS/BSD sem --sort
+      ps aux | sort -nrk 3 | head -6 | tail -5 | awk '{printf "%-20s %6.1f%% %s\n", $11, $3, $2}'
+    fi
   else
     echo "ps não disponível"
   fi
@@ -97,7 +103,13 @@ get_top_cpu_processes() {
 # Função para verificar processos com alto uso de memória
 get_top_memory_processes() {
   if command -v ps >/dev/null 2>&1; then
-    ps aux --sort=-%mem | head -6 | tail -5 | awk '{printf "%-20s %6.1f%% %s\n", $11, $4, $2}'
+    if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+      # Linux com --sort
+      ps aux --sort=-%mem | head -6 | tail -5 | awk '{printf "%-20s %6.1f%% %s\n", $11, $4, $2}'
+    else
+      # macOS/BSD sem --sort
+      ps aux | sort -nrk 4 | head -6 | tail -5 | awk '{printf "%-20s %6.1f%% %s\n", $11, $4, $2}'
+    fi
   else
     echo "ps não disponível"
   fi

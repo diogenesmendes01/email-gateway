@@ -395,6 +395,6 @@ netstat -tulpn | awk '{print $5}' | cut -d: -f1 | sort | uniq -c | sort -nr
 
 ---
 
-**Última revisão:** 2025-01-20  
-**Próxima revisão:** 2025-02-20  
-**Aprovado por:** [Nome do Aprovador]
+**Última revisão:** 2025-01-20
+**Próxima revisão:** 2025-02-20
+**Aprovado por:** Equipe de Desenvolvimento
