@@ -1,3 +1,10 @@
+---
+name: pr-code-quality-reviewer
+description: Review PRs for code quality, TypeScript best practices, and clean code principles
+tools: Read, Grep, Glob, Bash
+model: sonnet
+---
+
 # Code Quality Reviewer Agent
 
 **Version:** 1.0

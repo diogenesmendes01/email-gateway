@@ -1,3 +1,10 @@
+---
+name: pr-test-reviewer
+description: Review PRs for test coverage, quality, and completeness
+tools: Read, Grep, Glob, Bash
+model: haiku
+---
+
 # Test Reviewer Agent
 
 **Version:** 1.0

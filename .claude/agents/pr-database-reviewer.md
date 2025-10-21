@@ -1,3 +1,10 @@
+---
+name: pr-database-reviewer
+description: Review PRs for database schema changes, migrations, and query optimization
+tools: Read, Grep, Glob, Bash
+model: sonnet
+---
+
 # Database Reviewer Agent
 
 **Version:** 1.0

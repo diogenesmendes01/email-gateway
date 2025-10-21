@@ -1,3 +1,10 @@
+---
+name: pr-security-reviewer
+description: Review PRs for security vulnerabilities and compliance
+tools: Read, Grep, Glob, Bash
+model: opus
+---
+
 # Security Reviewer Agent
 
 **Version:** 1.0

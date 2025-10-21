@@ -1,3 +1,10 @@
+---
+name: pr-docs-reviewer
+description: Review PRs for documentation quality, completeness, and clarity
+tools: Read, Grep, Glob, Bash
+model: haiku
+---
+
 # Documentation Reviewer Agent
 
 **Version:** 1.0

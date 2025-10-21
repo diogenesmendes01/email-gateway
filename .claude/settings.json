@@ -65,26 +65,16 @@
         "Read": true,
         "Glob": true,
         "Grep": true,
-        "Bash(gh pr view *)": true,
-        "Bash(gh pr diff *)": true,
-        "Bash(gh pr list *)": true,
-        "Bash(gh pr review *)": true,
-        "Bash(gh api *)": true,
         "Bash(npm run test:cov)": true,
         "Bash(npm run test)": true,
         "Bash(npm run build)": true,
         "Bash(npm run lint)": true,
         "Bash(git status)": true,
-        "Bash(git diff *)": true,
-        "Bash(git log *)": true,
-        "Bash(cat *)": true,
-        "Bash(ls *)": true,
+        "Bash(ls:*)": true,
+        "Bash(cat:*)": true,
+        "Bash(npx:*)": true,
         "Bash(prisma migrate status)": true,
-        "Bash(prisma migrate diff)": true,
-        "Bash(grep *)": true,
-        "Bash(find *)": true,
-        "Bash(head *)": true,
-        "Bash(tail *)": true
+        "Bash(prisma migrate diff)": true
       }
     }
   }

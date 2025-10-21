@@ -1,3 +1,10 @@
+---
+name: pr-performance-reviewer
+description: Review PRs for performance issues, bottlenecks, and optimization opportunities
+tools: Read, Grep, Glob, Bash
+model: sonnet
+---
+
 # Performance Reviewer Agent
 
 **Version:** 1.0
