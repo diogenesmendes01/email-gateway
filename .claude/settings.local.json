@@ -13,7 +13,12 @@
       "Bash(gh pr review:*)",
       "Bash(gh api:*)",
       "Read(//c/Users/PC Di/**)",
-      "Bash(npm install)"
+      "Bash(npm install)",
+      "Bash(npm test)",
+      "Bash(git checkout:*)",
+      "Bash(cat:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
     ],
     "deny": [],
     "ask": []
