@@ -21,6 +21,13 @@
         "GITHUB_PERSONAL_ACCESS_TOKEN": ""
       }
     },
+    "github-actions": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github-actions"],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": ""
+      }
+    },
     "filesystem": {
       "command": "npx",
       "args": [
@@ -42,6 +49,13 @@
       "command": "npx",
       "args": ["-y", "@modelcontextprotocol/server-memory"]
     },
+    "notion": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-notion"],
+      "env": {
+        "NOTION_API_KEY": ""
+      }
+    },
     "brave-search": {
       "command": "npx",
       "args": ["-y", "@modelcontextprotocol/server-brave-search"],
@@ -49,9 +63,20 @@
         "BRAVE_API_KEY": ""
       }
     },
-    "sequential-thinking": {
+    "gpt-researcher": {
       "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"]
+      "args": ["-y", "@modelcontextprotocol/server-gpt-researcher"],
+      "env": {
+        "OPENAI_API_KEY": ""
+      }
+    },
+    "context7": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-context7"]
+    },
+    "archon": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-archon"]
     }
   }
 }
