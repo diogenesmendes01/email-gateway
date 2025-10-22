@@ -26,7 +26,8 @@
       "Bash(done)",
       "Bash(gh pr create:*)",
       "Bash(git clean:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(npm test:*)"
     ],
     "deny": [],
     "ask": []

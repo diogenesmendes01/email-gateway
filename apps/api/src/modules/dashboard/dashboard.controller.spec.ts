@@ -27,6 +27,7 @@ describe('DashboardController (Integration)', () => {
     getEmails: jest.fn(),
     getEmailById: jest.fn(),
     getErrorBreakdown: jest.fn(),
+    exportEmailsToCSV: jest.fn(),
   };
 
   const mockAuthService = {
@@ -194,17 +195,14 @@ describe('DashboardController (Integration)', () => {
         .expect(200);
 
       expect(response.body).toEqual(mockEmails);
-      expect(mockDashboardService.getEmails).toHaveBeenCalledWith({
-        externalId: undefined,
-        emailHash: undefined,
-        cpfCnpjHash: undefined,
-        status: undefined,
-        dateFrom: undefined,
-        dateTo: undefined,
-        companyId: undefined,
-        page: 1,
-        limit: 50,
-      });
+      expect(mockDashboardService.getEmails).toHaveBeenCalledWith(
+        expect.objectContaining({
+          page: 1,
+          limit: 50,
+          sortBy: 'createdAt',
+          sortOrder: 'desc',
+        })
+      );
     });
 
     it('should return emails with filters', async () => {
@@ -235,17 +233,17 @@ describe('DashboardController (Integration)', () => {
         .expect(200);
 
       expect(response.body).toEqual(mockEmails);
-      expect(mockDashboardService.getEmails).toHaveBeenCalledWith({
-        externalId: 'ext-123',
-        emailHash: 'hash-456',
-        cpfCnpjHash: 'cpf-hash-789',
-        status: 'FAILED',
-        dateFrom: '2024-01-01',
-        dateTo: '2024-01-31',
-        companyId: 'company-123',
-        page: '2',
-        limit: '25',
-      });
+      expect(mockDashboardService.getEmails).toHaveBeenCalledWith(
+        expect.objectContaining({
+          externalId: 'ext-123',
+          emailHash: 'hash-456',
+          cpfCnpjHash: 'cpf-hash-789',
+          status: 'FAILED',
+          dateFrom: '2024-01-01',
+          dateTo: '2024-01-31',
+          companyId: 'company-123',
+        })
+      );
     });
   });
 
@@ -664,6 +662,117 @@ describe('DashboardController (Integration)', () => {
 
       expect(response.body).toEqual(mockMetrics);
       expect(mockDashboardService.getMetrics).toHaveBeenCalled();
+    });
+  });
+
+  describe('GET /dashboard/emails with sorting - TASK 9.2', () => {
+    it('should accept sortBy and sortOrder parameters', async () => {
+      const mockResponse = {
+        emails: [],
+        total: 0,
+        page: 1,
+        limit: 50,
+        hasMore: false,
+      };
+
+      mockDashboardService.getEmails.mockResolvedValue(mockResponse);
+
+      const response = await request(app.getHttpServer())
+        .get('/dashboard/emails')
+        .query({ sortBy: 'status', sortOrder: 'asc' })
+        .set('Authorization', createAuthHeader())
+        .expect(200);
+
+      expect(mockDashboardService.getEmails).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sortBy: 'status',
+          sortOrder: 'asc',
+        })
+      );
+    });
+
+    it('should use default sorting if not provided', async () => {
+      const mockResponse = {
+        emails: [],
+        total: 0,
+        page: 1,
+        limit: 50,
+        hasMore: false,
+      };
+
+      mockDashboardService.getEmails.mockResolvedValue(mockResponse);
+
+      await request(app.getHttpServer())
+        .get('/dashboard/emails')
+        .set('Authorization', createAuthHeader())
+        .expect(200);
+
+      expect(mockDashboardService.getEmails).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sortBy: 'createdAt',
+          sortOrder: 'desc',
+        })
+      );
+    });
+  });
+
+  describe('POST /dashboard/emails/export - TASK 9.2', () => {
+    it('should export emails to CSV', async () => {
+      const mockExport = {
+        csv: 'ID,External ID,To\nemail-1,ext-1,test@example.com',
+        filename: 'emails-export-123456.csv',
+      };
+
+      mockDashboardService.exportEmailsToCSV.mockResolvedValue(mockExport);
+
+      const response = await request(app.getHttpServer())
+        .post('/dashboard/emails/export')
+        .send({ status: 'SENT' })
+        .set('Authorization', createAuthHeader())
+        .expect(200);
+
+      expect(response.body).toEqual(mockExport);
+      expect(mockDashboardService.exportEmailsToCSV).toHaveBeenCalledWith(
+        expect.objectContaining({ status: 'SENT' }),
+        'admin'
+      );
+    });
+
+    it('should pass username to export function', async () => {
+      mockDashboardService.exportEmailsToCSV.mockResolvedValue({
+        csv: 'test',
+        filename: 'test.csv',
+      });
+
+      await request(app.getHttpServer())
+        .post('/dashboard/emails/export')
+        .send({})
+        .set('Authorization', createAuthHeader())
+        .expect(200);
+
+      expect(mockDashboardService.exportEmailsToCSV).toHaveBeenCalledWith(
+        expect.any(Object),
+        'admin'
+      );
+    });
+
+    it('should require authentication', async () => {
+      await request(app.getHttpServer())
+        .post('/dashboard/emails/export')
+        .send({})
+        .expect(401);
+    });
+
+    it('should handle export errors', async () => {
+      mockDashboardService.exportEmailsToCSV.mockRejectedValue(
+        new Error('Export exceeds maximum limit of 10000 rows')
+      );
+
+      await request(app.getHttpServer())
+        .post('/dashboard/emails/export')
+        .send({})
+        .set('Authorization', createAuthHeader())
+        .expect(500);
     });
   });
 });

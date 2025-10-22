@@ -1518,7 +1518,7 @@ export class DashboardService {
         `# Filters: ${JSON.stringify(filters)}`,
         '', // Empty line before headers
         headers.join(','),
-        ...rows.map((row) => row.map((cell) => this.escapeCSVField(String(cell))).join(',')),
+        ...rows.map((row) => row.join(',')),
       ];
 
       const csv = csvLines.join('\n');
