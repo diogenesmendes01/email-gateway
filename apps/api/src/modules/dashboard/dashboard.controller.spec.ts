@@ -10,6 +10,12 @@ describe('DashboardController (Integration)', () => {
   let app: INestApplication;
   let dashboardService: DashboardService;
 
+  // Helper function to create Basic Auth header
+  const createAuthHeader = (username: string = 'admin', password: string = 'password123') => {
+    const credentials = Buffer.from(`${username}:${password}`).toString('base64');
+    return `Basic ${credentials}`;
+  };
+
   const mockDashboardService = {
     getOverview: jest.fn(),
     getAuditLogs: jest.fn(),
@@ -34,6 +40,18 @@ describe('DashboardController (Integration)', () => {
   };
 
   beforeEach(async () => {
+    // Reset mocks
+    mockAuthService.validateBasicAuth.mockResolvedValue(true);
+    mockConfigService.get.mockImplementation((key: string) => {
+      const config: Record<string, string> = {
+        'DASHBOARD_USERNAME': 'admin',
+        'DASHBOARD_PASSWORD_HASH': '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewdBPj8j/7qJ2V9O',
+        'DASHBOARD_READONLY_USERNAME': 'readonly',
+        'DASHBOARD_READONLY_PASSWORD_HASH': '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewdBPj8j/7qJ2V9O',
+      };
+      return config[key];
+    });
+
     const module: TestingModule = await Test.createTestingModule({
       controllers: [DashboardController],
       providers: [
@@ -91,6 +109,8 @@ describe('DashboardController (Integration)', () => {
 
       const response = await request(app.getHttpServer())
         .get('/dashboard/kpis')
+        .set('Authorization', createAuthHeader())
+        .set('Authorization', createAuthHeader())
         .expect(200);
 
       expect(response.body).toEqual(mockKPIs);
@@ -122,6 +142,8 @@ describe('DashboardController (Integration)', () => {
       const response = await request(app.getHttpServer())
         .get('/dashboard/kpis')
         .query({ period: 'day', companyId: 'company-123' })
+        .set('Authorization', createAuthHeader())
+        .set('Authorization', createAuthHeader())
         .expect(200);
 
       expect(response.body).toEqual(mockKPIs);
@@ -167,6 +189,8 @@ describe('DashboardController (Integration)', () => {
 
       const response = await request(app.getHttpServer())
         .get('/dashboard/emails')
+        .set('Authorization', createAuthHeader())
+        .set('Authorization', createAuthHeader())
         .expect(200);
 
       expect(response.body).toEqual(mockEmails);
@@ -207,6 +231,7 @@ describe('DashboardController (Integration)', () => {
           page: 2,
           limit: 25,
         })
+        .set('Authorization', createAuthHeader())
         .expect(200);
 
       expect(response.body).toEqual(mockEmails);
@@ -218,8 +243,8 @@ describe('DashboardController (Integration)', () => {
         dateFrom: '2024-01-01',
         dateTo: '2024-01-31',
         companyId: 'company-123',
-        page: 2,
-        limit: 25,
+        page: '2',
+        limit: '25',
       });
     });
   });
@@ -271,6 +296,7 @@ describe('DashboardController (Integration)', () => {
 
       const response = await request(app.getHttpServer())
         .get('/dashboard/emails/email-1')
+        .set('Authorization', createAuthHeader())
         .expect(200);
 
       expect(response.body).toEqual(mockEmailDetail);
@@ -282,6 +308,7 @@ describe('DashboardController (Integration)', () => {
 
       await request(app.getHttpServer())
         .get('/dashboard/emails/non-existent')
+        .set('Authorization', createAuthHeader())
         .expect(500);
     });
   });
@@ -336,6 +363,7 @@ describe('DashboardController (Integration)', () => {
 
       const response = await request(app.getHttpServer())
         .get('/dashboard/error-breakdown')
+        .set('Authorization', createAuthHeader())
         .expect(200);
 
       expect(response.body).toEqual(mockErrorBreakdown);
@@ -382,6 +410,7 @@ describe('DashboardController (Integration)', () => {
       const response = await request(app.getHttpServer())
         .get('/dashboard/error-breakdown')
         .query({ period: 'day', companyId: 'company-123' })
+        .set('Authorization', createAuthHeader())
         .expect(200);
 
       expect(response.body).toEqual(mockErrorBreakdown);
@@ -421,6 +450,7 @@ describe('DashboardController (Integration)', () => {
 
       const response = await request(app.getHttpServer())
         .get('/dashboard/overview')
+        .set('Authorization', createAuthHeader())
         .expect(200);
 
       expect(response.body).toEqual(mockOverview);
@@ -454,6 +484,7 @@ describe('DashboardController (Integration)', () => {
 
       const response = await request(app.getHttpServer())
         .get('/dashboard/audit-logs')
+        .set('Authorization', createAuthHeader())
         .expect(200);
 
       expect(response.body).toEqual(mockAuditLogs);
@@ -467,7 +498,7 @@ describe('DashboardController (Integration)', () => {
           page: undefined,
           limit: undefined,
         },
-        undefined
+        "admin"
       );
     });
 
@@ -492,6 +523,7 @@ describe('DashboardController (Integration)', () => {
           page: 2,
           limit: 25,
         })
+        .set('Authorization', createAuthHeader())
         .expect(200);
 
       expect(response.body).toEqual(mockAuditLogs);
@@ -502,10 +534,10 @@ describe('DashboardController (Integration)', () => {
           resource: 'email',
           dateFrom: '2024-01-01',
           dateTo: '2024-01-31',
-          page: 2,
-          limit: 25,
+          page: '2',
+          limit: '25',
         },
-        undefined
+        "admin"
       );
     });
   });
@@ -534,6 +566,7 @@ describe('DashboardController (Integration)', () => {
 
       const response = await request(app.getHttpServer())
         .get('/dashboard/rate-limit-stats')
+        .set('Authorization', createAuthHeader())
         .expect(200);
 
       expect(response.body).toEqual(mockRateLimitStats);
@@ -561,6 +594,7 @@ describe('DashboardController (Integration)', () => {
 
       const response = await request(app.getHttpServer())
         .get('/dashboard/companies')
+        .set('Authorization', createAuthHeader())
         .expect(200);
 
       expect(response.body).toEqual(mockCompanies);
@@ -595,6 +629,7 @@ describe('DashboardController (Integration)', () => {
 
       const response = await request(app.getHttpServer())
         .get('/dashboard/api-key-status')
+        .set('Authorization', createAuthHeader())
         .expect(200);
 
       expect(response.body).toEqual(mockApiKeyStatus);
@@ -624,6 +659,7 @@ describe('DashboardController (Integration)', () => {
 
       const response = await request(app.getHttpServer())
         .get('/dashboard/metrics')
+        .set('Authorization', createAuthHeader())
         .expect(200);
 
       expect(response.body).toEqual(mockMetrics);
