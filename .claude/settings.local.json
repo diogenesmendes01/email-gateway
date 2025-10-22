@@ -23,7 +23,8 @@
       "Bash(test:*)",
       "Bash(for file in .claude/agents/pr-*.md)",
       "Bash(head:*)",
-      "Bash(done)"
+      "Bash(done)",
+      "Bash(gh pr create:*)"
     ],
     "deny": [],
     "ask": []
