@@ -1,7 +1,8 @@
-import { UseGuards, applyDecorators, createParamDecorator, ExecutionContext } from '@nestjs/common';
+import { UseGuards, applyDecorators, createParamDecorator, ExecutionContext, SetMetadata } from '@nestjs/common';
 import { ApiKeyGuard } from './auth.guard';
 import { RateLimitGuard } from './rate-limit.guard';
 import { BasicAuthGuard } from './basic-auth.guard';
+import { AdminGuard } from './admin.guard';
 import { AuditInterceptor } from './audit.interceptor';
 import { UseInterceptors } from '@nestjs/common';
 
@@ -23,6 +24,17 @@ export function ApiProtected() {
 export function DashboardProtected() {
   return applyDecorators(
     UseGuards(BasicAuthGuard),
+    UseInterceptors(AuditInterceptor),
+  );
+}
+
+/**
+ * Decorator para proteger rotas com Basic Auth + Auditoria (apenas admin)
+ * Usado para endpoints do dashboard que requerem permissões de admin
+ */
+export function AdminProtected() {
+  return applyDecorators(
+    UseGuards(BasicAuthGuard, AdminGuard),
     UseInterceptors(AuditInterceptor),
   );
 }
