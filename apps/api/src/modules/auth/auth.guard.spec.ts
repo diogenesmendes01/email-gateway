@@ -15,6 +15,9 @@ describe('ApiKeyGuard', () => {
           provide: AuthService,
           useValue: {
             validateApiKey: jest.fn(),
+            isApiKeyExpired: jest.fn(),
+            validateIpAllowlist: jest.fn(),
+            updateLastUsedAt: jest.fn(),
           },
         },
       ],
@@ -40,6 +43,9 @@ describe('ApiKeyGuard', () => {
             'x-api-key': apiKey,
           },
           ip: ipAddress || '192.168.1.1',
+          connection: {
+            remoteAddress: ipAddress || '192.168.1.1',
+          },
         }),
       }),
     }) as ExecutionContext;
@@ -56,6 +62,9 @@ describe('ApiKeyGuard', () => {
       };
 
       (authService.validateApiKey as jest.Mock).mockResolvedValue(mockPayload);
+      (authService.isApiKeyExpired as jest.Mock).mockReturnValue(false);
+      (authService.validateIpAllowlist as jest.Mock).mockResolvedValue(true);
+      (authService.updateLastUsedAt as jest.Mock).mockResolvedValue(undefined);
 
       const result = await guard.canActivate(context);
 
@@ -100,7 +109,7 @@ describe('ApiKeyGuard', () => {
       (authService.validateApiKey as jest.Mock).mockResolvedValue(mockPayload);
 
       await expect(guard.canActivate(context)).rejects.toThrow(
-        new ForbiddenException('Company account is inactive')
+        new ForbiddenException('Company is inactive')
       );
 
       expect(authService.validateApiKey).toHaveBeenCalledWith(apiKey);
@@ -118,6 +127,7 @@ describe('ApiKeyGuard', () => {
       };
 
       (authService.validateApiKey as jest.Mock).mockResolvedValue(mockPayload);
+      (authService.isApiKeyExpired as jest.Mock).mockReturnValue(true);
 
       await expect(guard.canActivate(context)).rejects.toThrow(
         new UnauthorizedException('API Key has expired')

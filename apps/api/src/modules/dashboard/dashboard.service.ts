@@ -9,10 +9,11 @@
  * - Metrics from worker (TASK 7.1)
  */
 
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { prisma } from '@email-gateway/database';
 import { AuthService } from '../auth/auth.service';
 import Redis from 'ioredis';
+import { ConfigService } from '@nestjs/config';
 
 interface DashboardOverview {
   kpis: {
@@ -65,14 +66,18 @@ interface CompanyApiKeyStatus {
 
 @Injectable()
 export class DashboardService {
+  private readonly logger = new Logger(DashboardService.name);
   private redis: Redis;
 
-  constructor(private authService: AuthService) {
+  constructor(
+    private authService: AuthService,
+    private configService: ConfigService,
+  ) {
     // TASK 7.1: Initialize Redis connection for metrics
     this.redis = new Redis({
-      host: process.env.REDIS_HOST || 'localhost',
-      port: parseInt(process.env.REDIS_PORT || '6379', 10),
-      password: process.env.REDIS_PASSWORD,
+      host: this.configService.get<string>('REDIS_HOST', 'localhost'),
+      port: this.configService.get<number>('REDIS_PORT', 6379),
+      password: this.configService.get<string>('REDIS_PASSWORD'),
       db: parseInt(process.env.REDIS_DB || '0', 10),
     });
   }
@@ -203,6 +208,7 @@ export class DashboardService {
       include: {
         company: true,
       },
+      take: 1000, // Limit to prevent memory issues with large datasets
     });
 
     // Count requests by company
@@ -245,6 +251,7 @@ export class DashboardService {
         apiKeyExpiresAt: true,
         allowedIps: true,
       },
+      take: 100, // Limit to prevent memory issues with large datasets
     });
 
     return companies.map(company => ({
@@ -284,6 +291,7 @@ export class DashboardService {
         lastUsedAt: true,
         apiKeyExpiresAt: true,
       },
+      take: 100, // Limit to prevent memory issues with large datasets
     });
 
     const warnings: Array<{
@@ -455,6 +463,614 @@ export class DashboardService {
   }
 
   /**
+   * Get KPIs: total enviados, erro por categoria, DLQ, latências
+   * TASK 9.1: KPIs, estados e acesso
+   * 
+   * @param period - Time period for KPIs ('hour', 'day', 'week', 'month', 'today')
+   * @param companyId - Optional company ID to filter KPIs
+   * @returns Promise with KPI data including totals, success rates, errors, DLQ count, and latencies
+   * @throws Error if database query fails
+   */
+  async getKPIs(period?: string, companyId?: string): Promise<{
+    totalEnviados: number;
+    totalEnviadosPeriodoAnterior: number;
+    taxaSucesso: number;
+    taxaSucessoPeriodoAnterior: number;
+    totalErros: number;
+    totalErrosPeriodoAnterior: number;
+    dlqCount: number;
+    latenciaMedia: number;
+    latenciaP95: number;
+    latenciaP99: number;
+    periodo: string;
+    comparacao: {
+      enviados: number; // % de mudança
+      sucesso: number; // % de mudança
+      erros: number; // % de mudança
+    };
+  }> {
+    const requestId = `kpi-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    
+    this.logger.log({
+      message: 'Starting KPI calculation',
+      requestId,
+      period: period || 'today',
+      companyId: companyId || 'all',
+      timestamp: new Date().toISOString(),
+    });
+
+    // Cache key for KPIs
+    const cacheKey = `kpis:${period || 'today'}:${companyId || 'all'}`;
+    
+    // Try to get from cache first
+    try {
+      const cached = await this.redis.get(cacheKey);
+      if (cached) {
+        this.logger.log({
+          message: 'KPI data retrieved from cache',
+          requestId,
+          cacheKey,
+          timestamp: new Date().toISOString(),
+        });
+        return JSON.parse(cached);
+      }
+    } catch (error) {
+      this.logger.warn({
+        message: 'Cache retrieval failed, proceeding with database query',
+        requestId,
+        cacheKey,
+        error: (error as Error).message,
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    const { startDate, endDate, previousStartDate, previousEndDate } = this.getDateRange(period);
+
+    this.logger.log({
+      message: 'Calculating KPIs from database',
+      requestId,
+      startDate: startDate.toISOString(),
+      endDate: endDate.toISOString(),
+      previousStartDate: previousStartDate.toISOString(),
+      previousEndDate: previousEndDate.toISOString(),
+      timestamp: new Date().toISOString(),
+    });
+
+    const where = companyId ? { companyId } : {};
+    const whereWithPeriod = { ...where, createdAt: { gte: startDate, lte: endDate } };
+    const wherePreviousPeriod = { ...where, createdAt: { gte: previousStartDate, lte: previousEndDate } };
+
+    // Get current period stats
+    const [currentStats, previousStats, dlqCount, latencyStats] = await Promise.all([
+      this.getEmailStatsForPeriod(whereWithPeriod),
+      this.getEmailStatsForPeriod(wherePreviousPeriod),
+      this.getDLQCount(where),
+      this.getLatencyStats(whereWithPeriod),
+    ]);
+
+    // Calculate comparison percentages
+    const comparacao = {
+      enviados: this.calculatePercentageChange(currentStats.total, previousStats.total),
+      sucesso: this.calculatePercentageChange(currentStats.successRate, previousStats.successRate),
+      erros: this.calculatePercentageChange(currentStats.errorCount, previousStats.errorCount),
+    };
+
+    const result = {
+      totalEnviados: currentStats.total,
+      totalEnviadosPeriodoAnterior: previousStats.total,
+      taxaSucesso: currentStats.successRate,
+      taxaSucessoPeriodoAnterior: previousStats.successRate,
+      totalErros: currentStats.errorCount,
+      totalErrosPeriodoAnterior: previousStats.errorCount,
+      dlqCount,
+      latenciaMedia: latencyStats.average,
+      latenciaP95: latencyStats.p95,
+      latenciaP99: latencyStats.p99,
+      periodo: period || 'today',
+      comparacao,
+    };
+
+    // Cache the result for 5 minutes
+    try {
+      await this.redis.setex(cacheKey, 300, JSON.stringify(result));
+      this.logger.log({
+        message: 'KPI data cached successfully',
+        requestId,
+        cacheKey,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      this.logger.warn({
+        message: 'Failed to cache KPI data',
+        requestId,
+        cacheKey,
+        error: (error as Error).message,
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    this.logger.log({
+      message: 'KPI calculation completed',
+      requestId,
+      totalEnviados: result.totalEnviados,
+      taxaSucesso: result.taxaSucesso,
+      totalErros: result.totalErros,
+      dlqCount: result.dlqCount,
+      timestamp: new Date().toISOString(),
+    });
+
+    return result;
+  }
+
+  /**
+   * Get emails with filters: externalId, email_hash, cpfCnpj_hash, status, período
+   * TASK 9.1: KPIs, estados e acesso
+   * 
+   * @param filters - Filter parameters for email search
+   * @param filters.externalId - External ID filter
+   * @param filters.emailHash - Email hash filter
+   * @param filters.cpfCnpjHash - CPF/CNPJ hash filter
+   * @param filters.status - Email status filter ('SENT', 'FAILED', 'PENDING')
+   * @param filters.dateFrom - Start date filter
+   * @param filters.dateTo - End date filter
+   * @param filters.companyId - Company ID filter
+   * @param filters.page - Page number for pagination
+   * @param filters.limit - Number of items per page
+   * @returns Promise with paginated email list and metadata
+   * @throws Error if database query fails
+   */
+  async getEmails(filters: {
+    externalId?: string;
+    emailHash?: string;
+    cpfCnpjHash?: string;
+    status?: string;
+    dateFrom?: string;
+    dateTo?: string;
+    companyId?: string;
+    page: number;
+    limit: number;
+  }): Promise<{
+    emails: Array<{
+      id: string;
+      externalId?: string;
+      to: string;
+      subject: string;
+      status: string;
+      createdAt: Date;
+      sentAt?: Date;
+      failedAt?: Date;
+      errorCode?: string;
+      errorReason?: string;
+      attempts: number;
+      durationMs?: number;
+      companyId: string;
+      recipient?: {
+        id: string;
+        externalId?: string;
+        cpfCnpjHash?: string;
+        razaoSocial?: string;
+        nome?: string;
+        email: string;
+      };
+    }>;
+    total: number;
+    page: number;
+    limit: number;
+    hasMore: boolean;
+  }> {
+    const requestId = `emails-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    
+    this.logger.log({
+      message: 'Starting email search',
+      requestId,
+      filters: {
+        externalId: filters.externalId,
+        emailHash: filters.emailHash,
+        cpfCnpjHash: filters.cpfCnpjHash,
+        status: filters.status,
+        dateFrom: filters.dateFrom,
+        dateTo: filters.dateTo,
+        companyId: filters.companyId,
+        page: filters.page,
+        limit: filters.limit,
+      },
+      timestamp: new Date().toISOString(),
+    });
+
+    try {
+      const { page, limit, ...filterParams } = filters;
+      const offset = (page - 1) * limit;
+
+    const where: any = {};
+
+    if (filterParams.companyId) {
+      where.companyId = filterParams.companyId;
+    }
+
+    if (filterParams.externalId) {
+      where.externalId = filterParams.externalId;
+    }
+
+    if (filterParams.status) {
+      where.status = filterParams.status;
+    }
+
+    if (filterParams.dateFrom || filterParams.dateTo) {
+      where.createdAt = {};
+      if (filterParams.dateFrom) {
+        where.createdAt.gte = new Date(filterParams.dateFrom);
+      }
+      if (filterParams.dateTo) {
+        where.createdAt.lte = new Date(filterParams.dateTo);
+      }
+    }
+
+    // Handle recipient filters
+    if (filterParams.emailHash || filterParams.cpfCnpjHash) {
+      where.recipient = {};
+      if (filterParams.emailHash) {
+        where.recipient.email = { contains: filterParams.emailHash };
+      }
+      if (filterParams.cpfCnpjHash) {
+        where.recipient.cpfCnpjHash = filterParams.cpfCnpjHash;
+      }
+    }
+
+    const [emails, total] = await Promise.all([
+      prisma.emailLog.findMany({
+        where,
+        include: {
+          recipient: {
+            select: {
+              id: true,
+              externalId: true,
+              cpfCnpjHash: true,
+              razaoSocial: true,
+              nome: true,
+              email: true,
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip: offset,
+        take: limit + 1, // Take one extra to check if there are more
+      }),
+      prisma.emailLog.count({ where }),
+    ]);
+
+    const hasMore = emails.length > limit;
+    const resultEmails = hasMore ? emails.slice(0, -1) : emails;
+
+    const result = {
+      emails: resultEmails.map(email => ({
+        id: email.id,
+        externalId: undefined, // externalId is not available in emailLog, only in outbox
+        to: email.to,
+        subject: email.subject,
+        status: email.status,
+        createdAt: email.createdAt,
+        sentAt: email.sentAt || undefined,
+        failedAt: email.failedAt || undefined,
+        errorCode: email.errorCode || undefined,
+        errorReason: email.errorReason || undefined,
+        attempts: email.attempts,
+        durationMs: email.durationMs || undefined,
+        companyId: email.companyId,
+        recipient: email.recipient ? {
+          id: email.recipient.id,
+          externalId: email.recipient.externalId || undefined,
+          cpfCnpjHash: email.recipient.cpfCnpjHash || undefined,
+          razaoSocial: email.recipient.razaoSocial || undefined,
+          nome: email.recipient.nome || undefined,
+          email: email.recipient.email,
+        } : undefined,
+      })),
+      total,
+      page,
+      limit,
+      hasMore,
+    };
+
+    this.logger.log({
+      message: 'Email search completed',
+      requestId,
+      totalEmails: result.emails.length,
+      totalCount: result.total,
+      page: result.page,
+      limit: result.limit,
+      hasMore: result.hasMore,
+      timestamp: new Date().toISOString(),
+    });
+
+    return result;
+    } catch (error) {
+      this.logger.error({
+        message: 'Error in getEmails',
+        requestId,
+        error: (error as Error).message,
+        stack: (error as Error).stack,
+        filters,
+        timestamp: new Date().toISOString(),
+      });
+      
+      // Return empty result with error information
+      return {
+        emails: [],
+        total: 0,
+        page: filters.page,
+        limit: filters.limit,
+        hasMore: false,
+      };
+    }
+  }
+
+  /**
+   * Get email details by ID
+   * TASK 9.1: KPIs, estados e acesso
+   * 
+   * @param id - Email ID to retrieve details for
+   * @returns Promise with complete email details including recipient and events
+   * @throws Error if email not found or database query fails
+   */
+  async getEmailById(id: string): Promise<{
+    id: string;
+    outboxId: string;
+    externalId?: string;
+    to: string;
+    cc: string[];
+    bcc: string[];
+    subject: string;
+    html: string;
+    replyTo?: string;
+    headers?: any;
+    tags: string[];
+    status: string;
+    sesMessageId?: string;
+    errorCode?: string;
+    errorReason?: string;
+    attempts: number;
+    durationMs?: number;
+    requestId?: string;
+    createdAt: Date;
+    sentAt?: Date;
+    failedAt?: Date;
+    companyId: string;
+    recipient?: {
+      id: string;
+      externalId?: string;
+      cpfCnpjHash?: string;
+      razaoSocial?: string;
+      nome?: string;
+      email: string;
+    };
+    events: Array<{
+      id: string;
+      type: string;
+      metadata?: any;
+      createdAt: Date;
+    }>;
+  }> {
+    const requestId = `email-detail-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    
+    this.logger.log({
+      message: 'Starting email detail retrieval',
+      requestId,
+      emailId: id,
+      timestamp: new Date().toISOString(),
+    });
+
+    try {
+      const email = await prisma.emailLog.findUnique({
+      where: { id },
+      include: {
+        recipient: {
+          select: {
+            id: true,
+            externalId: true,
+            cpfCnpjHash: true,
+            razaoSocial: true,
+            nome: true,
+            email: true,
+          },
+        },
+        outbox: {
+          select: {
+            id: true,
+            externalId: true,
+            cc: true,
+            bcc: true,
+            html: true,
+            replyTo: true,
+            headers: true,
+            tags: true,
+          },
+        },
+        events: {
+          orderBy: { createdAt: 'asc' },
+          select: {
+            id: true,
+            type: true,
+            metadata: true,
+            createdAt: true,
+          },
+        },
+      },
+    });
+
+    if (!email) {
+      throw new Error('Email not found');
+    }
+
+    const result = {
+      id: email.id,
+      outboxId: email.outboxId,
+      externalId: email.outbox?.externalId || undefined,
+      to: email.to,
+      cc: email.outbox?.cc || [],
+      bcc: email.outbox?.bcc || [],
+      subject: email.subject,
+      html: email.outbox?.html || '',
+      replyTo: email.outbox?.replyTo || undefined,
+      headers: email.outbox?.headers || undefined,
+      tags: email.outbox?.tags || [],
+      status: email.status,
+      sesMessageId: email.sesMessageId || undefined,
+      errorCode: email.errorCode || undefined,
+      errorReason: email.errorReason || undefined,
+      attempts: email.attempts,
+      durationMs: email.durationMs || undefined,
+      requestId: email.requestId || undefined,
+      createdAt: email.createdAt,
+      sentAt: email.sentAt || undefined,
+      failedAt: email.failedAt || undefined,
+      companyId: email.companyId,
+      recipient: email.recipient ? {
+        id: email.recipient.id,
+        externalId: email.recipient.externalId || undefined,
+        cpfCnpjHash: email.recipient.cpfCnpjHash || undefined,
+        razaoSocial: email.recipient.razaoSocial || undefined,
+        nome: email.recipient.nome || undefined,
+        email: email.recipient.email,
+      } : undefined,
+      events: email.events.map(event => ({
+        id: event.id,
+        type: event.type,
+        metadata: event.metadata || undefined,
+        createdAt: event.createdAt,
+      })),
+    };
+
+    this.logger.log({
+      message: 'Email detail retrieved successfully',
+      requestId,
+      emailId: result.id,
+      status: result.status,
+      attempts: result.attempts,
+      hasRecipient: !!result.recipient,
+      eventsCount: result.events.length,
+      timestamp: new Date().toISOString(),
+    });
+
+    return result;
+    } catch (error) {
+      this.logger.error({
+        message: 'Error in getEmailById',
+        requestId,
+        emailId: id,
+        error: (error as Error).message,
+        stack: (error as Error).stack,
+        timestamp: new Date().toISOString(),
+      });
+      
+      // Throw error to be handled by controller
+      throw new Error(`Failed to retrieve email details: ${(error as Error).message}`);
+    }
+  }
+
+  /**
+   * Get error breakdown by category
+   * TASK 9.1: KPIs, estados e acesso
+   * 
+   * @param period - Time period for error analysis ('hour', 'day', 'week', 'month', 'today')
+   * @param companyId - Optional company ID to filter errors
+   * @returns Promise with error breakdown by category and code
+   * @throws Error if database query fails
+   */
+  async getErrorBreakdown(period?: string, companyId?: string): Promise<{
+    totalErrors: number;
+    errorsByCategory: Array<{
+      category: string;
+      count: number;
+      percentage: number;
+    }>;
+    errorsByCode: Array<{
+      code: string;
+      count: number;
+      percentage: number;
+    }>;
+    period: string;
+  }> {
+    // Cache key for error breakdown
+    const cacheKey = `error-breakdown:${period || 'today'}:${companyId || 'all'}`;
+    
+    // Try to get from cache first
+    try {
+      const cached = await this.redis.get(cacheKey);
+      if (cached) {
+        return JSON.parse(cached);
+      }
+    } catch (error) {
+      // Cache miss or error, continue with database query
+    }
+
+    const { startDate, endDate } = this.getDateRange(period);
+
+    const where: any = {
+      status: 'FAILED',
+      createdAt: { gte: startDate, lte: endDate },
+    };
+
+    if (companyId) {
+      where.companyId = companyId;
+    }
+
+    const errors = await prisma.emailLog.findMany({
+      where,
+      select: {
+        errorCode: true,
+        errorReason: true,
+      },
+      take: 10000, // Limit to prevent memory issues with large datasets
+    });
+
+    const totalErrors = errors.length;
+
+    // Group by error category (based on error code patterns)
+    const categoryMap = new Map<string, number>();
+    const codeMap = new Map<string, number>();
+
+    errors.forEach(error => {
+      const category = this.categorizeError(error.errorCode || 'UNKNOWN');
+      const code = error.errorCode || 'UNKNOWN';
+
+      categoryMap.set(category, (categoryMap.get(category) || 0) + 1);
+      codeMap.set(code, (codeMap.get(code) || 0) + 1);
+    });
+
+    const errorsByCategory = Array.from(categoryMap.entries())
+      .map(([category, count]) => ({
+        category,
+        count,
+        percentage: totalErrors > 0 ? (count / totalErrors) * 100 : 0,
+      }))
+      .sort((a, b) => b.count - a.count);
+
+    const errorsByCode = Array.from(codeMap.entries())
+      .map(([code, count]) => ({
+        code,
+        count,
+        percentage: totalErrors > 0 ? (count / totalErrors) * 100 : 0,
+      }))
+      .sort((a, b) => b.count - a.count);
+
+    const result = {
+      totalErrors,
+      errorsByCategory,
+      errorsByCode,
+      period: period || 'today',
+    };
+
+    // Cache the result for 5 minutes
+    try {
+      await this.redis.setex(cacheKey, 300, JSON.stringify(result));
+    } catch (error) {
+      // Cache error, but don't fail the request
+    }
+
+    return result;
+  }
+
+  /**
    * Get real-time metrics from worker (TASK 7.1)
    * Returns metrics collected by MetricsService in worker
    */
@@ -574,5 +1190,160 @@ export class DashboardService {
       tenant_fairness_ratio: Math.round((tenantFairnessRatio || 1.0) * 100) / 100,
       error_breakdown: errorBreakdown,
     };
+  }
+
+  // Private helper methods for TASK 9.1
+
+  private getDateRange(period?: string): {
+    startDate: Date;
+    endDate: Date;
+    previousStartDate: Date;
+    previousEndDate: Date;
+  } {
+    const now = new Date();
+    let startDate: Date;
+    let endDate: Date = now;
+
+    switch (period) {
+      case 'hour':
+        startDate = new Date(now.getTime() - 60 * 60 * 1000);
+        break;
+      case 'day':
+        startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+        break;
+      case 'week':
+        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        break;
+      case 'month':
+        startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        break;
+      default: // 'today'
+        startDate = new Date();
+        startDate.setHours(0, 0, 0, 0);
+        endDate = new Date();
+        endDate.setHours(23, 59, 59, 999);
+        break;
+    }
+
+    const duration = endDate.getTime() - startDate.getTime();
+    const previousEndDate = new Date(startDate.getTime() - 1);
+    const previousStartDate = new Date(previousEndDate.getTime() - duration);
+
+    return {
+      startDate,
+      endDate,
+      previousStartDate,
+      previousEndDate,
+    };
+  }
+
+  private async getEmailStatsForPeriod(where: any): Promise<{
+    total: number;
+    successRate: number;
+    errorCount: number;
+  }> {
+    const stats = await prisma.emailLog.groupBy({
+      by: ['status'],
+      where,
+      _count: {
+        id: true,
+      },
+    });
+
+    const total = stats.reduce((sum, stat) => sum + stat._count.id, 0);
+    const successful = stats
+      .filter(stat => stat.status === 'SENT')
+      .reduce((sum, stat) => sum + stat._count.id, 0);
+    const errorCount = stats
+      .filter(stat => stat.status === 'FAILED')
+      .reduce((sum, stat) => sum + stat._count.id, 0);
+
+    return {
+      total,
+      successRate: total > 0 ? (successful / total) * 100 : 0,
+      errorCount,
+    };
+  }
+
+  private async getDLQCount(where: any): Promise<number> {
+    const dlqCount = await prisma.emailOutbox.count({
+      where: {
+        ...where,
+        status: 'FAILED',
+        attempts: { gte: 5 }, // Assuming 5 is max retry attempts
+      },
+    });
+
+    return dlqCount;
+  }
+
+  private async getLatencyStats(where: any): Promise<{
+    average: number;
+    p95: number;
+    p99: number;
+  }> {
+    const latencies = await prisma.emailLog.findMany({
+      where: {
+        ...where,
+        status: 'SENT',
+        durationMs: { not: null },
+      },
+      select: {
+        durationMs: true,
+      },
+      take: 5000, // Limit to prevent memory issues with large datasets
+    });
+
+    if (latencies.length === 0) {
+      return { average: 0, p95: 0, p99: 0 };
+    }
+
+    const durations = latencies
+      .map(l => l.durationMs!)
+      .sort((a, b) => a - b);
+
+    const average = durations.reduce((sum, d) => sum + d, 0) / durations.length;
+    const p95Index = Math.ceil(durations.length * 0.95) - 1;
+    const p99Index = Math.ceil(durations.length * 0.99) - 1;
+
+    return {
+      average: Math.round(average),
+      p95: durations[p95Index] || 0,
+      p99: durations[p99Index] || 0,
+    };
+  }
+
+  private calculatePercentageChange(current: number, previous: number): number {
+    if (previous === 0) {
+      return current > 0 ? 100 : 0;
+    }
+    return Math.round(((current - previous) / previous) * 100 * 100) / 100;
+  }
+
+  private categorizeError(errorCode?: string): string {
+    if (!errorCode) return 'UNKNOWN';
+
+    const code = errorCode.toUpperCase();
+
+    if (code.includes('SES') || code.includes('AWS')) {
+      return 'SES_ERROR';
+    }
+    if (code.includes('VALIDATION') || code.includes('INVALID')) {
+      return 'VALIDATION_ERROR';
+    }
+    if (code.includes('RATE_LIMIT') || code.includes('THROTTLE')) {
+      return 'RATE_LIMIT_ERROR';
+    }
+    if (code.includes('TIMEOUT') || code.includes('TIMEOUT')) {
+      return 'TIMEOUT_ERROR';
+    }
+    if (code.includes('NETWORK') || code.includes('CONNECTION')) {
+      return 'NETWORK_ERROR';
+    }
+    if (code.includes('AUTH') || code.includes('UNAUTHORIZED')) {
+      return 'AUTH_ERROR';
+    }
+
+    return 'OTHER_ERROR';
   }
 }

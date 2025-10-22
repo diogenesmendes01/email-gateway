@@ -13,6 +13,12 @@ interface BasicAuthCredentials {
   password: string;
 }
 
+interface DashboardUser {
+  username: string;
+  type: 'basic_auth';
+  role: 'admin' | 'readonly';
+}
+
 @Injectable()
 export class BasicAuthGuard implements CanActivate {
   constructor(
@@ -37,10 +43,12 @@ export class BasicAuthGuard implements CanActivate {
       }
 
       // Adiciona informações do usuário ao request
+      const userRole = this.getUserRole(credentials.username);
       (request as any)['user'] = {
         username: credentials.username,
         type: 'basic_auth',
-      };
+        role: userRole,
+      } as DashboardUser;
       (request as any)['userId'] = credentials.username;
 
       return true;
@@ -52,7 +60,14 @@ export class BasicAuthGuard implements CanActivate {
   private parseBasicAuth(authHeader: string): BasicAuthCredentials {
     const base64Credentials = authHeader.slice(6); // Remove 'Basic '
     const credentials = Buffer.from(base64Credentials, 'base64').toString('utf-8');
-    const [username, password] = credentials.split(':');
+    const colonIndex = credentials.indexOf(':');
+    
+    if (colonIndex === -1) {
+      throw new Error('Invalid basic auth format');
+    }
+    
+    const username = credentials.substring(0, colonIndex);
+    const password = credentials.substring(colonIndex + 1);
 
     if (!username || !password) {
       throw new Error('Invalid basic auth format');
@@ -65,18 +80,35 @@ export class BasicAuthGuard implements CanActivate {
     // Obtém credenciais das variáveis de ambiente
     const dashboardUsername = this.configService.get<string>('DASHBOARD_USERNAME', 'admin');
     const dashboardPasswordHash = this.configService.get<string>('DASHBOARD_PASSWORD_HASH');
+    const readonlyUsername = this.configService.get<string>('DASHBOARD_READONLY_USERNAME', 'readonly');
+    const readonlyPasswordHash = this.configService.get<string>('DASHBOARD_READONLY_PASSWORD_HASH');
     
-    if (!dashboardPasswordHash) {
-      throw new UnauthorizedException('Dashboard authentication not configured');
+    // Verifica usuário admin
+    if (credentials.username === dashboardUsername && dashboardPasswordHash) {
+      return this.authService.validateBasicAuth(credentials.password, dashboardPasswordHash);
     }
 
-    // Verifica se o usuário corresponde
-    if (credentials.username !== dashboardUsername) {
-      return false;
+    // Verifica usuário readonly
+    if (credentials.username === readonlyUsername && readonlyPasswordHash) {
+      return this.authService.validateBasicAuth(credentials.password, readonlyPasswordHash);
     }
 
-    // Valida a senha
-    return this.authService.validateBasicAuth(credentials.password, dashboardPasswordHash);
+    return false;
+  }
+
+  private getUserRole(username: string): 'admin' | 'readonly' {
+    const dashboardUsername = this.configService.get<string>('DASHBOARD_USERNAME', 'admin');
+    const readonlyUsername = this.configService.get<string>('DASHBOARD_READONLY_USERNAME', 'readonly');
+    
+    if (username === dashboardUsername) {
+      return 'admin';
+    }
+    if (username === readonlyUsername) {
+      return 'readonly';
+    }
+    
+    // Default to readonly for security
+    return 'readonly';
   }
 
   /**

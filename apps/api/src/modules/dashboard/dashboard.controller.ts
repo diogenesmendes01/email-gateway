@@ -13,12 +13,16 @@ import {
   Controller,
   Get,
   Query,
+  Param,
   HttpCode,
   HttpStatus,
   Request,
+  UsePipes,
+  ValidationPipe,
 } from '@nestjs/common';
 import { DashboardService } from './dashboard.service';
 import { DashboardProtected } from '../auth/decorators';
+import { GetKPIsDto, GetEmailsDto, GetErrorBreakdownDto } from './dto/kpis.dto';
 
 interface AuditLogsQuery {
   companyId?: string;
@@ -110,5 +114,79 @@ export class DashboardController {
   @HttpCode(HttpStatus.OK)
   async getMetrics() {
     return this.dashboardService.getMetrics();
+  }
+
+  /**
+   * GET /dashboard/kpis
+   *
+   * Get KPIs: total enviados, erro por categoria, DLQ, latências
+   * TASK 9.1: KPIs, estados e acesso
+   */
+  @Get('kpis')
+  @DashboardProtected() // Basic Auth + Audit
+  @HttpCode(HttpStatus.OK)
+  async getKPIs(
+    @Request() req: any,
+    @Query() query: GetKPIsDto,
+  ) {
+    return this.dashboardService.getKPIs(query.period, query.companyId);
+  }
+
+  /**
+   * GET /dashboard/emails
+   *
+   * Get emails with filters: externalId, email_hash, cpfCnpj_hash, status, período
+   * TASK 9.1: KPIs, estados e acesso
+   */
+  @Get('emails')
+  @DashboardProtected() // Basic Auth + Audit
+  @HttpCode(HttpStatus.OK)
+  async getEmails(
+    @Request() req: any,
+    @Query() query: GetEmailsDto,
+  ) {
+    return this.dashboardService.getEmails({
+      externalId: query.externalId,
+      emailHash: query.emailHash,
+      cpfCnpjHash: query.cpfCnpjHash,
+      status: query.status,
+      dateFrom: query.dateFrom,
+      dateTo: query.dateTo,
+      companyId: query.companyId,
+      page: query.page || 1,
+      limit: query.limit || 50,
+    });
+  }
+
+  /**
+   * GET /dashboard/emails/:id
+   *
+   * Get email details by ID
+   * TASK 9.1: KPIs, estados e acesso
+   */
+  @Get('emails/:id')
+  @DashboardProtected() // Basic Auth + Audit
+  @HttpCode(HttpStatus.OK)
+  async getEmailById(
+    @Param('id') id: string,
+    @Request() req: any,
+  ) {
+    return this.dashboardService.getEmailById(id);
+  }
+
+  /**
+   * GET /dashboard/error-breakdown
+   *
+   * Get error breakdown by category
+   * TASK 9.1: KPIs, estados e acesso
+   */
+  @Get('error-breakdown')
+  @DashboardProtected() // Basic Auth + Audit
+  @HttpCode(HttpStatus.OK)
+  async getErrorBreakdown(
+    @Request() req: any,
+    @Query() query: GetErrorBreakdownDto,
+  ) {
+    return this.dashboardService.getErrorBreakdown(query.period, query.companyId);
   }
 }

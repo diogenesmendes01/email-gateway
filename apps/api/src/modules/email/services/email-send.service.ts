@@ -383,6 +383,13 @@ export class EmailSendService {
   }
 
   /**
+   * Hash CPF/CNPJ using SHA-256
+   */
+  private hashCpfCnpj(cpfCnpj: string): string {
+    return hashCpfCnpjSha256(cpfCnpj);
+  }
+
+  /**
    * Decrypt CPF/CNPJ for authorized access (using secure implementation)
    */
   public decryptCpfCnpj(encryptedCpfCnpj: string, salt: string, requestId?: string): string {

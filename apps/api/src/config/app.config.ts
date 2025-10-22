@@ -10,11 +10,11 @@ import { plainToClass, Transform } from 'class-transformer';
 class EnvironmentVariables {
   // Database
   @IsString()
-  DATABASE_URL: string;
+  DATABASE_URL!: string;
 
   // Redis
   @IsString()
-  REDIS_URL: string;
+  REDIS_URL!: string;
 
   @IsOptional()
   @IsString()
@@ -37,19 +37,19 @@ class EnvironmentVariables {
 
   // AWS SES
   @IsString()
-  AWS_ACCESS_KEY_ID: string;
+  AWS_ACCESS_KEY_ID!: string;
 
   @IsString()
-  AWS_SECRET_ACCESS_KEY: string;
+  AWS_SECRET_ACCESS_KEY!: string;
 
   @IsString()
-  AWS_REGION: string;
+  AWS_REGION!: string;
 
   @IsString()
-  AWS_SES_REGION: string;
+  AWS_SES_REGION!: string;
 
   @IsString()
-  SES_FROM_ADDRESS: string;
+  SES_FROM_ADDRESS!: string;
 
   @IsOptional()
   @IsString()
@@ -61,10 +61,10 @@ class EnvironmentVariables {
 
   // Dashboard Authentication
   @IsString()
-  DASHBOARD_USERNAME: string;
+  DASHBOARD_USERNAME!: string;
 
   @IsString()
-  DASHBOARD_PASSWORD_HASH: string;
+  DASHBOARD_PASSWORD_HASH!: string;
 
   // Rate Limiting
   @IsOptional()
@@ -138,7 +138,7 @@ class EnvironmentVariables {
 
   // Encryption (CRÍTICO para produção)
   @IsString()
-  ENCRYPTION_KEY: string;
+  ENCRYPTION_KEY!: string;
 
   @IsOptional()
   @IsString()
