@@ -3,6 +3,10 @@ name: pr-security-reviewer
 description: Review PRs for security vulnerabilities and compliance
 tools: Read, Grep, Glob, Bash
 model: opus
+tags: [security, encryption, authentication, pii, rate-limiting, input-validation]
+version: 1.0
+author: Architecture Team
+lastUpdated: 2025-10-20
 ---
 
 # Security Reviewer Agent

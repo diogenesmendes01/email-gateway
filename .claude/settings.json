@@ -56,7 +56,89 @@
   "commands": {
     "rules": "Mostra regras do projeto",
     "pre-commit-check": "Checklist antes de commitar",
-    "pre-pr-check": "Checklist antes de abrir PR"
+    "pre-pr-check": "Checklist antes de abrir PR",
+    "agents": "Lista agentes de revisão disponíveis"
+  },
+  "agent": {
+    "pr-security-reviewer": {
+      "name": "Security Reviewer",
+      "description": "Review PRs for security vulnerabilities and compliance",
+      "tags": ["security", "encryption", "authentication", "pii", "rate-limiting", "input-validation"],
+      "focusAreas": [
+        "Authentication and authorization",
+        "Encryption and PII protection",
+        "Input validation and injection prevention",
+        "Secrets management",
+        "Rate limiting",
+        "Security headers and CORS"
+      ],
+      "enabled": true
+    },
+    "pr-test-reviewer": {
+      "name": "Test Reviewer",
+      "description": "Review PRs for test coverage, quality, and completeness",
+      "tags": ["testing", "coverage", "unit-tests", "integration-tests", "mocking", "aaa-pattern"],
+      "focusAreas": [
+        "Test coverage (>=70%)",
+        "AAA pattern compliance",
+        "Mocking and test isolation",
+        "Edge cases coverage",
+        "Test quality and maintainability"
+      ],
+      "enabled": true
+    },
+    "pr-database-reviewer": {
+      "name": "Database Reviewer",
+      "description": "Review PRs for database schema changes, migrations, and query optimization",
+      "tags": ["database", "migrations", "indexes", "n+1-queries", "prisma", "performance", "schema"],
+      "focusAreas": [
+        "Migration reversibility",
+        "Index optimization",
+        "N+1 query prevention",
+        "PII encryption in database",
+        "Query performance"
+      ],
+      "enabled": true
+    },
+    "pr-code-quality-reviewer": {
+      "name": "Code Quality Reviewer",
+      "description": "Review PRs for code quality, TypeScript best practices, and clean code principles",
+      "tags": ["code-quality", "typescript", "logging", "error-handling", "clean-code", "dependency-injection"],
+      "focusAreas": [
+        "TypeScript best practices",
+        "Clean code principles (SRP, DRY, KISS)",
+        "Error handling patterns",
+        "Structured logging",
+        "Dependency injection"
+      ],
+      "enabled": true
+    },
+    "pr-performance-reviewer": {
+      "name": "Performance Reviewer",
+      "description": "Review PRs for performance issues, bottlenecks, and optimization opportunities",
+      "tags": ["performance", "optimization", "caching", "async-await", "query-optimization", "blocking-ops"],
+      "focusAreas": [
+        "Query optimization",
+        "Caching strategies",
+        "Async/await patterns",
+        "Blocking operations",
+        "Memory leaks"
+      ],
+      "enabled": true
+    },
+    "pr-docs-reviewer": {
+      "name": "Documentation Reviewer",
+      "description": "Review PRs for documentation quality, completeness, and clarity",
+      "tags": ["documentation", "architecture-docs", "api-docs", "adrs", "comments", "mermaid"],
+      "focusAreas": [
+        "Architecture documentation",
+        "API documentation",
+        "ADR completeness",
+        "Code comments",
+        "Diagram quality (Mermaid)"
+      ],
+      "enabled": true
+    }
   },
   "hooks": {
     "tool-use-submit-hook": {

@@ -3,6 +3,10 @@ name: pr-docs-reviewer
 description: Review PRs for documentation quality, completeness, and clarity
 tools: Read, Grep, Glob, Bash
 model: haiku
+tags: [documentation, architecture-docs, api-docs, adrs, comments, mermaid]
+version: 1.0
+author: Architecture Team
+lastUpdated: 2025-10-20
 ---
 
 # Documentation Reviewer Agent
