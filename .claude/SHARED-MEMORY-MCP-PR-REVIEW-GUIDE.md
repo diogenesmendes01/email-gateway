@@ -639,7 +639,7 @@ console.log(session.zones);
 ## Recursos Adicionais
 
 - **Repositório:** https://github.com/haasonsaas/shared-memory-mcp
-- **Helpers:** `~/shared-memory-mcp/pr-review-helpers.js`
+- **Helpers:** `.claude/helpers/pr-review-helpers.js` (versionado neste repositório)
 - **Agente V2:** `.claude/agents/pr-orchestrator-v2-shared-memory.md`
 
 ---
