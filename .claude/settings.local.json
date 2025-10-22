@@ -13,7 +13,18 @@
       "Bash(gh pr review:*)",
       "Bash(gh api:*)",
       "Read(//c/Users/PC Di/**)",
-      "Bash(npm install)"
+      "Bash(npm install)",
+      "Bash(npm test)",
+      "Bash(git checkout:*)",
+      "Bash(cat:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git ls-tree:*)",
+      "Bash(test:*)",
+      "Bash(for file in .claude/agents/pr-*.md)",
+      "Bash(head:*)",
+      "Bash(done)",
+      "Bash(gh pr create:*)"
     ],
     "deny": [],
     "ask": []
