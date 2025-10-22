@@ -1,10 +1,12 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
 import { LoadingSpinner } from '../components/ui/LoadingSpinner';
 import { ErrorMessage } from '../components/ui/LoadingSpinner';
 import { EmptyState } from '../components/ui/LoadingSpinner';
+import { copyToClipboard } from '../utils/clipboard';
+import { getRunbooksForEmail } from '../utils/runbooks';
 
 interface EmailDetail {
   id: string;
@@ -64,6 +66,33 @@ const getStatusColor = (status: string) => {
     default:
       return 'bg-gray-100 text-gray-800';
   }
+};
+
+// Copy Button Component
+const CopyButton: React.FC<{ text?: string; label: string }> = ({ text, label }) => {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    if (!text) return;
+
+    const success = await copyToClipboard(text);
+    if (success) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  if (!text) return null;
+
+  return (
+    <button
+      onClick={handleCopy}
+      className="ml-2 inline-flex items-center px-2 py-1 border border-gray-300 rounded text-xs font-medium text-gray-700 bg-white hover:bg-gray-50"
+      title={`Copy ${label}`}
+    >
+      {copied ? '✓ Copied!' : '📋 Copy'}
+    </button>
+  );
 };
 
 export const EmailDetailPage: React.FC = () => {
@@ -230,22 +259,69 @@ export const EmailDetailPage: React.FC = () => {
             {email.sesMessageId && (
               <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
                 <dt className="text-sm font-medium text-gray-500">SES Message ID</dt>
-                <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2 font-mono">
+                <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2 font-mono flex items-center">
                   {email.sesMessageId}
+                  <CopyButton text={email.sesMessageId} label="SES Message ID" />
                 </dd>
               </div>
             )}
             {email.requestId && (
               <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
                 <dt className="text-sm font-medium text-gray-500">Request ID</dt>
-                <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2 font-mono">
+                <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2 font-mono flex items-center">
                   {email.requestId}
+                  <CopyButton text={email.requestId} label="Request ID" />
                 </dd>
               </div>
             )}
           </dl>
         </div>
       </div>
+
+      {/* Troubleshooting / Runbooks */}
+      {(() => {
+        const runbooks = getRunbooksForEmail({
+          status: email.status,
+          errorCode: email.errorCode,
+        });
+
+        if (runbooks.length === 0) return null;
+
+        return (
+          <div className="bg-white shadow overflow-hidden sm:rounded-lg">
+            <div className="px-4 py-5 sm:px-6 bg-blue-50">
+              <h3 className="text-lg leading-6 font-medium text-blue-900">📚 Troubleshooting & Runbooks</h3>
+              <p className="mt-1 text-sm text-blue-700">
+                Resources to help diagnose and resolve issues
+              </p>
+            </div>
+            <div className="border-t border-gray-200 px-4 py-5 sm:px-6">
+              <ul className="space-y-3">
+                {runbooks.map((runbook, index) => (
+                  <li key={index} className="flex items-start">
+                    <div className="flex-shrink-0">
+                      <svg className="h-5 w-5 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <div className="ml-3 flex-1">
+                      <a
+                        href={runbook.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline"
+                      >
+                        {runbook.title} →
+                      </a>
+                      <p className="mt-1 text-sm text-gray-600">{runbook.description}</p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Recipient Info */}
       {email.recipient && (
@@ -280,8 +356,9 @@ export const EmailDetailPage: React.FC = () => {
               {email.recipient.externalId && (
                 <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
                   <dt className="text-sm font-medium text-gray-500">External ID</dt>
-                  <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+                  <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2 flex items-center">
                     {email.recipient.externalId}
+                    <CopyButton text={email.recipient.externalId} label="External ID" />
                   </dd>
                 </div>
               )}
