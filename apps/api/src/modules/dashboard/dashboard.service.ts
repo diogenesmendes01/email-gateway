@@ -1445,6 +1445,11 @@ export class DashboardService {
               email: true,
             },
           },
+          outbox: {
+            select: {
+              externalId: true,
+            },
+          },
         },
         orderBy: { createdAt: 'desc' },
         take: MAX_EXPORT_ROWS,

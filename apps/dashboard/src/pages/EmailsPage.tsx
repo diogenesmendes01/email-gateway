@@ -78,7 +78,11 @@ export const EmailsPage: React.FC = () => {
     companyId: '',
     page: 1,
     limit: 50,
+    sortBy: 'createdAt',
+    sortOrder: 'desc',
   });
+  const [isExporting, setIsExporting] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
 
   const { data: emailsData, isLoading, error, refetch } = useQuery({
     queryKey: ['emails', filters],
@@ -91,6 +95,49 @@ export const EmailsPage: React.FC = () => {
 
   const handlePageChange = (newPage: number) => {
     setFilters(prev => ({ ...prev, page: newPage }));
+  };
+
+  const handleSort = (field: string) => {
+    setFilters(prev => ({
+      ...prev,
+      sortBy: field,
+      sortOrder: prev.sortBy === field && prev.sortOrder === 'desc' ? 'asc' : 'desc',
+      page: 1,
+    }));
+  };
+
+  const handleExport = async () => {
+    setIsExporting(true);
+    try {
+      const response = await axios.post('/v1/dashboard/emails/export', {
+        externalId: filters.externalId || undefined,
+        emailHash: filters.emailHash || undefined,
+        cpfCnpjHash: filters.cpfCnpjHash || undefined,
+        status: filters.status || undefined,
+        dateFrom: filters.dateFrom || undefined,
+        dateTo: filters.dateTo || undefined,
+        companyId: filters.companyId || undefined,
+      });
+
+      const { csv, filename } = response.data;
+
+      // Create blob and download
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', filename);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      setShowExportModal(false);
+    } catch (err: any) {
+      alert(`Export failed: ${err.response?.data?.message || err.message}`);
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   if (isLoading) {
@@ -134,6 +181,14 @@ export const EmailsPage: React.FC = () => {
           <p className="mt-1 text-sm text-gray-500">
             View and filter email delivery logs
           </p>
+        </div>
+        <div className="mt-4 flex md:mt-0 md:ml-4">
+          <button
+            onClick={() => setShowExportModal(true)}
+            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+          >
+            📥 Export CSV
+          </button>
         </div>
       </div>
 
@@ -220,12 +275,37 @@ export const EmailsPage: React.FC = () => {
       {/* Results */}
       <div className="bg-white shadow overflow-hidden sm:rounded-md">
         <div className="px-4 py-5 sm:px-6">
-          <h3 className="text-lg leading-6 font-medium text-gray-900">
-            Email Logs ({emailsData.total.toLocaleString()} total)
-          </h3>
-          <p className="mt-1 max-w-2xl text-sm text-gray-500">
-            Showing {emailsData.emails.length} of {emailsData.total} emails
-          </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg leading-6 font-medium text-gray-900">
+                Email Logs ({emailsData.total.toLocaleString()} total)
+              </h3>
+              <p className="mt-1 max-w-2xl text-sm text-gray-500">
+                Showing {emailsData.emails.length} of {emailsData.total} emails
+              </p>
+            </div>
+            <div className="flex items-center space-x-2">
+              <span className="text-sm text-gray-500">Sort by:</span>
+              <select
+                value={filters.sortBy}
+                onChange={(e) => handleSort(e.target.value)}
+                className="block border-gray-300 rounded-md shadow-sm text-sm focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="createdAt">Created Date</option>
+                <option value="sentAt">Sent Date</option>
+                <option value="status">Status</option>
+                <option value="attempts">Attempts</option>
+                <option value="durationMs">Duration</option>
+              </select>
+              <button
+                onClick={() => setFilters(prev => ({ ...prev, sortOrder: prev.sortOrder === 'asc' ? 'desc' : 'asc' }))}
+                className="inline-flex items-center px-2 py-1 border border-gray-300 rounded-md text-sm text-gray-700 bg-white hover:bg-gray-50"
+                title={`Currently: ${filters.sortOrder === 'asc' ? 'Ascending' : 'Descending'}`}
+              >
+                {filters.sortOrder === 'asc' ? '↑ Asc' : '↓ Desc'}
+              </button>
+            </div>
+          </div>
         </div>
         
         {emailsData.emails.length === 0 ? (
@@ -338,6 +418,59 @@ export const EmailsPage: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Export Modal */}
+      {showExportModal && (
+        <div className="fixed z-10 inset-0 overflow-y-auto">
+          <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onClick={() => setShowExportModal(false)}></div>
+
+            <div className="inline-block align-bottom bg-white rounded-lg px-4 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full sm:p-6">
+              <div>
+                <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-blue-100">
+                  <svg className="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
+                  </svg>
+                </div>
+                <div className="mt-3 text-center sm:mt-5">
+                  <h3 className="text-lg leading-6 font-medium text-gray-900">
+                    Export Emails to CSV
+                  </h3>
+                  <div className="mt-2">
+                    <p className="text-sm text-gray-500">
+                      This will export all filtered emails (max 10,000 rows) to a CSV file.
+                      Sensitive data will be masked.
+                    </p>
+                    {emailsData && (
+                      <p className="mt-2 text-sm font-medium text-gray-900">
+                        {emailsData.total > 10000 ? '10,000' : emailsData.total} emails will be exported
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <div className="mt-5 sm:mt-6 sm:grid sm:grid-cols-2 sm:gap-3 sm:grid-flow-row-dense">
+                <button
+                  type="button"
+                  disabled={isExporting}
+                  onClick={handleExport}
+                  className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:col-start-2 sm:text-sm disabled:opacity-50"
+                >
+                  {isExporting ? 'Exporting...' : 'Export'}
+                </button>
+                <button
+                  type="button"
+                  disabled={isExporting}
+                  onClick={() => setShowExportModal(false)}
+                  className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:col-start-1 sm:text-sm"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
