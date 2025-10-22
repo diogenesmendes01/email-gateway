@@ -22,6 +22,7 @@ import {
   UsePipes,
   ValidationPipe,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { DashboardService } from './dashboard.service';
 import { DashboardProtected } from '../auth/decorators';
 import { GetKPIsDto, GetEmailsDto, GetErrorBreakdownDto, ExportEmailsDto } from './dto/kpis.dto';
@@ -205,6 +206,7 @@ export class DashboardController {
    * Watermark: Exported by {username} at {timestamp}
    */
   @Post('emails/export')
+  @Throttle({ default: { limit: 5, ttl: 60000 } }) // 5 exports per minute
   @DashboardProtected() // Basic Auth + Audit
   @HttpCode(HttpStatus.OK)
   async exportEmails(
@@ -212,6 +214,7 @@ export class DashboardController {
     @Request() req: any,
   ) {
     const username = req.user?.username || 'unknown';
-    return this.dashboardService.exportEmailsToCSV(body, username);
+    const ipAddress = req.ip || req.connection?.remoteAddress;
+    return this.dashboardService.exportEmailsToCSV(body, username, ipAddress);
   }
 }

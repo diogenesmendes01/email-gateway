@@ -1376,9 +1376,10 @@ export class DashboardService {
       companyId?: string;
     },
     username: string,
+    ipAddress?: string,
   ): Promise<{ csv: string; filename: string }> {
     const requestId = `export-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    const MAX_EXPORT_ROWS = 10000;
+    const MAX_EXPORT_ROWS = parseInt(process.env.MAX_CSV_EXPORT_ROWS || '10000');
 
     this.logger.log({
       message: 'Starting email export to CSV',
@@ -1509,7 +1510,9 @@ export class DashboardService {
 
       // Generate watermark
       const exportTimestamp = new Date().toISOString();
-      const watermark = `Exported by ${username} at ${exportTimestamp}`;
+      const watermark = ipAddress 
+        ? `Exported by ${username} from IP ${ipAddress} at ${exportTimestamp}`
+        : `Exported by ${username} at ${exportTimestamp}`;
 
       // Build CSV string
       const csvLines = [

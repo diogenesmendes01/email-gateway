@@ -175,6 +175,11 @@ model EmailLog {
   @@index([companyId, createdAt])
   @@index([recipientId])
   @@index([sesMessageId])
+  // TASK 9.2: Sorting indexes for dashboard performance
+  @@index([status, createdAt])
+  @@index([sentAt])
+  @@index([attempts, createdAt])
+  @@index([durationMs])
   @@map("email_logs")
 }
 

@@ -734,7 +734,8 @@ describe('DashboardController (Integration)', () => {
       expect(response.body).toEqual(mockExport);
       expect(mockDashboardService.exportEmailsToCSV).toHaveBeenCalledWith(
         expect.objectContaining({ status: 'SENT' }),
-        'admin'
+        'admin',
+        expect.any(String)
       );
     });
 
@@ -752,7 +753,8 @@ describe('DashboardController (Integration)', () => {
 
       expect(mockDashboardService.exportEmailsToCSV).toHaveBeenCalledWith(
         expect.any(Object),
-        'admin'
+        'admin',
+        expect.any(String)
       );
     });
 

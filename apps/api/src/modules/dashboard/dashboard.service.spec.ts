@@ -708,12 +708,13 @@ describe('DashboardService', () => {
 
       const result = await service.exportEmailsToCSV(
         { status: 'SENT' },
-        'test-user'
+        'test-user',
+        '192.168.1.1'
       );
 
       expect(result).toHaveProperty('csv');
       expect(result).toHaveProperty('filename');
-      expect(result.csv).toContain('Exported by test-user at');
+      expect(result.csv).toContain('Exported by test-user from IP 192.168.1.1 at');
       expect(result.csv).toContain('Total records: 1');
       expect(result.csv).toContain('ID,External ID,To (Masked)');
       expect(result.csv).toContain('j***@example.com'); // Masked email
@@ -752,7 +753,7 @@ describe('DashboardService', () => {
       (prisma.emailLog.count as jest.Mock).mockResolvedValue(1);
       (prisma.emailLog.findMany as jest.Mock).mockResolvedValue(mockEmails);
 
-      const result = await service.exportEmailsToCSV({}, 'test-user');
+      const result = await service.exportEmailsToCSV({}, 'test-user', '192.168.1.1');
 
       expect(result.csv).toContain('"Subject with, comma"');
       expect(result.csv).toContain('"Error with ""quotes"" and, comma"');
@@ -769,7 +770,8 @@ describe('DashboardService', () => {
           dateFrom: '2024-01-01',
           dateTo: '2024-01-31',
         },
-        'test-user'
+        'test-user',
+        '192.168.1.1'
       );
 
       expect(prisma.emailLog.count).toHaveBeenCalledWith(
