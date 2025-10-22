@@ -1,6 +1,8 @@
 ---
 name: pr-performance-reviewer
 description: Review PRs for performance issues, bottlenecks, and optimization opportunities
+tools: Read, Grep, Glob, Bash
+model: sonnet
 tags: [performance, optimization, caching, async-await, query-optimization, blocking-ops]
 version: 1.0
 author: Architecture Team

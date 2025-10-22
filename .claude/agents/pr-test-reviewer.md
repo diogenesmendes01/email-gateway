@@ -1,6 +1,8 @@
 ---
 name: pr-test-reviewer
 description: Review PRs for test coverage, quality, and completeness
+tools: Read, Grep, Glob, Bash
+model: haiku
 tags: [testing, coverage, unit-tests, integration-tests, mocking, aaa-pattern]
 version: 1.0
 author: Architecture Team
