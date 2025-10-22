@@ -66,7 +66,7 @@ export class ApiKeyGuard implements CanActivate {
   private getClientIp(request: Request): string {
     const forwarded = request.headers['x-forwarded-for'];
     const realIp = request.headers['x-real-ip'];
-    const remoteAddress = request.connection.remoteAddress;
+    const remoteAddress = request.connection?.remoteAddress;
     
     if (forwarded) {
       return Array.isArray(forwarded) ? forwarded[0] : forwarded.split(',')[0].trim();

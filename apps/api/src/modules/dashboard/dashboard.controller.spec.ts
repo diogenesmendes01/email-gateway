@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
-import * as request from 'supertest';
+import request from 'supertest';
 import { DashboardController } from './dashboard.controller';
 import { DashboardService } from './dashboard.service';
 import { AuthService } from '../auth/auth.service';

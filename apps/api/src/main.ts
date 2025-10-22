@@ -19,7 +19,7 @@ async function bootstrap() {
     logger.debug('Configuration loaded:', configService.getAll());
 
   } catch (error) {
-    logger.error('❌ Environment validation failed:', error.message);
+    logger.error('❌ Environment validation failed:', (error as Error).message);
     logger.error('Check your .env file and ensure all required variables are set');
     logger.error('See env.example for reference');
     process.exit(1);

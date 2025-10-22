@@ -8,7 +8,7 @@ import * as bcrypt from 'bcrypt';
 jest.mock('@email-gateway/database', () => ({
   prisma: {
     company: {
-      findUnique: jest.fn(),
+      findMany: jest.fn(),
       update: jest.fn(),
       create: jest.fn(),
     },
@@ -107,7 +107,7 @@ describe('AuthService', () => {
       };
 
       (bcrypt.compare as jest.Mock).mockResolvedValue(true);
-      (prisma.company.findUnique as jest.Mock).mockResolvedValue(mockCompany);
+      (prisma.company.findMany as jest.Mock).mockResolvedValue([mockCompany]);
       (prisma.company.update as jest.Mock).mockResolvedValue(mockCompany);
 
       const result = await service.validateApiKey(apiKey);
@@ -123,8 +123,11 @@ describe('AuthService', () => {
       });
 
       expect(bcrypt.compare).toHaveBeenCalledWith(apiKey, mockHash);
-      expect(prisma.company.findUnique).toHaveBeenCalledWith({
-        where: { apiKeyHash: mockHash },
+      expect(prisma.company.findMany).toHaveBeenCalledWith({
+        where: {
+          apiKeyPrefix: 'sk_live',
+          isActive: true,
+        },
       });
       expect(prisma.company.update).toHaveBeenCalledWith({
         where: { id: 'company-123' },
@@ -142,7 +145,7 @@ describe('AuthService', () => {
 
       expect(result).toBeNull();
       expect(bcrypt.compare).toHaveBeenCalledWith(apiKey, mockHash);
-      expect(prisma.company.findUnique).not.toHaveBeenCalled();
+      expect(prisma.company.findMany).not.toHaveBeenCalled();
     });
 
     it('should return null for expired API key', async () => {
@@ -162,7 +165,7 @@ describe('AuthService', () => {
       };
 
       (bcrypt.compare as jest.Mock).mockResolvedValue(true);
-      (prisma.company.findUnique as jest.Mock).mockResolvedValue(mockCompany);
+      (prisma.company.findMany as jest.Mock).mockResolvedValue([mockCompany]);
 
       const result = await service.validateApiKey(apiKey);
 
@@ -186,7 +189,7 @@ describe('AuthService', () => {
       };
 
       (bcrypt.compare as jest.Mock).mockResolvedValue(true);
-      (prisma.company.findUnique as jest.Mock).mockResolvedValue(mockCompany);
+      (prisma.company.findMany as jest.Mock).mockResolvedValue([mockCompany]);
 
       const result = await service.validateApiKey(apiKey);
 
@@ -198,7 +201,7 @@ describe('AuthService', () => {
       const mockHash = 'hashed_key';
 
       (bcrypt.compare as jest.Mock).mockResolvedValue(true);
-      (prisma.company.findUnique as jest.Mock).mockResolvedValue(null);
+      (prisma.company.findMany as jest.Mock).mockResolvedValue([]);
 
       const result = await service.validateApiKey(apiKey);
 
@@ -215,7 +218,7 @@ describe('AuthService', () => {
       (configService.get as jest.Mock).mockReturnValue(mockHash);
       (bcrypt.compare as jest.Mock).mockResolvedValue(true);
 
-      const result = await service.validateBasicAuth(username, password);
+      const result = await service.validateBasicAuth(password, mockHash);
 
       expect(result).toBe(true);
       expect(bcrypt.compare).toHaveBeenCalledWith(password, mockHash);
@@ -229,7 +232,7 @@ describe('AuthService', () => {
       (configService.get as jest.Mock).mockReturnValue(mockHash);
       (bcrypt.compare as jest.Mock).mockResolvedValue(false);
 
-      const result = await service.validateBasicAuth(username, password);
+      const result = await service.validateBasicAuth(password, mockHash);
 
       expect(result).toBe(false);
       expect(bcrypt.compare).toHaveBeenCalledWith(password, mockHash);
@@ -238,10 +241,11 @@ describe('AuthService', () => {
     it('should return false when credentials not configured', async () => {
       const username = 'admin';
       const password = 'password123';
+      const mockHash = 'hashed_password';
 
       (configService.get as jest.Mock).mockReturnValue(null);
 
-      const result = await service.validateBasicAuth(username, password);
+      const result = await service.validateBasicAuth(password, mockHash);
 
       expect(result).toBe(false);
       expect(bcrypt.compare).not.toHaveBeenCalled();

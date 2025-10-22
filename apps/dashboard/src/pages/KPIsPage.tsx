@@ -4,6 +4,7 @@ import axios from 'axios';
 import { LoadingSpinner } from '../components/ui/LoadingSpinner';
 import { ErrorMessage } from '../components/ui/LoadingSpinner';
 import { EmptyState } from '../components/ui/LoadingSpinner';
+import { sanitizeInput } from '../utils/sanitize';
 
 interface KPIData {
   totalEnviados: number;
@@ -52,9 +53,9 @@ const KPICard: React.FC<{
           </div>
           <div className="ml-5 w-0 flex-1">
             <dl>
-              <dt className="text-sm font-medium text-gray-500 truncate">{title}</dt>
+              <dt className="text-sm font-medium text-gray-500 truncate">{sanitizeInput(title)}</dt>
               <dd className="flex items-baseline">
-                <div className="text-2xl font-semibold text-gray-900">{value}</div>
+                <div className="text-2xl font-semibold text-gray-900">{sanitizeInput(value)}</div>
                 {change !== undefined && (
                   <div className={`ml-2 flex items-baseline text-sm font-semibold ${changeColor}`}>
                     <span>{changeIcon}</span>

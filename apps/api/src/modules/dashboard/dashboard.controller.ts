@@ -17,9 +17,12 @@ import {
   HttpCode,
   HttpStatus,
   Request,
+  UsePipes,
+  ValidationPipe,
 } from '@nestjs/common';
 import { DashboardService } from './dashboard.service';
 import { DashboardProtected } from '../auth/decorators';
+import { GetKPIsDto, GetEmailsDto, GetErrorBreakdownDto } from './dto/kpis.dto';
 
 interface AuditLogsQuery {
   companyId?: string;
@@ -123,11 +126,10 @@ export class DashboardController {
   @DashboardProtected() // Basic Auth + Audit
   @HttpCode(HttpStatus.OK)
   async getKPIs(
-    @Query('period') period?: string,
-    @Query('companyId') companyId?: string,
     @Request() req: any,
+    @Query() query: GetKPIsDto,
   ) {
-    return this.dashboardService.getKPIs(period, companyId);
+    return this.dashboardService.getKPIs(query.period, query.companyId);
   }
 
   /**
@@ -140,27 +142,19 @@ export class DashboardController {
   @DashboardProtected() // Basic Auth + Audit
   @HttpCode(HttpStatus.OK)
   async getEmails(
-    @Query('externalId') externalId?: string,
-    @Query('emailHash') emailHash?: string,
-    @Query('cpfCnpjHash') cpfCnpjHash?: string,
-    @Query('status') status?: string,
-    @Query('dateFrom') dateFrom?: string,
-    @Query('dateTo') dateTo?: string,
-    @Query('companyId') companyId?: string,
-    @Query('page') page?: number,
-    @Query('limit') limit?: number,
     @Request() req: any,
+    @Query() query: GetEmailsDto,
   ) {
     return this.dashboardService.getEmails({
-      externalId,
-      emailHash,
-      cpfCnpjHash,
-      status,
-      dateFrom,
-      dateTo,
-      companyId,
-      page: page || 1,
-      limit: limit || 50,
+      externalId: query.externalId,
+      emailHash: query.emailHash,
+      cpfCnpjHash: query.cpfCnpjHash,
+      status: query.status,
+      dateFrom: query.dateFrom,
+      dateTo: query.dateTo,
+      companyId: query.companyId,
+      page: query.page || 1,
+      limit: query.limit || 50,
     });
   }
 
@@ -190,10 +184,9 @@ export class DashboardController {
   @DashboardProtected() // Basic Auth + Audit
   @HttpCode(HttpStatus.OK)
   async getErrorBreakdown(
-    @Query('period') period?: string,
-    @Query('companyId') companyId?: string,
     @Request() req: any,
+    @Query() query: GetErrorBreakdownDto,
   ) {
-    return this.dashboardService.getErrorBreakdown(period, companyId);
+    return this.dashboardService.getErrorBreakdown(query.period, query.companyId);
   }
 }

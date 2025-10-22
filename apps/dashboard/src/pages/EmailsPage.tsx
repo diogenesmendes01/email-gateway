@@ -5,6 +5,7 @@ import axios from 'axios';
 import { LoadingSpinner } from '../components/ui/LoadingSpinner';
 import { ErrorMessage } from '../components/ui/LoadingSpinner';
 import { EmptyState } from '../components/ui/LoadingSpinner';
+import { sanitizeInput } from '../utils/sanitize';
 
 interface Email {
   id: string;
@@ -249,19 +250,19 @@ export const EmailsPage: React.FC = () => {
                       <div className="ml-4">
                         <div className="flex items-center">
                           <p className="text-sm font-medium text-blue-600 truncate">
-                            {email.subject}
+                            {sanitizeInput(email.subject)}
                           </p>
                           <span className={`ml-2 inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(email.status)}`}>
-                            {email.status}
+                            {sanitizeInput(email.status)}
                           </span>
                         </div>
                         <div className="mt-1">
                           <p className="text-sm text-gray-500">
-                            To: {email.to}
+                            To: {sanitizeInput(email.to)}
                           </p>
                           {email.recipient && (
                             <p className="text-sm text-gray-500">
-                              Recipient: {email.recipient.nome || email.recipient.razaoSocial || 'N/A'}
+                              Recipient: {sanitizeInput(email.recipient.nome || email.recipient.razaoSocial || 'N/A')}
                             </p>
                           )}
                         </div>

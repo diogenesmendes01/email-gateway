@@ -5,7 +5,15 @@
       "Bash(git diff:*)",
       "Bash(git log:*)",
       "Bash(git branch:*)",
-      "Bash(git show:*)"
+      "Bash(git show:*)",
+      "Bash(gh pr view:*)",
+      "Bash(gh pr diff:*)",
+      "Bash(npm run test:cov:*)",
+      "Bash(npm run:*)",
+      "Bash(gh pr review:*)",
+      "Bash(gh api:*)",
+      "Read(//c/Users/PC Di/**)",
+      "Bash(npm install)"
     ],
     "deny": [],
     "ask": []

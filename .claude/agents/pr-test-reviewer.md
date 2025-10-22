@@ -161,7 +161,53 @@ Use output template below.
 
 ## Output Template
 
-**STRICT FORMAT (Max 50 lines):**
+**When called by pr-orchestrator:** Return JSON only (compact)
+
+**When called directly:** Return full markdown report (for manual review)
+
+### JSON Format (Compact - for orchestrator):
+
+```json
+{
+  "agent": "pr-test-reviewer",
+  "score": 6,
+  "status": "CHANGES_REQUESTED",
+  "coverage": {
+    "overall": 68,
+    "services": 75,
+    "target_overall": 70,
+    "target_services": 80
+  },
+  "findings": {
+    "blockers": [
+      {
+        "title": "Tests don't compile",
+        "file": "dashboard.controller.spec.ts",
+        "line": 3,
+        "issue": "supertest import error prevents test execution",
+        "fix": "Change 'import * as request' to 'import request'",
+        "impact": "633 lines of tests cannot run"
+      }
+    ],
+    "critical": [
+      {
+        "title": "AdminGuard tests failing",
+        "file": "admin.guard.spec.ts",
+        "line": 50,
+        "issue": "mockContext missing getHandler() and getClass()",
+        "fix": "Add getHandler and getClass to mockContext in beforeEach",
+        "impact": "4 tests failing, cannot verify admin protection"
+      }
+    ],
+    "major": [],
+    "improvements": []
+  },
+  "summary": "Tests compilation blocked, coverage 68% (below 70%), AdminGuard tests failing",
+  "files_reviewed": ["dashboard.service.spec.ts", "admin.guard.spec.ts", "basic-auth.guard.spec.ts"]
+}
+```
+
+### Markdown Format (Full - for direct calls):
 
 ```markdown
 ## 🧪 Testing Review

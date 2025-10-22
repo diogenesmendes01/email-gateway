@@ -28,15 +28,14 @@ export class HealthService {
     this.sesClient = new SESClient({
       region: this.configService.get<string>('AWS_SES_REGION', 'us-east-1'),
       credentials: {
-        accessKeyId: this.configService.get<string>('AWS_ACCESS_KEY_ID'),
-        secretAccessKey: this.configService.get<string>('AWS_SECRET_ACCESS_KEY'),
+        accessKeyId: this.configService.get<string>('AWS_ACCESS_KEY_ID')!,
+        secretAccessKey: this.configService.get<string>('AWS_SECRET_ACCESS_KEY')!,
       },
     });
 
     // Initialize Redis client
-    const redisUrl = this.configService.get<string>('REDIS_URL');
+    const redisUrl = this.configService.get<string>('REDIS_URL')!;
     this.redis = new Redis(redisUrl, {
-      retryDelayOnFailover: 100,
       maxRetriesPerRequest: 1,
       lazyConnect: true,
     });
@@ -96,13 +95,13 @@ export class HealthService {
       
       this.logger.error({
         message: 'Database health check failed',
-        error: error.message,
+        error: (error as Error).message,
         responseTime,
       });
 
       return {
         status: 'error',
-        message: `Database connection failed: ${error.message}`,
+        message: `Database connection failed: ${(error as Error).message}`,
         responseTime,
       };
     }
@@ -145,13 +144,13 @@ export class HealthService {
       
       this.logger.error({
         message: 'Redis health check failed',
-        error: error.message,
+        error: (error as Error).message,
         responseTime,
       });
 
       return {
         status: 'error',
-        message: `Redis connection failed: ${error.message}`,
+        message: `Redis connection failed: ${(error as Error).message}`,
         responseTime,
       };
     }
@@ -170,7 +169,7 @@ export class HealthService {
       const { Max24HourSend, MaxSendRate, SentLast24Hours } = response;
       
       // Calcula percentual de uso
-      const usagePercent = (SentLast24Hours / Max24HourSend) * 100;
+      const usagePercent = ((SentLast24Hours || 0) / (Max24HourSend || 1)) * 100;
       
       // Verifica se está próximo do limite (80% é considerado crítico)
       const quotaThreshold = this.configService.get<number>('SES_QUOTA_THRESHOLD', 80);
@@ -213,13 +212,13 @@ export class HealthService {
       
       this.logger.error({
         message: 'SES health check failed',
-        error: error.message,
+        error: (error as Error).message,
         responseTime,
       });
 
       return {
         status: 'error',
-        message: `SES check failed: ${error.message}`,
+        message: `SES check failed: ${(error as Error).message}`,
         responseTime,
       };
     }

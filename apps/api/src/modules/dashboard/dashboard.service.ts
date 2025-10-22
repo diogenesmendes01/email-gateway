@@ -9,10 +9,11 @@
  * - Metrics from worker (TASK 7.1)
  */
 
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { prisma } from '@email-gateway/database';
 import { AuthService } from '../auth/auth.service';
 import Redis from 'ioredis';
+import { ConfigService } from '@nestjs/config';
 
 interface DashboardOverview {
   kpis: {
@@ -65,14 +66,18 @@ interface CompanyApiKeyStatus {
 
 @Injectable()
 export class DashboardService {
+  private readonly logger = new Logger(DashboardService.name);
   private redis: Redis;
 
-  constructor(private authService: AuthService) {
+  constructor(
+    private authService: AuthService,
+    private configService: ConfigService,
+  ) {
     // TASK 7.1: Initialize Redis connection for metrics
     this.redis = new Redis({
-      host: process.env.REDIS_HOST || 'localhost',
-      port: parseInt(process.env.REDIS_PORT || '6379', 10),
-      password: process.env.REDIS_PASSWORD,
+      host: this.configService.get<string>('REDIS_HOST', 'localhost'),
+      port: this.configService.get<number>('REDIS_PORT', 6379),
+      password: this.configService.get<string>('REDIS_PASSWORD'),
       db: parseInt(process.env.REDIS_DB || '0', 10),
     });
   }
@@ -203,6 +208,7 @@ export class DashboardService {
       include: {
         company: true,
       },
+      take: 1000, // Limit to prevent memory issues with large datasets
     });
 
     // Count requests by company
@@ -245,6 +251,7 @@ export class DashboardService {
         apiKeyExpiresAt: true,
         allowedIps: true,
       },
+      take: 100, // Limit to prevent memory issues with large datasets
     });
 
     return companies.map(company => ({
@@ -284,6 +291,7 @@ export class DashboardService {
         lastUsedAt: true,
         apiKeyExpiresAt: true,
       },
+      take: 100, // Limit to prevent memory issues with large datasets
     });
 
     const warnings: Array<{
@@ -457,6 +465,11 @@ export class DashboardService {
   /**
    * Get KPIs: total enviados, erro por categoria, DLQ, latências
    * TASK 9.1: KPIs, estados e acesso
+   * 
+   * @param period - Time period for KPIs ('hour', 'day', 'week', 'month', 'today')
+   * @param companyId - Optional company ID to filter KPIs
+   * @returns Promise with KPI data including totals, success rates, errors, DLQ count, and latencies
+   * @throws Error if database query fails
    */
   async getKPIs(period?: string, companyId?: string): Promise<{
     totalEnviados: number;
@@ -476,7 +489,52 @@ export class DashboardService {
       erros: number; // % de mudança
     };
   }> {
+    const requestId = `kpi-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    
+    this.logger.log({
+      message: 'Starting KPI calculation',
+      requestId,
+      period: period || 'today',
+      companyId: companyId || 'all',
+      timestamp: new Date().toISOString(),
+    });
+
+    // Cache key for KPIs
+    const cacheKey = `kpis:${period || 'today'}:${companyId || 'all'}`;
+    
+    // Try to get from cache first
+    try {
+      const cached = await this.redis.get(cacheKey);
+      if (cached) {
+        this.logger.log({
+          message: 'KPI data retrieved from cache',
+          requestId,
+          cacheKey,
+          timestamp: new Date().toISOString(),
+        });
+        return JSON.parse(cached);
+      }
+    } catch (error) {
+      this.logger.warn({
+        message: 'Cache retrieval failed, proceeding with database query',
+        requestId,
+        cacheKey,
+        error: (error as Error).message,
+        timestamp: new Date().toISOString(),
+      });
+    }
+
     const { startDate, endDate, previousStartDate, previousEndDate } = this.getDateRange(period);
+
+    this.logger.log({
+      message: 'Calculating KPIs from database',
+      requestId,
+      startDate: startDate.toISOString(),
+      endDate: endDate.toISOString(),
+      previousStartDate: previousStartDate.toISOString(),
+      previousEndDate: previousEndDate.toISOString(),
+      timestamp: new Date().toISOString(),
+    });
 
     const where = companyId ? { companyId } : {};
     const whereWithPeriod = { ...where, createdAt: { gte: startDate, lte: endDate } };
@@ -497,7 +555,7 @@ export class DashboardService {
       erros: this.calculatePercentageChange(currentStats.errorCount, previousStats.errorCount),
     };
 
-    return {
+    const result = {
       totalEnviados: currentStats.total,
       totalEnviadosPeriodoAnterior: previousStats.total,
       taxaSucesso: currentStats.successRate,
@@ -511,11 +569,55 @@ export class DashboardService {
       periodo: period || 'today',
       comparacao,
     };
+
+    // Cache the result for 5 minutes
+    try {
+      await this.redis.setex(cacheKey, 300, JSON.stringify(result));
+      this.logger.log({
+        message: 'KPI data cached successfully',
+        requestId,
+        cacheKey,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      this.logger.warn({
+        message: 'Failed to cache KPI data',
+        requestId,
+        cacheKey,
+        error: (error as Error).message,
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    this.logger.log({
+      message: 'KPI calculation completed',
+      requestId,
+      totalEnviados: result.totalEnviados,
+      taxaSucesso: result.taxaSucesso,
+      totalErros: result.totalErros,
+      dlqCount: result.dlqCount,
+      timestamp: new Date().toISOString(),
+    });
+
+    return result;
   }
 
   /**
    * Get emails with filters: externalId, email_hash, cpfCnpj_hash, status, período
    * TASK 9.1: KPIs, estados e acesso
+   * 
+   * @param filters - Filter parameters for email search
+   * @param filters.externalId - External ID filter
+   * @param filters.emailHash - Email hash filter
+   * @param filters.cpfCnpjHash - CPF/CNPJ hash filter
+   * @param filters.status - Email status filter ('SENT', 'FAILED', 'PENDING')
+   * @param filters.dateFrom - Start date filter
+   * @param filters.dateTo - End date filter
+   * @param filters.companyId - Company ID filter
+   * @param filters.page - Page number for pagination
+   * @param filters.limit - Number of items per page
+   * @returns Promise with paginated email list and metadata
+   * @throws Error if database query fails
    */
   async getEmails(filters: {
     externalId?: string;
@@ -556,8 +658,28 @@ export class DashboardService {
     limit: number;
     hasMore: boolean;
   }> {
-    const { page, limit, ...filterParams } = filters;
-    const offset = (page - 1) * limit;
+    const requestId = `emails-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    
+    this.logger.log({
+      message: 'Starting email search',
+      requestId,
+      filters: {
+        externalId: filters.externalId,
+        emailHash: filters.emailHash,
+        cpfCnpjHash: filters.cpfCnpjHash,
+        status: filters.status,
+        dateFrom: filters.dateFrom,
+        dateTo: filters.dateTo,
+        companyId: filters.companyId,
+        page: filters.page,
+        limit: filters.limit,
+      },
+      timestamp: new Date().toISOString(),
+    });
+
+    try {
+      const { page, limit, ...filterParams } = filters;
+      const offset = (page - 1) * limit;
 
     const where: any = {};
 
@@ -619,7 +741,7 @@ export class DashboardService {
     const hasMore = emails.length > limit;
     const resultEmails = hasMore ? emails.slice(0, -1) : emails;
 
-    return {
+    const result = {
       emails: resultEmails.map(email => ({
         id: email.id,
         externalId: undefined, // externalId is not available in emailLog, only in outbox
@@ -648,11 +770,47 @@ export class DashboardService {
       limit,
       hasMore,
     };
+
+    this.logger.log({
+      message: 'Email search completed',
+      requestId,
+      totalEmails: result.emails.length,
+      totalCount: result.total,
+      page: result.page,
+      limit: result.limit,
+      hasMore: result.hasMore,
+      timestamp: new Date().toISOString(),
+    });
+
+    return result;
+    } catch (error) {
+      this.logger.error({
+        message: 'Error in getEmails',
+        requestId,
+        error: (error as Error).message,
+        stack: (error as Error).stack,
+        filters,
+        timestamp: new Date().toISOString(),
+      });
+      
+      // Return empty result with error information
+      return {
+        emails: [],
+        total: 0,
+        page: filters.page,
+        limit: filters.limit,
+        hasMore: false,
+      };
+    }
   }
 
   /**
    * Get email details by ID
    * TASK 9.1: KPIs, estados e acesso
+   * 
+   * @param id - Email ID to retrieve details for
+   * @returns Promise with complete email details including recipient and events
+   * @throws Error if email not found or database query fails
    */
   async getEmailById(id: string): Promise<{
     id: string;
@@ -692,7 +850,17 @@ export class DashboardService {
       createdAt: Date;
     }>;
   }> {
-    const email = await prisma.emailLog.findUnique({
+    const requestId = `email-detail-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    
+    this.logger.log({
+      message: 'Starting email detail retrieval',
+      requestId,
+      emailId: id,
+      timestamp: new Date().toISOString(),
+    });
+
+    try {
+      const email = await prisma.emailLog.findUnique({
       where: { id },
       include: {
         recipient: {
@@ -733,7 +901,7 @@ export class DashboardService {
       throw new Error('Email not found');
     }
 
-    return {
+    const result = {
       id: email.id,
       outboxId: email.outboxId,
       externalId: email.outbox?.externalId || undefined,
@@ -771,11 +939,42 @@ export class DashboardService {
         createdAt: event.createdAt,
       })),
     };
+
+    this.logger.log({
+      message: 'Email detail retrieved successfully',
+      requestId,
+      emailId: result.id,
+      status: result.status,
+      attempts: result.attempts,
+      hasRecipient: !!result.recipient,
+      eventsCount: result.events.length,
+      timestamp: new Date().toISOString(),
+    });
+
+    return result;
+    } catch (error) {
+      this.logger.error({
+        message: 'Error in getEmailById',
+        requestId,
+        emailId: id,
+        error: (error as Error).message,
+        stack: (error as Error).stack,
+        timestamp: new Date().toISOString(),
+      });
+      
+      // Throw error to be handled by controller
+      throw new Error(`Failed to retrieve email details: ${(error as Error).message}`);
+    }
   }
 
   /**
    * Get error breakdown by category
    * TASK 9.1: KPIs, estados e acesso
+   * 
+   * @param period - Time period for error analysis ('hour', 'day', 'week', 'month', 'today')
+   * @param companyId - Optional company ID to filter errors
+   * @returns Promise with error breakdown by category and code
+   * @throws Error if database query fails
    */
   async getErrorBreakdown(period?: string, companyId?: string): Promise<{
     totalErrors: number;
@@ -791,6 +990,19 @@ export class DashboardService {
     }>;
     period: string;
   }> {
+    // Cache key for error breakdown
+    const cacheKey = `error-breakdown:${period || 'today'}:${companyId || 'all'}`;
+    
+    // Try to get from cache first
+    try {
+      const cached = await this.redis.get(cacheKey);
+      if (cached) {
+        return JSON.parse(cached);
+      }
+    } catch (error) {
+      // Cache miss or error, continue with database query
+    }
+
     const { startDate, endDate } = this.getDateRange(period);
 
     const where: any = {
@@ -808,6 +1020,7 @@ export class DashboardService {
         errorCode: true,
         errorReason: true,
       },
+      take: 10000, // Limit to prevent memory issues with large datasets
     });
 
     const totalErrors = errors.length;
@@ -840,12 +1053,21 @@ export class DashboardService {
       }))
       .sort((a, b) => b.count - a.count);
 
-    return {
+    const result = {
       totalErrors,
       errorsByCategory,
       errorsByCode,
       period: period || 'today',
     };
+
+    // Cache the result for 5 minutes
+    try {
+      await this.redis.setex(cacheKey, 300, JSON.stringify(result));
+    } catch (error) {
+      // Cache error, but don't fail the request
+    }
+
+    return result;
   }
 
   /**
@@ -1069,6 +1291,7 @@ export class DashboardService {
       select: {
         durationMs: true,
       },
+      take: 5000, // Limit to prevent memory issues with large datasets
     });
 
     if (latencies.length === 0) {

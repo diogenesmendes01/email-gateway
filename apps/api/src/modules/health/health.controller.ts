@@ -15,7 +15,7 @@ export class HealthController {
    * Usado por load balancers e monitors básicos
    */
   @Get('healthz')
-  @Throttle(60, 60) // 60 requests per minute
+  @Throttle({ default: { limit: 60, ttl: 60000 } }) // 60 requests per minute
   async getHealthz() {
     try {
       return {
@@ -28,7 +28,7 @@ export class HealthController {
       throw new HttpException(
         {
           status: 'error',
-          error: error.message,
+          error: (error as Error).message,
           timestamp: new Date().toISOString(),
         },
         HttpStatus.SERVICE_UNAVAILABLE,
@@ -41,7 +41,7 @@ export class HealthController {
    * Usado para determinar se a aplicação está pronta para receber tráfego
    */
   @Get('readyz')
-  @Throttle(30, 60) // 30 requests per minute (mais restritivo)
+  @Throttle({ default: { limit: 30, ttl: 60000 } }) // 30 requests per minute (mais restritivo)
   async getReadyz() {
     try {
       const checks = await this.healthService.performReadinessChecks();
@@ -68,7 +68,7 @@ export class HealthController {
       throw new HttpException(
         {
           status: 'not_ready',
-          error: error.message,
+          error: (error as Error).message,
           timestamp: new Date().toISOString(),
         },
         HttpStatus.SERVICE_UNAVAILABLE,
