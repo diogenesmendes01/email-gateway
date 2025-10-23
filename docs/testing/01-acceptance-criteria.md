@@ -1,13 +1,13 @@
 # 01-acceptance-criteria
 
 > **Tipo:** Testing | Referência
-> **Status:** Aprovado
-> **Última atualização:** 2025-01-23
+> **Status:** Em Revisão
+> **Última atualização:** 2025-10-23
 > **Responsável:** Equipe MVP Email Gateway
 
 ## Visão Geral
 
-Este documento define os critérios de aceitação funcionais para o MVP de envio de boletos por e-mail. Serve como checklist de validação para garantir que o sistema atende aos requisitos de negócio antes do go-live.
+Este documento define **38 critérios de aceitação** funcionais e não-funcionais para o MVP de envio de boletos por e-mail. Serve como checklist de validação para garantir que o sistema atende aos requisitos de negócio antes do go-live.
 
 ## Índice
 
@@ -88,6 +88,33 @@ Este documento tem como objetivos:
   - Retornar status atual do envio
   - **NÃO duplicar** envio
 
+**AC-001a: Idempotência por Header Idempotency-Key**
+
+- **DADO** que envio email com header `Idempotency-Key: "req-abc-123"`
+- **QUANDO** faço segunda requisição com mesmo `Idempotency-Key` (sem `externalId`)
+- **ENTÃO** o sistema deve:
+  - Retornar **200 OK** com mesmo `outboxId`
+  - Aplicar mesma lógica de idempotência que `externalId`
+  - TTL de 24 horas para a chave
+
+**AC-001b: Precedência de Idempotency-Key sobre externalId**
+
+- **DADO** que envio email com AMBOS: `Idempotency-Key` E `externalId`
+- **QUANDO** cliente fornece ambos os identificadores
+- **ENTÃO** o sistema deve:
+  - Usar `externalId` como identificador principal (precedência)
+  - Ignorar `Idempotency-Key` se `externalId` fornecido
+  - Logar uso de ambos para auditoria
+
+**AC-001c: Sem Identificadores de Idempotência**
+
+- **DADO** que envio email SEM `externalId` E SEM `Idempotency-Key`
+- **QUANDO** faço múltiplas requisições idênticas
+- **ENTÃO** o sistema deve:
+  - Criar novo registro a cada requisição
+  - Gerar `outboxId` único para cada envio
+  - **PERMITIR** duplicação (comportamento esperado)
+
 **Validação Técnica:**
 
 ```typescript
@@ -142,17 +169,24 @@ it('should enforce idempotency by externalId', async () => {
 
 **AC-006: Validação de payload size**
 
-- **QUANDO** envio HTML com **> 1MB** de tamanho
+- **QUANDO** envio requisição com campo `html` contendo **> 1MB** (1.048.576 bytes)
 - **ENTÃO** o sistema deve:
   - Retornar **413 Payload Too Large**
-  - Erro: `{ "code": "PAYLOAD_TOO_LARGE", "maxSize": "1MB", "actualSize": "1.5MB" }`
+  - Erro: `{ "code": "PAYLOAD_TOO_LARGE", "field": "html", "maxSize": "1MB", "actualSize": "1.5MB" }`
+  - **Nota:** Limite aplica-se ao campo `html` após serialização JSON
 
-**AC-007: Validação de HTML malicioso**
+**AC-007: Validação de HTML malicioso (XSS Prevention)**
 
-- **QUANDO** envio HTML com scripts: `<script>alert('XSS')</script>`
+- **QUANDO** envio HTML com conteúdo malicioso:
+  - Tags `<script>`: `<script>alert('XSS')</script>`
+  - Event handlers: `<img src=x onerror=alert(1)>`
+  - JavaScript URIs: `<a href="javascript:alert(1)">Click</a>`
+  - Inline events: `<div onclick="alert(1)">Click</div>`
 - **ENTÃO** o sistema deve:
   - Retornar **400 Bad Request**
-  - Erro: `{ "code": "INVALID_HTML", "reason": "Script tags not allowed" }`
+  - Erro: `{ "code": "INVALID_HTML", "reason": "Potentially malicious HTML detected" }`
+  - Logar tentativa de envio de conteúdo malicioso
+  - **Nota:** Sistema usa sanitização HTML (ex: DOMPurify, html-sanitizer)
 
 **AC-008: Validação de API Key**
 
@@ -171,11 +205,23 @@ it('should enforce idempotency by externalId', async () => {
 
 **AC-010: Validação de Rate Limit**
 
-- **QUANDO** excedo **60 RPS** (burst 120) com mesma API Key
+- **QUANDO** excedo os limites por empresa:
+  - **100 requisições/minuto** (burst curto)
+  - **2.000 requisições/hora** (operação normal)
+  - **10.000 requisições/dia** (limite diário)
 - **ENTÃO** o sistema deve:
   - Retornar **429 Too Many Requests**
-  - Headers: `X-RateLimit-Limit: 60`, `X-RateLimit-Remaining: 0`, `X-RateLimit-Reset: <timestamp>`
-  - Erro: `{ "code": "RATE_LIMIT_EXCEEDED" }`
+  - Headers: `X-RateLimit-Limit`, `X-RateLimit-Remaining: 0`, `X-RateLimit-Reset: <timestamp>`
+  - Erro: `{ "code": "RATE_LIMIT_EXCEEDED", "window": "1h", "retryAfter": 3600 }`
+  - Logar evento de rate limit excedido
+
+**AC-010a: Rate Limit Headers em Respostas Bem-sucedidas**
+
+- **QUANDO** faço requisição válida que não excede limites
+- **ENTÃO** o sistema deve incluir em **todas** as respostas (200/201):
+  - `X-RateLimit-Limit: 100` (para janela de 1 minuto)
+  - `X-RateLimit-Remaining: <count>` (decrementado a cada request)
+  - `X-RateLimit-Reset: <timestamp>` (quando o contador reseta)
 
 **Validação Técnica:**
 
@@ -264,6 +310,30 @@ describe('Negative validations', () => {
   - Retornar até 50 registros
   - Incluir cursor na resposta: `{ "data": [...], "cursor": "base64...", "hasMore": true }`
   - Próxima página: `GET /v1/emails?cursor=base64...&limit=50`
+
+**AC-016a: Validação de Limite de Paginação**
+
+- **QUANDO** consulto com `limit > 1000` ou `limit <= 0`
+- **ENTÃO** o sistema deve:
+  - Retornar **400 Bad Request** se `limit <= 0`
+  - Usar `limit = 1000` (máximo) se `limit > 1000`
+  - Incluir warning no header: `X-Warning: Limit capped at 1000`
+
+**AC-016b: Cursor Inválido ou Expirado**
+
+- **QUANDO** uso cursor inválido, corrompido, ou expirado (> 24h)
+- **ENTÃO** o sistema deve:
+  - Retornar **400 Bad Request**
+  - Erro: `{ "code": "INVALID_CURSOR", "message": "Cursor is invalid or expired" }`
+  - Cliente deve reiniciar consulta sem cursor
+
+**AC-016c: Última Página de Resultados**
+
+- **QUANDO** consulto última página de resultados
+- **ENTÃO** o sistema deve:
+  - Retornar registros disponíveis (pode ser < limit)
+  - `hasMore: false`
+  - `cursor: null` (não há próxima página)
 
 **AC-017: Consulta por ID específico**
 
@@ -394,12 +464,14 @@ describe('Query filters', () => {
 
 **AC-024: Ordering de eventos**
 
-- **DADO** que múltiplos eventos ocorrem para mesmo email
+- **DADO** que múltiplos eventos ocorrem para mesmo email (ex: `pending` → `processing` → `sent`)
 - **QUANDO** webhooks são enviados
 - **ENTÃO** o sistema deve:
-  - Enviar eventos em ordem (melhor-esforço)
-  - Incluir `sequenceNumber` no payload
-  - Cliente deve usar `timestamp` e `sequenceNumber` para ordenar
+  - **Garantir ordenação** se usando fila única por email (FIFO)
+  - Incluir `sequenceNumber` no payload (incremental por email)
+  - Incluir `timestamp` ISO 8601 com precisão de milissegundos
+  - **Nota:** Cliente deve usar `sequenceNumber` para ordenação canônica
+  - **Importante:** Retries podem causar eventos fora de ordem; use `sequenceNumber` para reordenar no cliente
 
 **Validação Técnica:**
 
