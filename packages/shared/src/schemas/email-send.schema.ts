@@ -9,6 +9,7 @@
  */
 
 import { z } from 'zod';
+import { sanitizeEmailHtml } from '../utils/html-sanitization.util';
 
 // ============================================================================
 // CONSTANTES E LIMITES
@@ -318,17 +319,17 @@ export const emailSendBodySchema = z.object({
 
   /**
    * Conteúdo HTML do e-mail (obrigatório, max 1MB)
+   * HTML é automaticamente sanitizado para prevenir XSS
    */
   html: z
     .string()
     .min(1, 'HTML content is required')
     .max(LIMITS.MAX_HTML_SIZE, `HTML content must not exceed ${LIMITS.MAX_HTML_SIZE} bytes`)
-    // TODO: [TASK 3.4] Adicionar sanitização de HTML (remover scripts, etc.)
-    // Considerar usar biblioteca como DOMPurify ou isomorphic-dompurify
     .refine(
       (val) => Buffer.byteLength(val, 'utf8') <= LIMITS.MAX_HTML_SIZE,
       `HTML content size must not exceed ${LIMITS.MAX_HTML_SIZE} bytes`
-    ),
+    )
+    .transform((val) => sanitizeEmailHtml(val)),
 
   /**
    * Endereço para respostas (opcional)
