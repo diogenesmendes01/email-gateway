@@ -202,6 +202,21 @@ export function constantTimeCompare(a: string, b: string): boolean {
 }
 
 /**
+ * Compara hashes de forma segura usando constant-time comparison
+ *
+ * @param hash1 - Primeiro hash
+ * @param hash2 - Segundo hash
+ * @returns True se hashes são iguais
+ */
+export function compareHashesSafe(hash1: string, hash2: string): boolean {
+  if (!isValidHash(hash1) || !isValidHash(hash2)) {
+    return false;
+  }
+
+  return constantTimeCompare(hash1, hash2);
+}
+
+/**
  * Valida se uma string é um hash válido
  *
  * @param hash - String para validar
