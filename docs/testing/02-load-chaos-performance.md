@@ -196,7 +196,7 @@ export default function () {
 
   errorRate.add(res.status !== 201);
 
-  sleep(72); // 72s sleep for 5 VUs = ~500 req/hour
+  sleep(36); // 36s sleep for 5 VUs = 5 × 100 = ~500 req/hour
 }
 ```
 
@@ -266,7 +266,7 @@ export default function () {
 
   errorRate.add(res.status !== 201);
 
-  sleep(36); // 36s sleep for 10 VUs = ~1000 req/hour per VU * 2 VUs = 2000/hour
+  sleep(18); // 18s sleep for 10 VUs = 10 × 200 = 2000 req/hour
 }
 
 function generateLargeHTML(sizeBytes) {
@@ -387,7 +387,8 @@ function sendEmail(company) {
     html: '<html><body>Test</body></html>',
   });
 
-  const res = http.post('http://localhost:3000/v1/email/send', payload, {
+  const BASE_URL = __ENV.BASE_URL || 'http://localhost:3000';
+  const res = http.post(`${BASE_URL}/v1/email/send`, payload, {
     headers: {
       'Content-Type': 'application/json',
       'X-API-Key': API_KEYS[company],
@@ -455,7 +456,11 @@ docker-compose -f docker-compose.chaos.yml start redis
 ```typescript
 // scripts/chaos-testing/redis-down.ts
 import axios from 'axios';
-import { sleep } from 'k6';
+import { exec as execCb } from 'child_process';
+import { promisify } from 'util';
+
+const exec = promisify(execCb);
+const sleep = (seconds: number) => new Promise(resolve => setTimeout(resolve, seconds * 1000));
 
 async function testRedisFailure() {
   console.log('[CHAOS] Iniciando teste: Redis Down 60s');
@@ -702,7 +707,7 @@ testDiskFull();
 // apps/api/src/middleware/metrics.middleware.ts
 import { Injectable, NestMiddleware } from '@nestjs/common';
 import { Request, Response, NextFunction } from 'express';
-import { register, Histogram } from 'prom-client';
+import { Histogram } from 'prom-client';
 
 const httpRequestDuration = new Histogram({
   name: 'http_request_duration_ms',
