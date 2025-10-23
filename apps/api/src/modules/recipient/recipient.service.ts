@@ -11,10 +11,10 @@
  * @see task/TASK-004-RECIPIENT-API.md
  */
 
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { prisma } from '@email-gateway/database';
 import {
-  hashCpfCnpjSha256,
+  hashCpfCnpjHmac,
   encryptCpfCnpj,
   decryptCpfCnpj,
 } from '@email-gateway/shared';
@@ -43,8 +43,12 @@ export class RecipientService {
       if (!encryptionKey) {
         throw new Error('ENCRYPTION_KEY environment variable is not set');
       }
+      if (Buffer.from(encryptionKey).length !== 32) {
+        throw new Error('ENCRYPTION_KEY must be exactly 32 bytes for AES-256');
+      }
 
-      const hash = hashCpfCnpjSha256(dto.cpfCnpj);
+      const hashSecret = process.env.HASH_SECRET || encryptionKey;
+      const hash = hashCpfCnpjHmac(dto.cpfCnpj, hashSecret);
       const { encrypted, salt } = encryptCpfCnpj(dto.cpfCnpj, encryptionKey);
 
       data.cpfCnpjHash = hash;
@@ -52,7 +56,17 @@ export class RecipientService {
       data.cpfCnpjSalt = salt;
     }
 
-    return prisma.recipient.create({ data });
+    try {
+      return await prisma.recipient.create({ data });
+    } catch (error: any) {
+      if (error.code === 'P2002') {
+        const field = error.meta?.target?.[0] || 'field';
+        throw new ConflictException(
+          `Recipient with this ${field} already exists for this company`,
+        );
+      }
+      throw error;
+    }
   }
 
   /**
@@ -132,8 +146,12 @@ export class RecipientService {
       if (!encryptionKey) {
         throw new Error('ENCRYPTION_KEY environment variable is not set');
       }
+      if (Buffer.from(encryptionKey).length !== 32) {
+        throw new Error('ENCRYPTION_KEY must be exactly 32 bytes for AES-256');
+      }
 
-      const hash = hashCpfCnpjSha256(dto.cpfCnpj);
+      const hashSecret = process.env.HASH_SECRET || encryptionKey;
+      const hash = hashCpfCnpjHmac(dto.cpfCnpj, hashSecret);
       const { encrypted, salt } = encryptCpfCnpj(dto.cpfCnpj, encryptionKey);
 
       data.cpfCnpjHash = hash;

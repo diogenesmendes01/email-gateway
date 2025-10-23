@@ -5,7 +5,7 @@
  */
 
 import { Test, TestingModule } from '@nestjs/testing';
-import { NotFoundException } from '@nestjs/common';
+import { NotFoundException, ConflictException } from '@nestjs/common';
 import { RecipientService } from '../recipient.service';
 import * as encryptionUtil from '@email-gateway/shared';
 
@@ -51,8 +51,8 @@ describe('RecipientService', () => {
 
     service = module.get<RecipientService>(RecipientService);
 
-    // Set environment variable
-    process.env.ENCRYPTION_KEY = 'test-encryption-key-32-characters';
+    // Set environment variable (exactly 32 bytes for AES-256)
+    process.env.ENCRYPTION_KEY = '12345678901234567890123456789012'; // 32 bytes
 
     // Clear all mocks
     jest.clearAllMocks();
@@ -124,6 +124,38 @@ describe('RecipientService', () => {
 
       await expect(service.create(mockCompanyId, dto)).rejects.toThrow(
         'ENCRYPTION_KEY environment variable is not set',
+      );
+    });
+
+    it('should throw error if ENCRYPTION_KEY is not 32 bytes', async () => {
+      process.env.ENCRYPTION_KEY = 'short-key'; // Not 32 bytes
+
+      const dto = {
+        email: 'test@example.com',
+        cpfCnpj: '12345678901',
+      };
+
+      await expect(service.create(mockCompanyId, dto)).rejects.toThrow(
+        'ENCRYPTION_KEY must be exactly 32 bytes for AES-256',
+      );
+    });
+
+    it('should throw ConflictException on unique constraint violation', async () => {
+      const dto = {
+        email: 'duplicate@example.com',
+      };
+
+      const prismaError: any = new Error('Unique constraint failed');
+      prismaError.code = 'P2002';
+      prismaError.meta = { target: ['email'] };
+
+      (prisma.recipient.create as jest.Mock).mockRejectedValue(prismaError);
+
+      await expect(service.create(mockCompanyId, dto)).rejects.toThrow(
+        ConflictException,
+      );
+      await expect(service.create(mockCompanyId, dto)).rejects.toThrow(
+        'Recipient with this email already exists for this company',
       );
     });
   });

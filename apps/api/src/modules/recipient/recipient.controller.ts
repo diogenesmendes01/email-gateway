@@ -42,6 +42,17 @@ export class RecipientController {
   constructor(private readonly recipientService: RecipientService) {}
 
   /**
+   * Remove sensitive fields from recipient object
+   * Prevents exposure of encrypted CPF/CNPJ data
+   */
+  private sanitizeRecipient<T extends Record<string, any>>(
+    recipient: T,
+  ): Omit<T, 'cpfCnpjEnc' | 'cpfCnpjSalt'> {
+    const { cpfCnpjEnc, cpfCnpjSalt, ...rest } = recipient;
+    return rest as Omit<T, 'cpfCnpjEnc' | 'cpfCnpjSalt'>;
+  }
+
+  /**
    * GET /v1/recipients
    *
    * List recipients with pagination and filters
@@ -53,10 +64,9 @@ export class RecipientController {
     const result = await this.recipientService.findAll(companyId, query);
 
     // Remove sensitive fields from all recipients
-    result.data = result.data.map((recipient) => {
-      const { cpfCnpjEnc, cpfCnpjSalt, ...rest } = recipient;
-      return rest;
-    });
+    result.data = result.data.map((recipient) =>
+      this.sanitizeRecipient(recipient),
+    );
 
     return result;
   }
@@ -81,9 +91,7 @@ export class RecipientController {
       throw new NotFoundException('Recipient not found');
     }
 
-    // Remove sensitive fields
-    const { cpfCnpjEnc, cpfCnpjSalt, ...rest } = recipient;
-    return rest;
+    return this.sanitizeRecipient(recipient);
   }
 
   /**
@@ -101,9 +109,7 @@ export class RecipientController {
       throw new NotFoundException('Recipient not found');
     }
 
-    // Remove sensitive fields
-    const { cpfCnpjEnc, cpfCnpjSalt, ...rest } = recipient;
-    return rest;
+    return this.sanitizeRecipient(recipient);
   }
 
   /**
@@ -117,9 +123,7 @@ export class RecipientController {
     const companyId = req.companyId;
     const recipient = await this.recipientService.create(companyId, dto);
 
-    // Remove sensitive fields
-    const { cpfCnpjEnc, cpfCnpjSalt, ...rest } = recipient;
-    return rest;
+    return this.sanitizeRecipient(recipient);
   }
 
   /**
@@ -137,9 +141,7 @@ export class RecipientController {
     const companyId = req.companyId;
     const recipient = await this.recipientService.update(companyId, id, dto);
 
-    // Remove sensitive fields
-    const { cpfCnpjEnc, cpfCnpjSalt, ...rest } = recipient;
-    return rest;
+    return this.sanitizeRecipient(recipient);
   }
 
   /**
