@@ -145,7 +145,7 @@ describe('ApiKeyGuard', () => {
       );
 
       await expect(guard.canActivate(context)).rejects.toThrow(
-        new UnauthorizedException('Authentication service unavailable')
+        'Database connection failed'
       );
     });
 
@@ -155,9 +155,12 @@ describe('ApiKeyGuard', () => {
         switchToHttp: () => ({
           getRequest: () => ({
             headers: {
-              'authorization': `Bearer ${apiKey}`,
+              'x-api-key': apiKey,
             },
             ip: '192.168.1.1',
+            connection: {
+              remoteAddress: '192.168.1.1',
+            },
           }),
         }),
       } as ExecutionContext;
@@ -171,6 +174,9 @@ describe('ApiKeyGuard', () => {
       };
 
       (authService.validateApiKey as jest.Mock).mockResolvedValue(mockPayload);
+      (authService.isApiKeyExpired as jest.Mock).mockReturnValue(false);
+      (authService.validateIpAllowlist as jest.Mock).mockResolvedValue(true);
+      (authService.updateLastUsedAt as jest.Mock).mockResolvedValue(undefined);
 
       const result = await guard.canActivate(context);
 

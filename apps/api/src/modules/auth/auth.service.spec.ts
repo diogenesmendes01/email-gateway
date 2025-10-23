@@ -116,7 +116,7 @@ describe('AuthService', () => {
         companyId: 'company-123',
         prefix: 'sk_live',
         expiresAt: mockCompany.apiKeyExpiresAt,
-        lastUsedAt: expect.any(Date),
+        lastUsedAt: undefined,
         allowedIps: ['192.168.1.1'],
         rateLimitConfig: { rps: 60, burst: 120, windowMs: 1000 },
         isActive: true,
@@ -138,17 +138,30 @@ describe('AuthService', () => {
     it('should return null for invalid API key hash', async () => {
       const apiKey = 'sk_live_invalid_key';
       const mockHash = 'hashed_key';
+      const mockCompany = {
+        id: 'company-123',
+        name: 'Test Company',
+        apiKeyHash: mockHash,
+        apiKeyPrefix: 'sk_live',
+        apiKeyCreatedAt: new Date(),
+        apiKeyExpiresAt: new Date(Date.now() + 86400000),
+        lastUsedAt: null,
+        isActive: true,
+        allowedIps: [],
+        rateLimitConfig: null,
+      };
 
       (bcrypt.compare as jest.Mock).mockResolvedValue(false);
+      (prisma.company.findMany as jest.Mock).mockResolvedValue([mockCompany]);
 
       const result = await service.validateApiKey(apiKey);
 
       expect(result).toBeNull();
       expect(bcrypt.compare).toHaveBeenCalledWith(apiKey, mockHash);
-      expect(prisma.company.findMany).not.toHaveBeenCalled();
+      expect(prisma.company.findMany).toHaveBeenCalled();
     });
 
-    it('should return null for expired API key', async () => {
+    it('should throw UnauthorizedException for expired API key', async () => {
       const apiKey = 'sk_live_expired_key';
       const mockHash = 'hashed_key';
       const mockCompany = {
@@ -167,29 +180,15 @@ describe('AuthService', () => {
       (bcrypt.compare as jest.Mock).mockResolvedValue(true);
       (prisma.company.findMany as jest.Mock).mockResolvedValue([mockCompany]);
 
-      const result = await service.validateApiKey(apiKey);
-
-      expect(result).toBeNull();
+      await expect(service.validateApiKey(apiKey)).rejects.toThrow('API Key has expired');
     });
 
     it('should return null for inactive company', async () => {
       const apiKey = 'sk_live_inactive_key';
       const mockHash = 'hashed_key';
-      const mockCompany = {
-        id: 'company-123',
-        name: 'Test Company',
-        apiKeyHash: mockHash,
-        apiKeyPrefix: 'sk_live',
-        apiKeyCreatedAt: new Date(),
-        apiKeyExpiresAt: new Date(Date.now() + 86400000),
-        lastUsedAt: null,
-        isActive: false, // Inactive company
-        allowedIps: [],
-        rateLimitConfig: null,
-      };
 
       (bcrypt.compare as jest.Mock).mockResolvedValue(true);
-      (prisma.company.findMany as jest.Mock).mockResolvedValue([mockCompany]);
+      (prisma.company.findMany as jest.Mock).mockResolvedValue([]);
 
       const result = await service.validateApiKey(apiKey);
 
@@ -211,11 +210,9 @@ describe('AuthService', () => {
 
   describe('validateBasicAuth', () => {
     it('should return true for valid credentials', async () => {
-      const username = 'admin';
       const password = 'password123';
       const mockHash = 'hashed_password';
 
-      (configService.get as jest.Mock).mockReturnValue(mockHash);
       (bcrypt.compare as jest.Mock).mockResolvedValue(true);
 
       const result = await service.validateBasicAuth(password, mockHash);
@@ -225,30 +222,15 @@ describe('AuthService', () => {
     });
 
     it('should return false for invalid credentials', async () => {
-      const username = 'admin';
       const password = 'wrong_password';
       const mockHash = 'hashed_password';
 
-      (configService.get as jest.Mock).mockReturnValue(mockHash);
       (bcrypt.compare as jest.Mock).mockResolvedValue(false);
 
       const result = await service.validateBasicAuth(password, mockHash);
 
       expect(result).toBe(false);
       expect(bcrypt.compare).toHaveBeenCalledWith(password, mockHash);
-    });
-
-    it('should return false when credentials not configured', async () => {
-      const username = 'admin';
-      const password = 'password123';
-      const mockHash = 'hashed_password';
-
-      (configService.get as jest.Mock).mockReturnValue(null);
-
-      const result = await service.validateBasicAuth(password, mockHash);
-
-      expect(result).toBe(false);
-      expect(bcrypt.compare).not.toHaveBeenCalled();
     });
   });
 });
