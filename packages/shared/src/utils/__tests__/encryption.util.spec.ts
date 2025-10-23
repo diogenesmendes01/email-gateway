@@ -14,6 +14,7 @@ import {
   generateHmacSha256,
   generateSha256,
   constantTimeCompare,
+  compareHashesSafe,
   isValidHash,
   normalizeCpfCnpjForHash,
   hashCpfCnpjHmac,
@@ -271,35 +272,35 @@ describe('Encryption Utilities', () => {
     it('should return true for identical strings', () => {
       const str1 = 'test-string-123';
       const str2 = 'test-string-123';
-      
+
       expect(constantTimeCompare(str1, str2)).toBe(true);
     });
 
     it('should return false for different strings of same length', () => {
       const str1 = 'test-string-123';
       const str2 = 'test-string-456';
-      
+
       expect(constantTimeCompare(str1, str2)).toBe(false);
     });
 
     it('should return false for different length strings', () => {
       const str1 = 'short';
       const str2 = 'much-longer-string';
-      
+
       expect(constantTimeCompare(str1, str2)).toBe(false);
     });
 
     it('should return false for empty string vs non-empty', () => {
       const str1 = '';
       const str2 = 'non-empty';
-      
+
       expect(constantTimeCompare(str1, str2)).toBe(false);
     });
 
     it('should return true for empty strings', () => {
       const str1 = '';
       const str2 = '';
-      
+
       expect(constantTimeCompare(str1, str2)).toBe(true);
     });
 
@@ -307,7 +308,7 @@ describe('Encryption Utilities', () => {
       const str1 = 'test@#$%^&*()';
       const str2 = 'test@#$%^&*()';
       const str3 = 'test@#$%^&*()!';
-      
+
       expect(constantTimeCompare(str1, str2)).toBe(true);
       expect(constantTimeCompare(str1, str3)).toBe(false);
     });
@@ -316,7 +317,7 @@ describe('Encryption Utilities', () => {
       const str1 = 'café';
       const str2 = 'café';
       const str3 = 'cafe';
-      
+
       expect(constantTimeCompare(str1, str2)).toBe(true);
       expect(constantTimeCompare(str1, str3)).toBe(false);
     });
@@ -325,9 +326,61 @@ describe('Encryption Utilities', () => {
       const str1 = Buffer.from('binary-data').toString('binary');
       const str2 = Buffer.from('binary-data').toString('binary');
       const str3 = Buffer.from('different-data').toString('binary');
-      
+
       expect(constantTimeCompare(str1, str2)).toBe(true);
       expect(constantTimeCompare(str1, str3)).toBe(false);
+    });
+  });
+
+  describe('compareHashesSafe', () => {
+    it('should return true for equal hashes', () => {
+      const hash1 = hashCpfCnpjSha256('12345678901');
+      const hash2 = hashCpfCnpjSha256('12345678901');
+
+      expect(compareHashesSafe(hash1, hash2)).toBe(true);
+    });
+
+    it('should return false for different hashes', () => {
+      const hash1 = hashCpfCnpjSha256('12345678901');
+      const hash2 = hashCpfCnpjSha256('98765432100');
+
+      expect(compareHashesSafe(hash1, hash2)).toBe(false);
+    });
+
+    it('should return false for invalid hash format in first argument', () => {
+      const validHash = hashCpfCnpjSha256('12345678901');
+      const invalidHash = 'invalid-hash';
+
+      expect(compareHashesSafe(invalidHash, validHash)).toBe(false);
+    });
+
+    it('should return false for invalid hash format in second argument', () => {
+      const validHash = hashCpfCnpjSha256('12345678901');
+      const invalidHash = 'invalid-hash';
+
+      expect(compareHashesSafe(validHash, invalidHash)).toBe(false);
+    });
+
+    it('should return false for both invalid hashes', () => {
+      expect(compareHashesSafe('invalid1', 'invalid2')).toBe(false);
+    });
+
+    it('should return false for empty strings', () => {
+      expect(compareHashesSafe('', '')).toBe(false);
+    });
+
+    it('should return false for hashes of different length', () => {
+      const validHash = hashCpfCnpjSha256('12345678901');
+      const shortHash = '123abc';
+
+      expect(compareHashesSafe(validHash, shortHash)).toBe(false);
+    });
+
+    it('should be safe for comparing stored hash with provided hash', () => {
+      const storedHash = hashCpfCnpjSha256('12345678901');
+      const providedHash = hashCpfCnpjSha256('12345678901');
+
+      expect(compareHashesSafe(storedHash, providedHash)).toBe(true);
     });
   });
 });
