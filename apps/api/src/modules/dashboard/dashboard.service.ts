@@ -629,6 +629,8 @@ export class DashboardService {
     companyId?: string;
     page: number;
     limit: number;
+    sortBy?: string;
+    sortOrder?: string;
   }): Promise<{
     emails: Array<{
       id: string;
@@ -716,6 +718,13 @@ export class DashboardService {
       }
     }
 
+    // Build orderBy clause based on sortBy and sortOrder
+    const sortBy = filters.sortBy || 'createdAt';
+    const sortOrder = (filters.sortOrder || 'desc') as 'asc' | 'desc';
+
+    const orderBy: any = {};
+    orderBy[sortBy] = sortOrder;
+
     const [emails, total] = await Promise.all([
       prisma.emailLog.findMany({
         where,
@@ -731,7 +740,7 @@ export class DashboardService {
             },
           },
         },
-        orderBy: { createdAt: 'desc' },
+        orderBy,
         skip: offset,
         take: limit + 1, // Take one extra to check if there are more
       }),
@@ -1345,5 +1354,227 @@ export class DashboardService {
     }
 
     return 'OTHER_ERROR';
+  }
+
+  /**
+   * Export emails to CSV with masking and watermark
+   * TASK 9.2: Integração com logs/eventos e runbooks
+   *
+   * @param filters - Filter parameters for email export
+   * @param username - Username performing the export (for watermark)
+   * @returns CSV string with masked data and watermark
+   * @throws Error if export fails or exceeds 10k limit
+   */
+  async exportEmailsToCSV(
+    filters: {
+      externalId?: string;
+      emailHash?: string;
+      cpfCnpjHash?: string;
+      status?: string;
+      dateFrom?: string;
+      dateTo?: string;
+      companyId?: string;
+    },
+    username: string,
+    ipAddress?: string,
+  ): Promise<{ csv: string; filename: string }> {
+    const requestId = `export-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const MAX_EXPORT_ROWS = parseInt(process.env.MAX_CSV_EXPORT_ROWS || '10000');
+
+    this.logger.log({
+      message: 'Starting email export to CSV',
+      requestId,
+      username,
+      filters,
+      timestamp: new Date().toISOString(),
+    });
+
+    try {
+      // Build where clause
+      const where: any = {};
+
+      if (filters.companyId) {
+        where.companyId = filters.companyId;
+      }
+
+      if (filters.externalId) {
+        where.externalId = filters.externalId;
+      }
+
+      if (filters.status) {
+        where.status = filters.status;
+      }
+
+      if (filters.dateFrom || filters.dateTo) {
+        where.createdAt = {};
+        if (filters.dateFrom) {
+          where.createdAt.gte = new Date(filters.dateFrom);
+        }
+        if (filters.dateTo) {
+          where.createdAt.lte = new Date(filters.dateTo);
+        }
+      }
+
+      // Handle recipient filters
+      if (filters.emailHash || filters.cpfCnpjHash) {
+        where.recipient = {};
+        if (filters.emailHash) {
+          where.recipient.email = { contains: filters.emailHash };
+        }
+        if (filters.cpfCnpjHash) {
+          where.recipient.cpfCnpjHash = filters.cpfCnpjHash;
+        }
+      }
+
+      // Count total records
+      const total = await prisma.emailLog.count({ where });
+
+      if (total > MAX_EXPORT_ROWS) {
+        throw new Error(`Export exceeds maximum limit of ${MAX_EXPORT_ROWS} rows. Found ${total} records. Please refine your filters.`);
+      }
+
+      // Fetch emails
+      const emails = await prisma.emailLog.findMany({
+        where,
+        include: {
+          recipient: {
+            select: {
+              externalId: true,
+              cpfCnpjHash: true,
+              razaoSocial: true,
+              nome: true,
+              email: true,
+            },
+          },
+          outbox: {
+            select: {
+              externalId: true,
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+        take: MAX_EXPORT_ROWS,
+      });
+
+      this.logger.log({
+        message: 'Emails fetched for export',
+        requestId,
+        totalRecords: emails.length,
+        timestamp: new Date().toISOString(),
+      });
+
+      // Import masking utilities
+      const { maskEmail, maskCPFOrCNPJ } = await import('@email-gateway/shared');
+
+      // Generate CSV header
+      const headers = [
+        'ID',
+        'External ID',
+        'To (Masked)',
+        'Recipient Name',
+        'Recipient CPF/CNPJ (Masked)',
+        'Subject',
+        'Status',
+        'Created At',
+        'Sent At',
+        'Failed At',
+        'Error Code',
+        'Error Reason',
+        'Attempts',
+        'Duration (ms)',
+        'SES Message ID',
+        'Request ID',
+      ];
+
+      // Generate CSV rows with masking
+      const rows = emails.map((email) => {
+        return [
+          email.id,
+          email.outbox?.externalId || '',
+          maskEmail(email.to), // Mask email
+          email.recipient?.nome || email.recipient?.razaoSocial || '',
+          email.recipient?.cpfCnpjHash ? maskCPFOrCNPJ(email.recipient.cpfCnpjHash) : '', // Mask CPF/CNPJ
+          this.escapeCSVField(email.subject),
+          email.status,
+          email.createdAt.toISOString(),
+          email.sentAt?.toISOString() || '',
+          email.failedAt?.toISOString() || '',
+          email.errorCode || '',
+          this.escapeCSVField(email.errorReason || ''),
+          email.attempts,
+          email.durationMs || '',
+          email.sesMessageId || '',
+          email.requestId || '',
+        ];
+      });
+
+      // Generate watermark
+      const exportTimestamp = new Date().toISOString();
+      const watermark = ipAddress 
+        ? `Exported by ${username} from IP ${ipAddress} at ${exportTimestamp}`
+        : `Exported by ${username} at ${exportTimestamp}`;
+
+      // Build CSV string
+      const csvLines = [
+        `# ${watermark}`,
+        `# Total records: ${emails.length}`,
+        `# Filters: ${JSON.stringify(filters)}`,
+        '', // Empty line before headers
+        headers.join(','),
+        ...rows.map((row) => row.join(',')),
+      ];
+
+      const csv = csvLines.join('\n');
+
+      // Generate filename
+      const filename = `emails-export-${Date.now()}.csv`;
+
+      this.logger.log({
+        message: 'CSV export completed successfully',
+        requestId,
+        username,
+        totalRecords: emails.length,
+        filename,
+        timestamp: new Date().toISOString(),
+      });
+
+      return {
+        csv,
+        filename,
+      };
+    } catch (error) {
+      this.logger.error({
+        message: 'Error in exportEmailsToCSV',
+        requestId,
+        username,
+        error: (error as Error).message,
+        stack: (error as Error).stack,
+        filters,
+        timestamp: new Date().toISOString(),
+      });
+
+      throw new Error(`Failed to export emails: ${(error as Error).message}`);
+    }
+  }
+
+  /**
+   * Escape CSV field to prevent injection and formatting issues
+   *
+   * @param field - Field value to escape
+   * @returns Escaped field value
+   */
+  private escapeCSVField(field: string): string {
+    if (field === null || field === undefined) {
+      return '';
+    }
+
+    const str = String(field);
+
+    // If field contains comma, quotes, or newlines, wrap in quotes and escape quotes
+    if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r')) {
+      return `"${str.replace(/"/g, '""')}"`;
+    }
+
+    return str;
   }
 }

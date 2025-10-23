@@ -614,4 +614,178 @@ describe('DashboardService', () => {
       );
     });
   });
+
+  describe('getEmails with sorting - TASK 9.2', () => {
+    it('should apply sorting by createdAt desc', async () => {
+      const mockEmails = [
+        { id: 'email-1', status: 'SENT', createdAt: new Date(), attempts: 1, recipient: null, outbox: null },
+      ];
+
+      (prisma.emailLog.findMany as jest.Mock).mockResolvedValue(mockEmails);
+      (prisma.emailLog.count as jest.Mock).mockResolvedValue(1);
+
+      await service.getEmails({
+        page: 1,
+        limit: 50,
+        sortBy: 'createdAt',
+        sortOrder: 'desc',
+      });
+
+      expect(prisma.emailLog.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          orderBy: { createdAt: 'desc' },
+        })
+      );
+    });
+
+    it('should apply sorting by status asc', async () => {
+      (prisma.emailLog.findMany as jest.Mock).mockResolvedValue([]);
+      (prisma.emailLog.count as jest.Mock).mockResolvedValue(0);
+
+      await service.getEmails({
+        page: 1,
+        limit: 50,
+        sortBy: 'status',
+        sortOrder: 'asc',
+      });
+
+      expect(prisma.emailLog.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          orderBy: { status: 'asc' },
+        })
+      );
+    });
+
+    it('should default to createdAt desc if no sorting provided', async () => {
+      (prisma.emailLog.findMany as jest.Mock).mockResolvedValue([]);
+      (prisma.emailLog.count as jest.Mock).mockResolvedValue(0);
+
+      await service.getEmails({
+        page: 1,
+        limit: 50,
+      });
+
+      expect(prisma.emailLog.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          orderBy: { createdAt: 'desc' },
+        })
+      );
+    });
+  });
+
+  describe('exportEmailsToCSV - TASK 9.2', () => {
+    it('should export emails with masking and watermark', async () => {
+      const mockEmails = [
+        {
+          id: 'email-1',
+          to: 'john@example.com',
+          subject: 'Test Subject',
+          status: 'SENT',
+          createdAt: new Date('2024-01-01'),
+          sentAt: new Date('2024-01-01'),
+          failedAt: null,
+          errorCode: null,
+          errorReason: null,
+          attempts: 1,
+          durationMs: 1000,
+          sesMessageId: 'ses-123',
+          requestId: 'req-123',
+          recipient: {
+            externalId: 'ext-1',
+            cpfCnpjHash: '12345678900',
+            razaoSocial: 'Test Company',
+            nome: 'John Doe',
+            email: 'john@example.com',
+          },
+          outbox: {
+            externalId: 'outbox-ext-1',
+          },
+        },
+      ];
+
+      (prisma.emailLog.count as jest.Mock).mockResolvedValue(1);
+      (prisma.emailLog.findMany as jest.Mock).mockResolvedValue(mockEmails);
+
+      const result = await service.exportEmailsToCSV(
+        { status: 'SENT' },
+        'test-user',
+        '192.168.1.1'
+      );
+
+      expect(result).toHaveProperty('csv');
+      expect(result).toHaveProperty('filename');
+      expect(result.csv).toContain('Exported by test-user from IP 192.168.1.1 at');
+      expect(result.csv).toContain('Total records: 1');
+      expect(result.csv).toContain('ID,External ID,To (Masked)');
+      expect(result.csv).toContain('j***@example.com'); // Masked email
+      expect(result.filename).toMatch(/emails-export-\d+\.csv/);
+    });
+
+    it('should reject export if exceeds 10k limit', async () => {
+      (prisma.emailLog.count as jest.Mock).mockResolvedValue(10001);
+
+      await expect(
+        service.exportEmailsToCSV({}, 'test-user')
+      ).rejects.toThrow('Export exceeds maximum limit');
+    });
+
+    it('should handle CSV field escaping', async () => {
+      const mockEmails = [
+        {
+          id: 'email-1',
+          to: 'test@example.com',
+          subject: 'Subject with, comma',
+          status: 'SENT',
+          createdAt: new Date(),
+          sentAt: null,
+          failedAt: null,
+          errorCode: null,
+          errorReason: 'Error with "quotes" and, comma',
+          attempts: 1,
+          durationMs: null,
+          sesMessageId: null,
+          requestId: null,
+          recipient: null,
+          outbox: null,
+        },
+      ];
+
+      (prisma.emailLog.count as jest.Mock).mockResolvedValue(1);
+      (prisma.emailLog.findMany as jest.Mock).mockResolvedValue(mockEmails);
+
+      const result = await service.exportEmailsToCSV({}, 'test-user', '192.168.1.1');
+
+      expect(result.csv).toContain('"Subject with, comma"');
+      expect(result.csv).toContain('"Error with ""quotes"" and, comma"');
+    });
+
+    it('should apply filters in export', async () => {
+      (prisma.emailLog.count as jest.Mock).mockResolvedValue(0);
+      (prisma.emailLog.findMany as jest.Mock).mockResolvedValue([]);
+
+      await service.exportEmailsToCSV(
+        {
+          status: 'FAILED',
+          companyId: 'company-1',
+          dateFrom: '2024-01-01',
+          dateTo: '2024-01-31',
+        },
+        'test-user',
+        '192.168.1.1'
+      );
+
+      expect(prisma.emailLog.count).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            status: 'FAILED',
+            companyId: 'company-1',
+            createdAt: expect.objectContaining({
+              gte: expect.any(Date),
+              lte: expect.any(Date),
+            }),
+          }),
+        })
+      );
+    });
+  });
 });

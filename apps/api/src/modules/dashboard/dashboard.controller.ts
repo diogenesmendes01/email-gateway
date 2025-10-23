@@ -12,6 +12,8 @@
 import {
   Controller,
   Get,
+  Post,
+  Body,
   Query,
   Param,
   HttpCode,
@@ -20,9 +22,10 @@ import {
   UsePipes,
   ValidationPipe,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { DashboardService } from './dashboard.service';
 import { DashboardProtected } from '../auth/decorators';
-import { GetKPIsDto, GetEmailsDto, GetErrorBreakdownDto } from './dto/kpis.dto';
+import { GetKPIsDto, GetEmailsDto, GetErrorBreakdownDto, ExportEmailsDto } from './dto/kpis.dto';
 
 interface AuditLogsQuery {
   companyId?: string;
@@ -155,6 +158,8 @@ export class DashboardController {
       companyId: query.companyId,
       page: query.page || 1,
       limit: query.limit || 50,
+      sortBy: query.sortBy || 'createdAt',
+      sortOrder: query.sortOrder || 'desc',
     });
   }
 
@@ -188,5 +193,28 @@ export class DashboardController {
     @Query() query: GetErrorBreakdownDto,
   ) {
     return this.dashboardService.getErrorBreakdown(query.period, query.companyId);
+  }
+
+  /**
+   * POST /dashboard/emails/export
+   *
+   * Export emails to CSV with masking and watermark
+   * TASK 9.2: Integração com logs/eventos e runbooks
+   *
+   * Limit: 10k rows max
+   * Masking: cpfCnpj, email
+   * Watermark: Exported by {username} at {timestamp}
+   */
+  @Post('emails/export')
+  @Throttle({ default: { limit: 5, ttl: 60000 } }) // 5 exports per minute
+  @DashboardProtected() // Basic Auth + Audit
+  @HttpCode(HttpStatus.OK)
+  async exportEmails(
+    @Body() body: ExportEmailsDto,
+    @Request() req: any,
+  ) {
+    const username = req.user?.username || 'unknown';
+    const ipAddress = req.ip || req.connection?.remoteAddress;
+    return this.dashboardService.exportEmailsToCSV(body, username, ipAddress);
   }
 }
