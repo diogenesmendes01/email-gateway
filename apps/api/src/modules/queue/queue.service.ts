@@ -1,93 +1,150 @@
-import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { Queue } from 'bullmq';
+/**
+ * TASK 8.2 - Queue Service
+ *
+ * Integrates API with BullMQ to enqueue email jobs for worker processing
+ * Fixes critical missing piece: API → Queue → Worker flow
+ */
+
+import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
+import { Queue, QueueOptions } from 'bullmq';
 import Redis from 'ioredis';
 import { EMAIL_JOB_CONFIG, EmailSendJobData } from '@email-gateway/shared';
 
+export interface QueueHealth {
+  waiting: number;
+  active: number;
+  completed: number;
+  failed: number;
+  delayed: number;
+  total: number;
+}
+
 @Injectable()
 export class QueueService implements OnModuleInit, OnModuleDestroy {
-  private queue!: Queue<EmailSendJobData>;
-  private redis!: Redis;
-
-  constructor(private readonly configService: ConfigService) {}
+  private readonly logger = new Logger(QueueService.name);
+  private queue: Queue;
+  private redis: Redis;
 
   async onModuleInit() {
+    // Initialize Redis connection for BullMQ
     this.redis = new Redis({
-      host: this.configService.get<string>('REDIS_HOST', 'localhost'),
-      port: this.configService.get<number>('REDIS_PORT', 6379),
-      password: this.configService.get<string>('REDIS_PASSWORD'),
-      db: this.configService.get<number>('REDIS_DB', 0),
-      maxRetriesPerRequest: null,
+      host: process.env.REDIS_HOST || 'localhost',
+      port: parseInt(process.env.REDIS_PORT || '6379', 10),
+      password: process.env.REDIS_PASSWORD || undefined,
+      db: parseInt(process.env.REDIS_DB || '0', 10),
+      maxRetriesPerRequest: null, // Required for BullMQ
+      enableReadyCheck: false,
+      retryStrategy: (times: number) => {
+        const delay = Math.min(times * 50, 2000);
+        return delay;
+      },
     });
 
-    this.queue = new Queue<EmailSendJobData>(EMAIL_JOB_CONFIG.QUEUE_NAME, {
+    // Wait for Redis connection
+    await new Promise<void>((resolve, reject) => {
+      this.redis.once('ready', () => {
+        this.logger.log(\`✅ Redis connected: \${process.env.REDIS_HOST}:\${process.env.REDIS_PORT}\`);
+        resolve();
+      });
+
+      this.redis.once('error', (error) => {
+        this.logger.error(\`❌ Redis connection failed: \${error.message}\`);
+        reject(error);
+      });
+    });
+
+    // Initialize BullMQ Queue with configuration from shared package
+    const queueOptions: QueueOptions = {
       connection: this.redis,
       defaultJobOptions: {
         attempts: EMAIL_JOB_CONFIG.MAX_ATTEMPTS,
         backoff: {
           type: 'exponential',
-          delay: EMAIL_JOB_CONFIG.BACKOFF_DELAYS[0] * 1000,
+          delay: EMAIL_JOB_CONFIG.BACKOFF_DELAYS[0], // 2000ms initial delay
         },
         removeOnComplete: {
-          age: 24 * 3600,
-          count: 1000,
+          age: 24 * 3600, // Keep completed jobs for 24h
+          count: 1000, // Keep last 1000
         },
         removeOnFail: {
-          age: 7 * 24 * 3600,
+          age: 7 * 24 * 3600, // Keep failed jobs for 7 days
         },
       },
-    });
+    };
 
-    // Log inicial de saúde da fila e alertas simples
-    try {
-      const health = await this.getQueueHealth();
-      // Log estruturado
-      // eslint-disable-next-line no-console
-      console.log({
-        message: '[QueueService] Initialized',
-        queue: EMAIL_JOB_CONFIG.QUEUE_NAME,
-        health,
-      });
+    this.queue = new Queue(EMAIL_JOB_CONFIG.QUEUE_NAME, queueOptions);
 
-      const waitingThreshold = this.configService.get<number>('QUEUE_ALERT_WAITING_THRESHOLD', 1000);
-      const failedThreshold = this.configService.get<number>('QUEUE_ALERT_FAILED_THRESHOLD', 50);
+    this.logger.log(\`✅ Queue initialized: \${EMAIL_JOB_CONFIG.QUEUE_NAME}\`);
+    this.logger.log(\`   Max attempts: \${EMAIL_JOB_CONFIG.MAX_ATTEMPTS}\`);
+    this.logger.log(\`   Backoff delays: \${EMAIL_JOB_CONFIG.BACKOFF_DELAYS.join(', ')}ms\`);
 
-      if (health.waiting > waitingThreshold) {
-        // eslint-disable-next-line no-console
-        console.warn({
-          message: '[QueueService] ALERT: waiting jobs above threshold',
-          waiting: health.waiting,
-          threshold: waitingThreshold,
-        });
-      }
-      if (health.failed > failedThreshold) {
-        // eslint-disable-next-line no-console
-        console.error({
-          message: '[QueueService] ALERT: failed jobs above threshold',
-          failed: health.failed,
-          threshold: failedThreshold,
-        });
-      }
-    } catch (err) {
-      // eslint-disable-next-line no-console
-      console.error('[QueueService] Failed to fetch initial queue health', err);
-    }
+    // Log initial queue health
+    const health = await this.getQueueHealth();
+    this.logger.log(\`📊 Queue health: waiting=\${health.waiting}, active=\${health.active}, failed=\${health.failed}\`);
   }
 
   async onModuleDestroy() {
-    if (this.queue) await this.queue.close();
-    if (this.redis) await this.redis.quit();
+    this.logger.log('🛑 Shutting down queue service...');
+
+    if (this.queue) {
+      await this.queue.close();
+      this.logger.log('✅ Queue closed');
+    }
+
+    if (this.redis) {
+      await this.redis.quit();
+      this.logger.log('✅ Redis disconnected');
+    }
   }
 
+  /**
+   * Enqueue email send job
+   *
+   * @param jobData - Email job data from shared types
+   * @returns Job ID (same as outboxId for idempotency)
+   */
   async enqueueEmailJob(jobData: EmailSendJobData): Promise<string> {
-    const job = await this.queue.add('send-email', jobData, {
-      jobId: jobData.outboxId,
-      priority: jobData as any && (jobData as any).priority ? (jobData as any).priority : EMAIL_JOB_CONFIG.DEFAULT_PRIORITY,
-    });
-    return job.id as string;
+    try {
+      // Use outboxId as jobId for idempotency
+      // If same outboxId is enqueued twice, BullMQ will return existing job
+      const job = await this.queue.add(
+        'send-email', // Job name
+        jobData,
+        {
+          jobId: jobData.outboxId, // Idempotency key
+          priority: jobData.priority || 1, // Lower number = higher priority
+        }
+      );
+
+      this.logger.log({
+        message: 'Email job enqueued',
+        jobId: job.id,
+        outboxId: jobData.outboxId,
+        companyId: jobData.companyId,
+        to: jobData.to,
+        priority: jobData.priority,
+        requestId: jobData.requestId,
+      });
+
+      return job.id!;
+    } catch (error) {
+      this.logger.error({
+        message: 'Failed to enqueue email job',
+        error: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+        outboxId: jobData.outboxId,
+        companyId: jobData.companyId,
+      });
+
+      throw error;
+    }
   }
 
-  async getQueueHealth() {
+  /**
+   * Get queue health metrics
+   * Used for monitoring and health checks
+   */
+  async getQueueHealth(): Promise<QueueHealth> {
     const [waiting, active, completed, failed, delayed] = await Promise.all([
       this.queue.getWaitingCount(),
       this.queue.getActiveCount(),
@@ -105,6 +162,49 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
       total: waiting + active + delayed,
     };
   }
+
+  /**
+   * Check if queue is healthy
+   * Returns false if queue depth is too high (potential backlog)
+   */
+  async isHealthy(): Promise<boolean> {
+    const health = await this.getQueueHealth();
+
+    // Queue is unhealthy if:
+    // - Too many waiting jobs (> 1000)
+    // - Too many failed jobs (> 50)
+    const isHealthy = health.waiting < 1000 && health.failed < 50;
+
+    if (!isHealthy) {
+      this.logger.warn({
+        message: 'Queue health degraded',
+        ...health,
+      });
+    }
+
+    return isHealthy;
+  }
+
+  /**
+   * Get specific job by ID
+   */
+  async getJob(jobId: string) {
+    return this.queue.getJob(jobId);
+  }
+
+  /**
+   * Pause queue (stops processing new jobs)
+   */
+  async pause() {
+    await this.queue.pause();
+    this.logger.warn('Queue paused');
+  }
+
+  /**
+   * Resume queue
+   */
+  async resume() {
+    await this.queue.resume();
+    this.logger.log('Queue resumed');
+  }
 }
-
-

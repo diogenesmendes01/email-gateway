@@ -1,6 +1,7 @@
-import { Module } from '@nestjs/common';
+import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
+import { RequestIdMiddleware } from './middleware/request-id.middleware';
 
 // Modules
 import { HealthModule } from './modules/health/health.module';
@@ -37,4 +38,11 @@ import { DomainModule } from './modules/domain/domain.module';
     DomainModule,
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    // TASK 8.3: Request ID middleware for end-to-end correlation
+    consumer
+      .apply(RequestIdMiddleware)
+      .forRoutes('*');
+  }
+}
