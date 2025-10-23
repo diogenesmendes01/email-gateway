@@ -2,6 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { AppConfigService } from './config/app.config';
+import { AllExceptionsFilter } from './filters/http-exception.filter';
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
@@ -30,6 +31,9 @@ async function bootstrap() {
   // Global prefix
   const prefix = process.env.API_PREFIX || 'v1';
   app.setGlobalPrefix(prefix);
+
+  // TASK 8.3: Global exception filter for consistent error handling
+  app.useGlobalFilters(new AllExceptionsFilter());
 
   // Global validation pipe
   app.useGlobalPipes(
