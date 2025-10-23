@@ -9,6 +9,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { EmailSendService } from '../email-send.service';
 import { InternalServerErrorException } from '@nestjs/common';
 import * as encryptionUtils from '@email-gateway/shared';
+import { QueueService } from '../../../queue/queue.service';
 
 // Mock the shared encryption utilities
 jest.mock('@email-gateway/shared', () => ({
@@ -43,7 +44,15 @@ describe('EmailSendService - Encryption Integration', () => {
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      providers: [EmailSendService],
+      providers: [
+        EmailSendService,
+        {
+          provide: QueueService,
+          useValue: {
+            addEmailToQueue: jest.fn(),
+          },
+        },
+      ],
     }).compile();
 
     service = module.get<EmailSendService>(EmailSendService);

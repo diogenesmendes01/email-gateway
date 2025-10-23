@@ -5,6 +5,13 @@ import { SESClient, GetSendQuotaCommand } from '@aws-sdk/client-ses';
 import { prisma } from '@email-gateway/database';
 import { Redis } from 'ioredis';
 
+// Mock Redis client - must be defined before jest.mock()
+const mockRedis = {
+  ping: jest.fn(),
+  info: jest.fn(),
+  disconnect: jest.fn(),
+};
+
 // Mock das dependências externas
 jest.mock('@aws-sdk/client-ses');
 jest.mock('@email-gateway/database', () => ({
@@ -12,18 +19,26 @@ jest.mock('@email-gateway/database', () => ({
     $queryRaw: jest.fn(),
   },
 }));
-jest.mock('ioredis');
+
+// Mock ioredis - needs to support both default and named imports
+jest.mock('ioredis', () => {
+  const MockRedisConstructor = jest.fn(() => mockRedis);
+  return {
+    __esModule: true,
+    default: MockRedisConstructor,
+    Redis: MockRedisConstructor,
+  };
+});
 
 describe('HealthService', () => {
   let service: HealthService;
   let configService: ConfigService;
   let mockSESClient: jest.Mocked<SESClient>;
-  let mockRedis: jest.Mocked<Redis>;
 
   beforeEach(async () => {
     const mockConfigService = {
       get: jest.fn((key: string, defaultValue?: any) => {
-        const config = {
+        const config: Record<string, any> = {
           AWS_SES_REGION: 'us-east-1',
           AWS_ACCESS_KEY_ID: 'test-key',
           AWS_SECRET_ACCESS_KEY: 'test-secret',
@@ -39,12 +54,8 @@ describe('HealthService', () => {
       send: jest.fn(),
     } as any;
 
-    // Mock Redis
-    mockRedis = {
-      ping: jest.fn(),
-      info: jest.fn(),
-      disconnect: jest.fn(),
-    } as any;
+    // Reset Redis mocks
+    jest.clearAllMocks();
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -61,7 +72,7 @@ describe('HealthService', () => {
 
     // Substituir instâncias mockadas
     (service as any).sesClient = mockSESClient;
-    (service as any).redis = mockRedis;
+    // Redis is already mocked via constructor
   });
 
   describe('performReadinessChecks', () => {
@@ -74,7 +85,7 @@ describe('HealthService', () => {
       mockRedis.info.mockResolvedValue('used_memory:1024');
 
       // Mock SES check
-      mockSESClient.send.mockResolvedValue({
+      (mockSESClient.send as jest.Mock).mockResolvedValue({
         Max24HourSend: 200,
         MaxSendRate: 14,
         SentLast24Hours: 50,
@@ -96,7 +107,7 @@ describe('HealthService', () => {
       mockRedis.info.mockResolvedValue('used_memory:1024');
 
       // Mock SES check success
-      mockSESClient.send.mockResolvedValue({
+      (mockSESClient.send as jest.Mock).mockResolvedValue({
         Max24HourSend: 200,
         MaxSendRate: 14,
         SentLast24Hours: 50,
@@ -118,7 +129,7 @@ describe('HealthService', () => {
       mockRedis.ping.mockRejectedValue(new Error('Connection refused'));
 
       // Mock SES check success
-      mockSESClient.send.mockResolvedValue({
+      (mockSESClient.send as jest.Mock).mockResolvedValue({
         Max24HourSend: 200,
         MaxSendRate: 14,
         SentLast24Hours: 50,
@@ -141,7 +152,7 @@ describe('HealthService', () => {
       mockRedis.info.mockResolvedValue('used_memory:1024');
 
       // Mock SES quota alta (90% de uso)
-      mockSESClient.send.mockResolvedValue({
+      (mockSESClient.send as jest.Mock).mockResolvedValue({
         Max24HourSend: 200,
         MaxSendRate: 14,
         SentLast24Hours: 180, // 90% de 200
@@ -211,7 +222,7 @@ describe('HealthService', () => {
 
   describe('checkSESQuota', () => {
     it('deve retornar ok quando quota está baixa', async () => {
-      mockSESClient.send.mockResolvedValue({
+      (mockSESClient.send as jest.Mock).mockResolvedValue({
         Max24HourSend: 200,
         MaxSendRate: 14,
         SentLast24Hours: 50, // 25% de uso
@@ -225,7 +236,7 @@ describe('HealthService', () => {
     });
 
     it('deve retornar erro quando quota está alta', async () => {
-      mockSESClient.send.mockResolvedValue({
+      (mockSESClient.send as jest.Mock).mockResolvedValue({
         Max24HourSend: 200,
         MaxSendRate: 14,
         SentLast24Hours: 170, // 85% de uso
@@ -239,7 +250,7 @@ describe('HealthService', () => {
     });
 
     it('deve retornar erro quando SES falha', async () => {
-      mockSESClient.send.mockRejectedValue(new Error('AWS credentials invalid'));
+      (mockSESClient.send as jest.Mock).mockRejectedValue(new Error('AWS credentials invalid'));
 
       const result = await (service as any).checkSESQuota();
 
@@ -250,7 +261,7 @@ describe('HealthService', () => {
 
   describe('onModuleDestroy', () => {
     it('deve desconectar Redis corretamente', async () => {
-      mockRedis.disconnect.mockResolvedValue('OK');
+      (mockRedis.disconnect as jest.Mock).mockResolvedValue('OK');
 
       await service.onModuleDestroy();
 
@@ -258,7 +269,7 @@ describe('HealthService', () => {
     });
 
     it('deve lidar com erro ao desconectar Redis', async () => {
-      mockRedis.disconnect.mockRejectedValue(new Error('Disconnect failed'));
+      (mockRedis.disconnect as jest.Mock).mockRejectedValue(new Error('Disconnect failed'));
 
       // Não deve lançar exceção
       await expect(service.onModuleDestroy()).resolves.not.toThrow();

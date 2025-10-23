@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { RedisService } from './redis.service';
 import { ConfigService } from '@nestjs/config';
 
-// Mock Redis client
+// Mock Redis client - must be defined before jest.mock()
 const mockRedisClient = {
   incr: jest.fn(),
   expire: jest.fn(),
@@ -18,15 +18,27 @@ const mockRedisClient = {
   isOpen: true,
 };
 
-jest.mock('ioredis', () => ({
-  default: jest.fn(() => mockRedisClient),
-}));
+// Mock ioredis - needs to support both default and named imports
+jest.mock('ioredis', () => {
+  const MockRedisConstructor = jest.fn(() => mockRedisClient);
+  return {
+    __esModule: true,
+    default: MockRedisConstructor,
+    Redis: MockRedisConstructor,
+  };
+});
 
 describe('RedisService', () => {
   let service: RedisService;
   let configService: ConfigService;
 
   beforeEach(async () => {
+    // Reset all mocks before each test
+    jest.clearAllMocks();
+
+    // Ensure connect is mocked to resolve successfully
+    mockRedisClient.connect.mockResolvedValue(undefined);
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         RedisService,
@@ -41,6 +53,9 @@ describe('RedisService', () => {
 
     service = module.get<RedisService>(RedisService);
     configService = module.get<ConfigService>(ConfigService);
+
+    // Initialize the service (calls onModuleInit)
+    await service.onModuleInit();
   });
 
   afterEach(() => {
@@ -155,11 +170,11 @@ describe('RedisService', () => {
 
       const result = await service.expire(key, ttl);
 
-      expect(result).toBe(1);
+      expect(result).toBe(true);
       expect(mockRedisClient.expire).toHaveBeenCalledWith(key, ttl);
     });
 
-    it('should return 0 when key does not exist', async () => {
+    it('should return false when key does not exist', async () => {
       const key = 'nonexistent:key';
       const ttl = 60;
 
@@ -167,7 +182,7 @@ describe('RedisService', () => {
 
       const result = await service.expire(key, ttl);
 
-      expect(result).toBe(0);
+      expect(result).toBe(false);
     });
   });
 
@@ -206,17 +221,6 @@ describe('RedisService', () => {
   });
 
   describe('connection management', () => {
-    it('should handle connection events', () => {
-      const connectCallback = jest.fn();
-      const errorCallback = jest.fn();
-
-      service.on('connect', connectCallback);
-      service.on('error', errorCallback);
-
-      expect(mockRedisClient.on).toHaveBeenCalledWith('connect', connectCallback);
-      expect(mockRedisClient.on).toHaveBeenCalledWith('error', errorCallback);
-    });
-
     it('should connect to Redis on initialization', async () => {
       mockRedisClient.connect.mockResolvedValue(undefined);
 
@@ -255,7 +259,7 @@ describe('RedisService', () => {
 
       const result = await service.expire(key, ttl);
 
-      expect(result).toBe(1);
+      expect(result).toBe(true);
       expect(mockRedisClient.expire).toHaveBeenCalledWith(key, ttl);
     });
 

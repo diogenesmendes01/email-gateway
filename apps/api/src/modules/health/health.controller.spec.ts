@@ -5,15 +5,15 @@ import { HttpStatus } from '@nestjs/common';
 
 describe('HealthController', () => {
   let controller: HealthController;
-  let healthService: HealthService;
-  let queueService: QueueService;
+  let healthService: any;
+  let queueService: any;
 
   beforeEach(() => {
-    const mockHealthService = {
+    healthService = {
       performReadinessChecks: jest.fn(),
     };
 
-    const mockQueueService = {
+    queueService = {
       getQueueHealth: jest.fn().mockResolvedValue({
         waiting: 1,
         active: 0,
@@ -24,9 +24,7 @@ describe('HealthController', () => {
       }),
     };
 
-    controller = new HealthController(mockQueueService as any, mockHealthService as any);
-    healthService = mockHealthService as any;
-    queueService = mockQueueService as any;
+    controller = new HealthController(queueService, healthService);
   });
 
   describe('getHealthz', () => {
