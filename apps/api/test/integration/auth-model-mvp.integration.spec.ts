@@ -32,6 +32,10 @@ describe('Auth Model MVP (Integration)', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
+    
+    // Set global prefix to match production behavior
+    app.setGlobalPrefix('v1');
+    
     authService = moduleFixture.get<AuthService>(AuthService);
     configService = moduleFixture.get<ConfigService>(ConfigService);
 

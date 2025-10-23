@@ -1,8 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { UnauthorizedException, ForbiddenException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { AuthService, ApiKeyPayload, RateLimitConfig } from '../auth.service';
-import { ApiKeyGuard } from '../auth.guard';
+import { AuthService, ApiKeyPayload, RateLimitConfig } from '../../src/modules/auth/auth.service';
+import { ApiKeyGuard } from '../../src/modules/auth/auth.guard';
 import { prisma } from '@email-gateway/database';
 import * as bcrypt from 'bcrypt';
 
