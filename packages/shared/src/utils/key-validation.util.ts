@@ -6,6 +6,18 @@
  * PR-BACKLOG: [PR18-TASK-8.1-03] Melhorar validação de ENCRYPTION_KEY
  */
 
+// ============================================
+// CONSTANTS
+// ============================================
+
+/**
+ * Key validation constraints
+ */
+export const KEY_VALIDATION_CONSTRAINTS = {
+  MIN_KEY_LENGTH: 32,        // 256 bits minimum
+  MIN_UNIQUE_CHARS: 10,      // Minimum unique characters for entropy
+} as const;
+
 export interface KeyValidationResult {
   valid: boolean;
   error?: string;
@@ -48,10 +60,10 @@ export function validateEncryptionKey(key: string): KeyValidationResult {
   }
 
   // 2. Length check (minimum 32 characters / 256 bits)
-  if (key.length < 32) {
+  if (key.length < KEY_VALIDATION_CONSTRAINTS.MIN_KEY_LENGTH) {
     return {
       valid: false,
-      error: 'ENCRYPTION_KEY must be at least 32 characters (256 bits). Generate with: openssl rand -base64 32',
+      error: `ENCRYPTION_KEY must be at least ${KEY_VALIDATION_CONSTRAINTS.MIN_KEY_LENGTH} characters (256 bits). Generate with: openssl rand -base64 32`,
     };
   }
 
@@ -106,12 +118,11 @@ export function validateEncryptionKey(key: string): KeyValidationResult {
 
   // 5. Entropy check (simplified - unique characters)
   const uniqueChars = new Set(key).size;
-  const minUniqueChars = 10; // At least 10 different characters
 
-  if (uniqueChars < minUniqueChars) {
+  if (uniqueChars < KEY_VALIDATION_CONSTRAINTS.MIN_UNIQUE_CHARS) {
     return {
       valid: false,
-      error: `ENCRYPTION_KEY has insufficient entropy (only ${uniqueChars} unique characters, minimum ${minUniqueChars}). Generate a strong key with: openssl rand -base64 32`,
+      error: `ENCRYPTION_KEY has insufficient entropy (only ${uniqueChars} unique characters, minimum ${KEY_VALIDATION_CONSTRAINTS.MIN_UNIQUE_CHARS}). Generate a strong key with: openssl rand -base64 32`,
     };
   }
 
