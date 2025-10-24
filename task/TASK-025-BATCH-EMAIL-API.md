@@ -572,13 +572,19 @@ async createOutboxRecord(companyId: string, emailDto: EmailSendDto, batchId?: st
 **Arquivo:** `apps/api/src/modules/email/guards/batch-rate-limit.guard.ts`
 
 ```typescript
-import { Injectable, CanActivate, ExecutionContext, HttpException, HttpStatus } from '@nestjs/common';
+import { Injectable, CanActivate, ExecutionContext, HttpException, HttpStatus, UnauthorizedException } from '@nestjs/common';
 import { prisma } from '@email-gateway/database';
 
 @Injectable()
 export class BatchRateLimitGuard implements CanActivate {
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
+
+    // Ensure companyId exists (should be set by ApiKeyGuard)
+    if (!request.companyId) {
+      throw new UnauthorizedException('Company ID not found. Ensure ApiKeyGuard is applied first.');
+    }
+
     const companyId = request.companyId;
 
     // Check batches in last hour

@@ -238,11 +238,10 @@ describe('QueueService', () => {
 import { Test, TestingModule } from '@nestjs/testing';
 import { QueueService } from '../src/services/queue.service';
 import { Queue, Worker } from 'bullmq';
-import { StartedRedisContainer } from '@testcontainers/redis';
-import { GenericContainer } from 'testcontainers';
+import { GenericContainer, StartedTestContainer } from 'testcontainers';
 
 describe('QueueService (Integration)', () => {
-  let redisContainer: StartedRedisContainer;
+  let redisContainer: StartedTestContainer;
   let service: QueueService;
   let queue: Queue;
   let worker: Worker;

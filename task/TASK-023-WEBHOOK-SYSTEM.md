@@ -516,19 +516,37 @@ export class WebhookDeliveryService {
         responseCode: response.status,
       });
     } catch (error) {
+      // Classify errors as retryable or not
+      const isRetryable =
+        error.code === 'ECONNREFUSED' ||
+        error.code === 'ETIMEDOUT' ||
+        error.code === 'ENOTFOUND' ||
+        (error.response?.status >= 500); // 5xx errors are retryable
+
       const isLastAttempt = job.attemptsMade >= 2; // 3 total attempts
 
       await prisma.webhookDelivery.update({
         where: { id: delivery.id },
         data: {
-          status: isLastAttempt ? 'FAILED' : 'RETRYING',
+          status: isLastAttempt || !isRetryable ? 'FAILED' : 'RETRYING',
           responseCode: error.response?.status,
           responseBody: error.message.substring(0, 1000),
           attempts: job.attemptsMade + 1,
         },
       });
 
-      throw error; // BullMQ will handle retry
+      // Only throw (trigger retry) if error is retryable and not last attempt
+      if (isRetryable && !isLastAttempt) {
+        throw error; // BullMQ will retry
+      }
+
+      // Non-retryable errors (4xx) don't throw - just log and mark as failed
+      this.logger.warn({
+        message: 'Webhook failed with non-retryable error',
+        webhookId,
+        responseCode: error.response?.status,
+        error: error.message,
+      });
     }
   }
 

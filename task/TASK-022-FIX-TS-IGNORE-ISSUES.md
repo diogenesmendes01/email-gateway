@@ -141,7 +141,9 @@ module.exports = {
     '@typescript-eslint/ban-ts-comment': [
       'error',
       {
-        'ts-expect-error': 'allow-with-description',
+        'ts-expect-error': {
+          descriptionFormat: '^\\s*\\S.*$', // Require non-empty description
+        },
         'ts-ignore': true, // Sempre proibir @ts-ignore
         'ts-nocheck': true,
         'ts-check': false,

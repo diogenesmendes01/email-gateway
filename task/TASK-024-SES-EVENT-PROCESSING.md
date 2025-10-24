@@ -1,13 +1,16 @@
-# TASK-024 — Processamento de Eventos SES (Feature - Priority 2)
+# TASK-024 — Processamento de Eventos SES via Webhook (Feature - Priority 2)
 
 ## Contexto
 - Origem: Análise de arquitetura - Sistema 75% completo
-- Resumo: AWS SES envia notificações de bounces, complaints e deliveries via SNS/SQS, mas o sistema não processa esses eventos. Sem isso, impossível rastrear bounces (email inválido) e complaints (spam), prejudicando reputação do sender.
+- Resumo: AWS SES envia notificações de bounces, complaints e deliveries, mas o sistema não processa esses eventos. Sem isso, impossível rastrear bounces (email inválido) e complaints (spam), prejudicando reputação do sender.
+- **Arquitetura:** Usar BullMQ/Redis (não SNS/SQS) conforme definido no README.md
 
 ## O que precisa ser feito
 - [ ] Configurar SNS Topic no AWS SES para eventos (bounces, complaints, deliveries)
-- [ ] Criar SQS Queue para receber eventos do SNS
-- [ ] Implementar worker para processar eventos SQS
+- [ ] Criar endpoint POST /webhooks/ses para receber notificações SNS
+- [ ] Validar assinatura SNS (segurança)
+- [ ] Enfileirar eventos SES no BullMQ
+- [ ] Implementar worker para processar eventos da fila
 - [ ] Atualizar EmailLog com eventos SES (bounce_type, complaint_feedback)
 - [ ] Criar tabela `recipient_blocklist` para emails bounced/complained
 - [ ] Implementar lógica de bloqueio automático (hard bounce, complaint)
@@ -26,17 +29,18 @@
 - Dependências:
   - AWS SES configurado
   - AWS SNS Topic
-  - AWS SQS Queue
-  - AWS SDK (@aws-sdk/client-sqs)
+  - BullMQ (já instalado)
+  - Redis (já instalado)
+  - AWS SDK (@aws-sdk/client-sns) para validação de assinatura
 - Riscos:
   - ALTO: Sem processar bounces/complaints, reputação degrada
   - AWS pode suspender conta se complaint rate > 0.5%
   - Hard bounces devem ser bloqueados permanentemente
-  - Processar eventos com delay (SNS → SQS → Worker)
+  - Endpoint webhook precisa ser HTTPS e público
 
 ## Detalhes Técnicos
 
-### 1. Configurar AWS SES Notifications (Terraform/CloudFormation)
+### 1. Configurar AWS SES Notifications (Terraform)
 
 **Arquivo:** `infrastructure/aws/ses-notifications.tf`
 
@@ -46,48 +50,11 @@ resource "aws_sns_topic" "ses_events" {
   name = "email-gateway-ses-events"
 }
 
-# SQS Queue for processing events
-resource "aws_sqs_queue" "ses_events" {
-  name                      = "email-gateway-ses-events"
-  visibility_timeout_seconds = 300  # 5 minutes
-  message_retention_seconds  = 1209600  # 14 days
-  receive_wait_time_seconds  = 20  # Long polling
-
-  # Dead Letter Queue after 3 failures
-  redrive_policy = jsonencode({
-    deadLetterTargetArn = aws_sqs_queue.ses_events_dlq.arn
-    maxReceiveCount     = 3
-  })
-}
-
-resource "aws_sqs_queue" "ses_events_dlq" {
-  name = "email-gateway-ses-events-dlq"
-  message_retention_seconds = 1209600  # 14 days
-}
-
-# Subscribe SQS to SNS
-resource "aws_sns_topic_subscription" "ses_to_sqs" {
+# SNS Subscription to webhook endpoint
+resource "aws_sns_topic_subscription" "ses_to_webhook" {
   topic_arn = aws_sns_topic.ses_events.arn
-  protocol  = "sqs"
-  endpoint  = aws_sqs_queue.ses_events.arn
-}
-
-# SQS Policy to allow SNS
-resource "aws_sqs_queue_policy" "ses_events" {
-  queue_url = aws_sqs_queue.ses_events.id
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Effect = "Allow"
-      Principal = { Service = "sns.amazonaws.com" }
-      Action = "sqs:SendMessage"
-      Resource = aws_sqs_queue.ses_events.arn
-      Condition = {
-        ArnEquals = { "aws:SourceArn" = aws_sns_topic.ses_events.arn }
-      }
-    }]
-  })
+  protocol  = "https"
+  endpoint  = "https://your-domain.com/webhooks/ses"
 }
 
 # Configure SES to send events to SNS
@@ -171,14 +138,212 @@ model EmailLog {
 }
 ```
 
-### 3. Implementar worker de processamento SES
+### 3. Criar endpoint webhook para receber SNS
+
+**Arquivo:** `apps/api/src/modules/webhook/ses-webhook.controller.ts`
+
+```typescript
+import { Controller, Post, Body, Headers, BadRequestException, Logger } from '@nestjs/common';
+import { SESWebhookService } from './ses-webhook.service';
+
+@Controller('webhooks/ses')
+export class SESWebhookController {
+  private readonly logger = new Logger(SESWebhookController.name);
+
+  constructor(private readonly sesWebhookService: SESWebhookService) {}
+
+  /**
+   * POST /webhooks/ses
+   * Receive SNS notifications from AWS SES
+   */
+  @Post()
+  async handleSNSNotification(
+    @Body() body: any,
+    @Headers('x-amz-sns-message-type') messageType: string
+  ) {
+    this.logger.log({
+      message: 'Received SNS notification',
+      messageType,
+    });
+
+    // Handle SNS subscription confirmation
+    if (messageType === 'SubscriptionConfirmation') {
+      await this.sesWebhookService.confirmSubscription(body);
+      return { message: 'Subscription confirmed' };
+    }
+
+    // Handle SNS notification
+    if (messageType === 'Notification') {
+      // Validate SNS signature
+      const isValid = await this.sesWebhookService.validateSNSSignature(body);
+      if (!isValid) {
+        throw new BadRequestException('Invalid SNS signature');
+      }
+
+      // Parse and enqueue SES event
+      await this.sesWebhookService.processSNSNotification(body);
+      return { message: 'Event queued for processing' };
+    }
+
+    throw new BadRequestException('Unknown SNS message type');
+  }
+}
+```
+
+**Arquivo:** `apps/api/src/modules/webhook/ses-webhook.service.ts`
+
+```typescript
+import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { Queue } from 'bullmq';
+import axios from 'axios';
+import * as crypto from 'crypto';
+
+@Injectable()
+export class SESWebhookService {
+  private readonly logger = new Logger(SESWebhookService.name);
+  private sesEventsQueue: Queue;
+
+  constructor(private readonly configService: ConfigService) {
+    // Initialize BullMQ queue for SES events
+    this.sesEventsQueue = new Queue('ses-events', {
+      connection: {
+        host: this.configService.get('REDIS_HOST'),
+        port: this.configService.get('REDIS_PORT'),
+      },
+    });
+  }
+
+  /**
+   * Confirm SNS subscription (one-time setup)
+   */
+  async confirmSubscription(snsMessage: any) {
+    const subscribeUrl = snsMessage.SubscribeURL;
+
+    this.logger.log({
+      message: 'Confirming SNS subscription',
+      subscribeUrl,
+    });
+
+    // Call AWS subscribe URL to confirm
+    await axios.get(subscribeUrl);
+
+    this.logger.log('SNS subscription confirmed');
+  }
+
+  /**
+   * Validate SNS message signature
+   * https://docs.aws.amazon.com/sns/latest/dg/sns-verify-signature-of-message.html
+   */
+  async validateSNSSignature(snsMessage: any): Promise<boolean> {
+    try {
+      const {
+        SignatureVersion,
+        Signature,
+        SigningCertURL,
+        Message,
+        MessageId,
+        Subject,
+        Timestamp,
+        TopicArn,
+        Type,
+      } = snsMessage;
+
+      // Only support v1 signatures
+      if (SignatureVersion !== '1') {
+        return false;
+      }
+
+      // Download signing certificate
+      const certResponse = await axios.get(SigningCertURL);
+      const certificate = certResponse.data;
+
+      // Build string to sign
+      const stringToSign = Type === 'Notification'
+        ? [
+            'Message',
+            Message,
+            'MessageId',
+            MessageId,
+            Subject ? 'Subject' : null,
+            Subject,
+            'Timestamp',
+            Timestamp,
+            'TopicArn',
+            TopicArn,
+            'Type',
+            Type,
+          ].filter(Boolean).join('\n') + '\n'
+        : [
+            'Message',
+            Message,
+            'MessageId',
+            MessageId,
+            'SubscribeURL',
+            snsMessage.SubscribeURL,
+            'Timestamp',
+            Timestamp,
+            'Token',
+            snsMessage.Token,
+            'TopicArn',
+            TopicArn,
+            'Type',
+            Type,
+          ].join('\n') + '\n';
+
+      // Verify signature
+      const verifier = crypto.createVerify('RSA-SHA1');
+      verifier.update(stringToSign);
+      return verifier.verify(certificate, Signature, 'base64');
+    } catch (error) {
+      this.logger.error({
+        message: 'Failed to validate SNS signature',
+        error: error.message,
+      });
+      return false;
+    }
+  }
+
+  /**
+   * Process SNS notification and enqueue to BullMQ
+   */
+  async processSNSNotification(snsMessage: any) {
+    // Parse SES event from SNS message
+    const sesEvent = JSON.parse(snsMessage.Message);
+
+    this.logger.log({
+      message: 'Processing SES event',
+      eventType: sesEvent.eventType,
+      sesMessageId: sesEvent.mail?.messageId,
+    });
+
+    // Add to BullMQ queue for processing
+    await this.sesEventsQueue.add('process-ses-event', sesEvent, {
+      attempts: 3,
+      backoff: {
+        type: 'exponential',
+        delay: 5000,
+      },
+      removeOnComplete: true,
+      removeOnFail: false,
+    });
+
+    this.logger.log({
+      message: 'SES event enqueued',
+      eventType: sesEvent.eventType,
+    });
+  }
+}
+```
+
+### 4. Implementar worker para processar eventos
 
 **Arquivo:** `apps/worker/src/services/ses-event-processor.service.ts`
 
 ```typescript
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Worker, Job } from 'bullmq';
 import { ConfigService } from '@nestjs/config';
-import { SQSClient, ReceiveMessageCommand, DeleteMessageCommand } from '@aws-sdk/client-sqs';
 import { prisma } from '@email-gateway/database';
 import { MetricsService } from '../metrics/metrics.service';
 
@@ -229,92 +394,51 @@ interface SESDeliveryEvent {
 @Injectable()
 export class SESEventProcessorService implements OnModuleInit {
   private readonly logger = new Logger(SESEventProcessorService.name);
-  private sqsClient: SQSClient;
-  private queueUrl: string;
-  private isProcessing = false;
+  private worker: Worker;
 
   constructor(
     private readonly configService: ConfigService,
     private readonly metricsService: MetricsService
-  ) {
-    this.sqsClient = new SQSClient({
-      region: this.configService.get('AWS_REGION'),
-      credentials: {
-        accessKeyId: this.configService.get('AWS_ACCESS_KEY_ID'),
-        secretAccessKey: this.configService.get('AWS_SECRET_ACCESS_KEY'),
-      },
-    });
-
-    this.queueUrl = this.configService.get('SES_EVENTS_QUEUE_URL');
-  }
+  ) {}
 
   async onModuleInit() {
-    // Start polling SQS
-    this.startPolling();
-  }
-
-  private startPolling() {
-    if (this.isProcessing) return;
-    this.isProcessing = true;
-
-    // Poll every 5 seconds
-    setInterval(async () => {
-      try {
-        await this.pollMessages();
-      } catch (error) {
-        this.logger.error({
-          message: 'Error polling SQS',
-          error: error.message,
-        });
+    // Create BullMQ worker for SES events
+    this.worker = new Worker(
+      'ses-events',
+      async (job: Job) => this.processEvent(job),
+      {
+        connection: {
+          host: this.configService.get('REDIS_HOST'),
+          port: this.configService.get('REDIS_PORT'),
+        },
+        concurrency: 10,
       }
-    }, 5000);
-  }
+    );
 
-  private async pollMessages() {
-    const command = new ReceiveMessageCommand({
-      QueueUrl: this.queueUrl,
-      MaxNumberOfMessages: 10, // Process up to 10 messages at once
-      WaitTimeSeconds: 20, // Long polling
-      VisibilityTimeout: 300, // 5 minutes to process
+    this.worker.on('completed', (job) => {
+      this.logger.log({ message: 'SES event processed', jobId: job.id });
     });
 
-    const response = await this.sqsClient.send(command);
-
-    if (!response.Messages || response.Messages.length === 0) {
-      return; // No messages
-    }
-
-    for (const message of response.Messages) {
-      try {
-        await this.processMessage(message);
-
-        // Delete message after successful processing
-        await this.sqsClient.send(
-          new DeleteMessageCommand({
-            QueueUrl: this.queueUrl,
-            ReceiptHandle: message.ReceiptHandle,
-          })
-        );
-      } catch (error) {
-        this.logger.error({
-          message: 'Failed to process SES event',
-          messageId: message.MessageId,
-          error: error.message,
-        });
-        // Message will return to queue after visibility timeout
-      }
-    }
+    this.worker.on('failed', (job, err) => {
+      this.logger.error({
+        message: 'SES event processing failed',
+        jobId: job?.id,
+        error: err.message,
+      });
+    });
   }
 
-  private async processMessage(message: any) {
-    // Parse SNS message
-    const snsMessage = JSON.parse(message.Body);
-    const sesEvent = JSON.parse(snsMessage.Message);
+  async onModuleDestroy() {
+    await this.worker?.close();
+  }
+
+  private async processEvent(job: Job) {
+    const sesEvent = job.data;
 
     this.logger.log({
       message: 'Processing SES event',
       eventType: sesEvent.eventType,
-      sesMessageId: sesEvent.mail.messageId,
+      sesMessageId: sesEvent.mail?.messageId,
     });
 
     switch (sesEvent.eventType) {
@@ -533,7 +657,7 @@ export class SESEventProcessorService implements OnModuleInit {
 }
 ```
 
-### 4. Validar email contra blocklist antes de enviar
+### 5. Validar email contra blocklist antes de enviar
 
 **Arquivo:** `apps/api/src/modules/email/services/email-send.service.ts` (adicionar)
 
@@ -559,7 +683,7 @@ async sendEmail(data: EmailSendDto, companyId: string) {
 }
 ```
 
-### 5. Criar endpoint para listar eventos
+### 6. Criar endpoint para listar eventos
 
 **Arquivo:** `apps/api/src/modules/email/email.controller.ts` (adicionar)
 
@@ -593,7 +717,7 @@ async getEmailEvents(
 }
 ```
 
-### 6. Adicionar métricas e alertas
+### 7. Adicionar métricas e alertas
 
 **Prometheus metrics:**
 
@@ -639,3 +763,11 @@ Sem processar eventos SES:
 - Complaint rate > 0.5% = Account suspension risk
 
 **Prioridade Alta:** Implementar após Priority 1 tasks, mas antes de escalar volume.
+
+## Diferença vs. Versão Anterior
+
+Esta versão **redesigned** usa BullMQ/Redis em vez de SQS:
+- SNS → Webhook HTTP → BullMQ → Worker
+- Mantém infraestrutura consistente com o resto do sistema
+- Elimina dependência de mais um serviço AWS (SQS)
+- Segue arquitetura definida no README.md

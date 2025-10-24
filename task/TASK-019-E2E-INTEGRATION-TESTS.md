@@ -41,7 +41,7 @@
 
 ```typescript
 import { GenericContainer, StartedTestContainer } from 'testcontainers';
-import { Client } from 'pg';
+import { execSync } from 'child_process';
 
 export interface E2ETestEnvironment {
   redisContainer: StartedTestContainer;
@@ -70,11 +70,11 @@ export async function setupE2EEnvironment(): Promise<E2ETestEnvironment> {
 
   const databaseUrl = `postgresql://test:test@${postgresContainer.getHost()}:${postgresContainer.getMappedPort(5432)}/email_gateway_test`;
 
-  // Run migrations
-  const client = new Client({ connectionString: databaseUrl });
-  await client.connect();
-  // Execute migrations using Prisma
-  await client.end();
+  // Run Prisma migrations
+  execSync('npx prisma migrate deploy', {
+    env: { ...process.env, DATABASE_URL: databaseUrl },
+    stdio: 'inherit',
+  });
 
   return {
     redisContainer,
@@ -117,7 +117,7 @@ describe('Email Flow (E2E - Full Integration)', () => {
   let companyId: string;
   const sesMock = mockClient(SESClient);
 
-  beforeAll(async (done) => {
+  beforeAll(async () => {
     // Setup TestContainers
     env = await setupE2EEnvironment();
 
@@ -177,8 +177,6 @@ describe('Email Flow (E2E - Full Integration)', () => {
         },
       }
     );
-
-    done();
   }, 60000); // 60s timeout for container startup
 
   afterAll(async () => {
