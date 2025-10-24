@@ -12,6 +12,7 @@ export * from './schemas/email-job.schema';
 export * from './schemas/email-job.types';
 export * from './schemas/email-job-retry.schema';
 export * from './schemas/email-job-retry.types';
+export * from './schemas/attachment.schema'; // TASK-015
 
 // Types
 export * from './types/email-pipeline.types';

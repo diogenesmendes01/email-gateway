@@ -10,6 +10,11 @@
 
 import { z } from 'zod';
 import { sanitizeEmailHtml } from '../utils/html-sanitization.util';
+import {
+  attachmentSchema,
+  ATTACHMENT_LIMITS,
+  validateAttachmentConstraints,
+} from './attachment.schema';
 
 // ============================================================================
 // CONSTANTES E LIMITES
@@ -367,6 +372,35 @@ export const emailSendBodySchema = z.object({
    * Diferente de recipient.externalId
    */
   externalId: externalIdSchema.optional(),
+
+  // ========================================
+  // ANEXOS (TASK-015)
+  // ========================================
+
+  /**
+   * Lista de anexos do e-mail (opcional, max 10, max 40MB total)
+   * MIME types permitidos: PDF, DOC, XLS, imagens, etc.
+   * @see ALLOWED_MIME_TYPES in attachment.schema.ts
+   */
+  attachments: z
+    .array(attachmentSchema)
+    .max(
+      ATTACHMENT_LIMITS.MAX_ATTACHMENTS_PER_EMAIL,
+      `Maximum of ${ATTACHMENT_LIMITS.MAX_ATTACHMENTS_PER_EMAIL} attachments allowed`
+    )
+    .optional()
+    .refine(
+      (attachments) => {
+        if (!attachments || attachments.length === 0) return true;
+        const result = validateAttachmentConstraints(attachments);
+        return result.valid;
+      },
+      (attachments) => {
+        if (!attachments) return { message: 'Invalid attachments' };
+        const result = validateAttachmentConstraints(attachments);
+        return { message: result.error || 'Invalid attachments' };
+      }
+    ),
 }).strict()
   // Validação customizada: recipient.email deve coincidir com 'to'
   .refine(
