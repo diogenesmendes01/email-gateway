@@ -39,16 +39,19 @@ export class HealthController {
   /**
    * Readiness check - verifica dependências críticas (DB, Redis, SES quota)
    * Usado para determinar se a aplicação está pronta para receber tráfego
+   * TASK-008: Updated to accept 'warning' status as healthy (only 'error' is unhealthy)
    */
   @Get('readyz')
   @Throttle({ default: { limit: 30, ttl: 60000 } }) // 30 requests per minute (mais restritivo)
   async getReadyz() {
     try {
       const checks = await this.healthService.performReadinessChecks();
-      
-      const allHealthy = Object.values(checks).every(check => check.status === 'ok');
-      
-      if (!allHealthy) {
+
+      // Only 'error' status should make the service unavailable
+      // 'warning' is acceptable (e.g., SES quota at 85% is concerning but not blocking)
+      const hasErrors = Object.values(checks).some(check => check.status === 'error');
+
+      if (hasErrors) {
         throw new HttpException(
           {
             status: 'not_ready',
@@ -68,6 +71,31 @@ export class HealthController {
       throw new HttpException(
         {
           status: 'not_ready',
+          error: (error as Error).message,
+          timestamp: new Date().toISOString(),
+        },
+        HttpStatus.SERVICE_UNAVAILABLE,
+      );
+    }
+  }
+
+  /**
+   * SES quota check endpoint - dedicated endpoint for monitoring SES quota
+   * TASK-008: New endpoint for observability tools
+   */
+  @Get('ses-quota')
+  @Throttle({ default: { limit: 30, ttl: 60000 } }) // 30 requests per minute
+  async getSESQuota() {
+    try {
+      const checks = await this.healthService.performReadinessChecks();
+      return {
+        ...checks.ses,
+        timestamp: new Date().toISOString(),
+      };
+    } catch (error) {
+      throw new HttpException(
+        {
+          status: 'error',
           error: (error as Error).message,
           timestamp: new Date().toISOString(),
         },

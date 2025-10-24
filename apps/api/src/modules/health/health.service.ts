@@ -5,7 +5,7 @@ import { prisma } from '@email-gateway/database';
 import { Redis } from 'ioredis';
 
 export interface HealthCheck {
-  status: 'ok' | 'error';
+  status: 'ok' | 'warning' | 'error';
   message?: string;
   responseTime?: number;
   details?: any;
@@ -22,6 +22,13 @@ export class HealthService {
   private readonly logger = new Logger(HealthService.name);
   private readonly sesClient: SESClient;
   private readonly redis: Redis;
+
+  // TASK-008: SES quota monitoring configuration
+  private quotaCache: { data: HealthCheck; timestamp: number } | null = null;
+  private readonly CACHE_TTL_MS = 60000; // 1 minuto
+  private readonly QUOTA_WARNING_THRESHOLD = 0.8; // 80%
+  private readonly QUOTA_CRITICAL_THRESHOLD = 0.95; // 95%
+  private readonly SES_TIMEOUT_MS = 2000; // 2 segundos
 
   constructor(private readonly configService: ConfigService) {
     // Initialize SES client
@@ -158,70 +165,120 @@ export class HealthService {
 
   /**
    * Verifica quota do SES e conectividade
+   * TASK-008: Enhanced with cache, timeout, and graduated thresholds (warning + critical)
    */
   private async checkSESQuota(): Promise<HealthCheck> {
+    // Use cache if available and valid
+    if (this.quotaCache && Date.now() - this.quotaCache.timestamp < this.CACHE_TTL_MS) {
+      this.logger.debug('Using cached SES quota data');
+      return this.quotaCache.data;
+    }
+
     const startTime = Date.now();
-    
+
     try {
       const command = new GetSendQuotaCommand({});
-      const response = await this.sesClient.send(command);
-      
-      const { Max24HourSend, MaxSendRate, SentLast24Hours } = response;
-      
-      // Calcula percentual de uso
-      const usagePercent = ((SentLast24Hours || 0) / (Max24HourSend || 1)) * 100;
-      
-      // Verifica se está próximo do limite (80% é considerado crítico)
-      const quotaThreshold = this.configService.get<number>('SES_QUOTA_THRESHOLD', 80);
-      const isQuotaHealthy = usagePercent < quotaThreshold;
-      
+
+      // Add timeout to prevent health check from hanging
+      const response = await Promise.race([
+        this.sesClient.send(command),
+        this.timeoutPromise(this.SES_TIMEOUT_MS),
+      ]);
+
+      const sentLast24Hours = response.SentLast24Hours || 0;
+      const max24HourSend = response.Max24HourSend || 200; // Default sandbox limit
+      const maxSendRate = response.MaxSendRate || 1;
+
+      // Calculate usage percentage
+      const usagePercent = max24HourSend > 0
+        ? (sentLast24Hours / max24HourSend) * 100
+        : 0;
+
       const responseTime = Date.now() - startTime;
-      
-      if (!isQuotaHealthy) {
+
+      // Determine status based on graduated thresholds
+      let status: 'ok' | 'warning' | 'error' = 'ok';
+      let message: string;
+
+      if (usagePercent >= this.QUOTA_CRITICAL_THRESHOLD * 100) {
+        status = 'error';
+        message = `SES quota critical: ${usagePercent.toFixed(1)}% used (${sentLast24Hours}/${max24HourSend} emails)`;
+
+        this.logger.error({
+          message: 'SES quota critical',
+          usagePercent: usagePercent.toFixed(2),
+          sentLast24Hours,
+          max24HourSend,
+          threshold: this.QUOTA_CRITICAL_THRESHOLD * 100,
+        });
+      } else if (usagePercent >= this.QUOTA_WARNING_THRESHOLD * 100) {
+        status = 'warning';
+        message = `SES quota warning: ${usagePercent.toFixed(1)}% used (${sentLast24Hours}/${max24HourSend} emails)`;
+
         this.logger.warn({
-          message: 'SES quota approaching limit',
-          usagePercent: Math.round(usagePercent * 100) / 100,
-          threshold: quotaThreshold,
-          sentLast24Hours: SentLast24Hours,
-          max24HourSend: Max24HourSend,
+          message: 'SES quota warning',
+          usagePercent: usagePercent.toFixed(2),
+          sentLast24Hours,
+          max24HourSend,
+          threshold: this.QUOTA_WARNING_THRESHOLD * 100,
+        });
+      } else {
+        message = `SES quota healthy: ${usagePercent.toFixed(1)}% used`;
+
+        this.logger.debug({
+          message: 'SES quota healthy',
+          usagePercent: usagePercent.toFixed(2),
+          sentLast24Hours,
+          max24HourSend,
         });
       }
 
-      this.logger.debug({
-        message: 'SES health check completed',
-        usagePercent: Math.round(usagePercent * 100) / 100,
-        responseTime,
-      });
-
-      return {
-        status: isQuotaHealthy ? 'ok' : 'error',
-        message: isQuotaHealthy 
-          ? 'SES quota is healthy' 
-          : `SES quota usage is ${Math.round(usagePercent * 100) / 100}% (threshold: ${quotaThreshold}%)`,
+      const result: HealthCheck = {
+        status,
+        message,
         responseTime,
         details: {
-          usagePercent: Math.round(usagePercent * 100) / 100,
-          sentLast24Hours: SentLast24Hours,
-          max24HourSend: Max24HourSend,
-          maxSendRate: MaxSendRate,
-          threshold: quotaThreshold,
+          usagePercent: parseFloat(usagePercent.toFixed(2)),
+          sentLast24Hours,
+          max24HourSend,
+          maxSendRate,
+          warningThreshold: this.QUOTA_WARNING_THRESHOLD * 100,
+          criticalThreshold: this.QUOTA_CRITICAL_THRESHOLD * 100,
         },
       };
+
+      // Update cache
+      this.quotaCache = {
+        data: result,
+        timestamp: Date.now(),
+      };
+
+      return result;
     } catch (error) {
       const responseTime = Date.now() - startTime;
-      
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
       this.logger.error({
         message: 'SES health check failed',
-        error: (error as Error).message,
+        error: errorMessage,
         responseTime,
       });
 
       return {
         status: 'error',
-        message: `SES check failed: ${(error as Error).message}`,
+        message: `SES check failed: ${errorMessage}`,
         responseTime,
       };
     }
+  }
+
+  /**
+   * Creates a timeout promise that rejects after specified milliseconds
+   */
+  private timeoutPromise(ms: number): Promise<never> {
+    return new Promise((_, reject) =>
+      setTimeout(() => reject(new Error(`SES quota check timeout after ${ms}ms`)), ms)
+    );
   }
 
   /**
