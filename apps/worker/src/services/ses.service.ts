@@ -8,7 +8,12 @@
  */
 
 import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
-import { EmailSendJobData, PIPELINE_CONSTANTS } from '@email-gateway/shared';
+import {
+  EmailSendJobData,
+  PIPELINE_CONSTANTS,
+  ErrorCode,
+  ErrorCategory,
+} from '@email-gateway/shared';
 import { ErrorMappingService, type MappedError } from './error-mapping.service';
 import CircuitBreaker from 'opossum';
 
@@ -56,9 +61,9 @@ export class SESService {
     this.circuitBreaker = new CircuitBreaker(
       this.sendEmailInternal.bind(this),
       {
-        timeout: 5000, // 5s timeout
-        errorThresholdPercentage: 50, // Open after 50% errors
-        resetTimeout: 30000, // Try to close after 30s
+        timeout: 35000, // 35s timeout (longer than SES SDK default)
+        errorThresholdPercentage: 70, // Open after 70% errors
+        resetTimeout: 60000, // Try to close after 60s
         rollingCountTimeout: 10000, // 10s window
         rollingCountBuckets: 10, // 10 buckets of 1s each
         volumeThreshold: 10, // Minimum 10 calls to evaluate
@@ -67,23 +72,25 @@ export class SESService {
 
     // Circuit breaker events
     this.circuitBreaker.on('open', () => {
-      console.error({
-        message: 'Circuit breaker OPEN - SES unavailable',
+      console.error('[SES Circuit Breaker] OPEN - SES unavailable', {
         state: 'OPEN',
+        timestamp: new Date().toISOString(),
+        stats: this.circuitBreaker.stats,
       });
     });
 
     this.circuitBreaker.on('halfOpen', () => {
-      console.warn({
-        message: 'Circuit breaker HALF-OPEN - Testing SES',
+      console.warn('[SES Circuit Breaker] HALF-OPEN - Testing SES recovery', {
         state: 'HALF_OPEN',
+        timestamp: new Date().toISOString(),
       });
     });
 
     this.circuitBreaker.on('close', () => {
-      console.log({
-        message: 'Circuit breaker CLOSED - SES recovered',
+      console.log('[SES Circuit Breaker] CLOSED - SES recovered', {
         state: 'CLOSED',
+        timestamp: new Date().toISOString(),
+        stats: this.circuitBreaker.stats,
       });
     });
 
@@ -91,10 +98,11 @@ export class SESService {
     this.circuitBreaker.fallback(() => ({
       success: false,
       error: {
-        type: 'TRANSIENT',
-        code: 'SES_CIRCUIT_OPEN',
+        code: ErrorCode.SES_CIRCUIT_OPEN,
+        category: ErrorCategory.TRANSIENT_ERROR,
+        retryable: true,
         message: 'SES temporarily unavailable (circuit breaker open)',
-        isRetryable: true,
+        originalCode: 'CIRCUIT_BREAKER_OPEN',
       } as MappedError,
     }));
   }
@@ -161,15 +169,12 @@ export class SESService {
         Tags: this.buildTags(jobData),
       });
 
-      // Envia com timeout
-      const response = await Promise.race([
-        this.client.send(command),
-        this.createTimeoutPromise(PIPELINE_CONSTANTS.SES_SEND_TIMEOUT_MS),
-      ]);
+      // Envia email (circuit breaker handles timeout)
+      const response = await this.client.send(command);
 
-      // Verifica se deu timeout
+      // Verifica resposta
       if (!response || !('MessageId' in response)) {
-        throw new Error('SES request timeout');
+        throw new Error('SES request failed - no MessageId returned');
       }
 
       return {
@@ -180,6 +185,18 @@ export class SESService {
       // Mapeia o erro para nossa taxonomia
       const mappedError = ErrorMappingService.mapSESError(error);
 
+      // TASK-009: Throw retryable errors so circuit breaker can detect failures
+      // Non-retryable errors are returned as failed results
+      if (mappedError.retryable) {
+        const enrichedError = new Error(
+          `${mappedError.code}: ${mappedError.message}`,
+        );
+        // Attach mapped error for debugging
+        (enrichedError as any).mappedError = mappedError;
+        throw enrichedError;
+      }
+
+      // Non-retryable errors don't count toward circuit breaker
       return {
         success: false,
         error: mappedError,
@@ -223,17 +240,6 @@ export class SESService {
     }
 
     return tags;
-  }
-
-  /**
-   * Cria uma promise que rejeita após timeout
-   */
-  private createTimeoutPromise(timeoutMs: number): Promise<never> {
-    return new Promise((_, reject) => {
-      setTimeout(() => {
-        reject(new Error('Request timeout'));
-      }, timeoutMs);
-    });
   }
 
   /**
