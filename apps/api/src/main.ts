@@ -3,6 +3,7 @@ import { AppModule } from './app.module';
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { AppConfigService } from './config/app.config';
 import { AllExceptionsFilter } from './filters/http-exception.filter';
+import { validateEncryptionKey, getKeyGenerationHelp } from './utils/key-validation';
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
@@ -12,10 +13,29 @@ async function bootstrap() {
     const configService = new AppConfigService(null as any);
     
     logger.log('✅ Environment validation passed');
+
+    // TASK-007: Validate encryption key strength
+    const encryptionKey = process.env.ENCRYPTION_KEY;
+    if (!encryptionKey) {
+      logger.error('❌ ENCRYPTION_KEY environment variable is not set');
+      logger.error('');
+      logger.error(getKeyGenerationHelp());
+      process.exit(1);
+    }
+
+    const keyValidation = validateEncryptionKey(encryptionKey);
+    if (!keyValidation.valid) {
+      logger.error(`❌ ${keyValidation.error}`);
+      logger.error('');
+      logger.error(getKeyGenerationHelp());
+      process.exit(1);
+    }
+
+    logger.log('✅ Encryption key validation passed');
     logger.log(`🌍 Environment: ${configService.app.nodeEnv}`);
     logger.log(`🚀 Port: ${configService.app.port}`);
     logger.log(`📡 API Prefix: ${configService.app.apiPrefix}`);
-    
+
     // Log de configurações (sem dados sensíveis)
     logger.debug('Configuration loaded:', configService.getAll());
 
