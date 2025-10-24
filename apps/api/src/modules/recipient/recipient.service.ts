@@ -11,7 +11,7 @@
  * @see task/TASK-004-RECIPIENT-API.md
  */
 
-import { Injectable, NotFoundException, ConflictException, OnModuleInit } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, OnModuleInit, Logger } from '@nestjs/common';
 import { Recipient } from '@prisma/client';
 import { prisma } from '@email-gateway/database';
 import {
@@ -46,8 +46,13 @@ interface EncryptedCpfCnpj {
 
 @Injectable()
 export class RecipientService implements OnModuleInit {
+  private readonly logger = new Logger(RecipientService.name);
   private encryptionKey!: string;
   private hashSecret!: string;
+  private readonly ENCRYPTION_SLOW_THRESHOLD_MS = parseInt(
+    process.env.ENCRYPTION_SLOW_THRESHOLD_MS || '200',
+    10
+  );
 
   /**
    * Initialize and validate encryption keys on module startup
@@ -73,11 +78,49 @@ export class RecipientService implements OnModuleInit {
   /**
    * Encrypt CPF/CNPJ and generate hash for searching
    * Extracted to avoid code duplication
+   * TASK-012: Includes performance monitoring
    */
-  private encryptCpfCnpjData(cpfCnpj: string): EncryptedCpfCnpj {
-    const hash = hashCpfCnpjHmac(cpfCnpj, this.hashSecret);
-    const { encrypted, salt } = encryptCpfCnpj(cpfCnpj, this.encryptionKey);
-    return { hash, encrypted, salt };
+  private encryptCpfCnpjData(cpfCnpj: string, requestContext?: { companyId: string; requestId?: string }): EncryptedCpfCnpj {
+    const startTime = performance.now();
+
+    try {
+      const hash = hashCpfCnpjHmac(cpfCnpj, this.hashSecret);
+      const { encrypted, salt } = encryptCpfCnpj(cpfCnpj, this.encryptionKey);
+
+      const durationMs = performance.now() - startTime;
+
+      // Log slow encryption
+      if (durationMs > this.ENCRYPTION_SLOW_THRESHOLD_MS) {
+        this.logger.warn({
+          message: 'Slow CPF/CNPJ encryption detected',
+          durationMs: Math.round(durationMs),
+          threshold: this.ENCRYPTION_SLOW_THRESHOLD_MS,
+          companyId: requestContext?.companyId,
+          requestId: requestContext?.requestId,
+        });
+      }
+
+      // Log metrics (debug level)
+      this.logger.debug({
+        message: 'CPF/CNPJ encrypted',
+        durationMs: Math.round(durationMs),
+        companyId: requestContext?.companyId,
+      });
+
+      return { hash, encrypted, salt };
+    } catch (error) {
+      const durationMs = performance.now() - startTime;
+
+      this.logger.error({
+        message: 'CPF/CNPJ encryption failed',
+        error: error instanceof Error ? error.message : 'Unknown error',
+        durationMs: Math.round(durationMs),
+        companyId: requestContext?.companyId,
+        requestId: requestContext?.requestId,
+      });
+
+      throw error;
+    }
   }
   /**
    * Create a new recipient
@@ -94,7 +137,7 @@ export class RecipientService implements OnModuleInit {
 
     // Encrypt CPF/CNPJ if provided
     if (dto.cpfCnpj) {
-      const { hash, encrypted, salt } = this.encryptCpfCnpjData(dto.cpfCnpj);
+      const { hash, encrypted, salt } = this.encryptCpfCnpjData(dto.cpfCnpj, { companyId });
       data.cpfCnpjHash = hash;
       data.cpfCnpjEnc = encrypted;
       data.cpfCnpjSalt = salt;
@@ -188,7 +231,7 @@ export class RecipientService implements OnModuleInit {
 
     // If updating CPF/CNPJ, re-encrypt
     if (dto.cpfCnpj) {
-      const { hash, encrypted, salt } = this.encryptCpfCnpjData(dto.cpfCnpj);
+      const { hash, encrypted, salt } = this.encryptCpfCnpjData(dto.cpfCnpj, { companyId });
       data.cpfCnpjHash = hash;
       data.cpfCnpjEnc = encrypted;
       data.cpfCnpjSalt = salt;
