@@ -255,7 +255,12 @@ model Domain {
   lastChecked           DateTime?                 @map("last_checked")
   lastVerified          DateTime?                 @map("last_verified")
   errorMessage          String?                   @map("error_message") @db.Text
+
+  // TASK-016: Domain warm-up configuration
+  warmupEnabled         Boolean                   @default(false) @map("warmup_enabled")
+  warmupStartDate       DateTime?                 @map("warmup_start_date")
   warmupConfig          Json?                     @map("warmup_config")
+
   isProductionReady     Boolean                   @default(false) @map("is_production_ready")
   createdAt             DateTime                  @default(now()) @map("created_at")
   updatedAt             DateTime                  @updatedAt @map("updated_at")

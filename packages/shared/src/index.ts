@@ -20,6 +20,7 @@ export * from './types/domain.types';
 
 // Services
 export * from './services/domain-management.service';
+export * from './services/domain-warmup.service'; // TASK-016
 
 // Utils
 export * from './utils/masking.util';
