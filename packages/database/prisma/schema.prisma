@@ -146,6 +146,10 @@ model EmailOutbox {
   @@index([companyId, externalId])
   @@index([companyId, createdAt])
   @@index([recipientId])
+  // TASK-017: Composite index for dashboard queries
+  // Optimizes: WHERE company_id = X AND status = Y ORDER BY created_at DESC
+  // Used by dashboard email list, date range filters, and status-based queries
+  @@index([companyId, status, createdAt(sort: Desc)], map: "idx_email_outbox_dashboard")
   @@map("email_outbox")
 }
 
