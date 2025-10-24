@@ -8,7 +8,7 @@
  * validação de região/quota e warm-up de volumetria
  */
 
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { prisma } from '@email-gateway/database';
 import { DomainVerificationStatus as PrismaDomainVerificationStatus } from '@prisma/client';
@@ -38,6 +38,7 @@ import { DomainManagementService } from '../../../../worker/src/services/domain-
  */
 @Injectable()
 export class DomainService {
+  private readonly logger = new Logger(DomainService.name);
   private domainManagementService: DomainManagementService;
 
   constructor(private configService: ConfigService) {
@@ -148,7 +149,7 @@ export class DomainService {
         errorMessage: verificationInfo.errorMessage,
       };
     } catch (error) {
-      console.error(`Failed to add domain ${request.domain}:`, error);
+      this.logger.error(`Failed to add domain ${request.domain}:`, error);
       throw new BadRequestException(
         `Failed to add domain: ${error instanceof Error ? error.message : 'Unknown error'}`
       );
@@ -201,7 +202,7 @@ export class DomainService {
         errorMessage: verificationInfo.errorMessage,
       };
     } catch (error) {
-      console.error(`Failed to get domain status for ${domain}:`, error);
+      this.logger.error(`Failed to get domain status for ${domain}:`, error);
       return {
         domain,
         status: DomainVerificationStatus.FAILED,
@@ -254,7 +255,7 @@ export class DomainService {
         errorMessage: verificationInfo.errorMessage,
       };
     } catch (error) {
-      console.error(`Failed to verify domain ${domain}:`, error);
+      this.logger.error(`Failed to verify domain ${domain}:`, error);
       throw new BadRequestException(
         `Failed to verify domain: ${error instanceof Error ? error.message : 'Unknown error'}`
       );
@@ -289,7 +290,7 @@ export class DomainService {
         isValid: true,
       };
     } catch (error) {
-      console.error(`Failed to get DNS records for ${domain}:`, error);
+      this.logger.error(`Failed to get DNS records for ${domain}:`, error);
       return {
         domain,
         records: [],
@@ -340,7 +341,7 @@ export class DomainService {
         isValid: true,
       };
     } catch (error) {
-      console.error(`Failed to enable DKIM for ${domain}:`, error);
+      this.logger.error(`Failed to enable DKIM for ${domain}:`, error);
       return {
         domain,
         records: [],
@@ -381,7 +382,7 @@ export class DomainService {
         isValid: validation.isValid,
       };
     } catch (error) {
-      console.error(`Failed to validate DNS for ${domain}:`, error);
+      this.logger.error(`Failed to validate DNS for ${domain}:`, error);
       return {
         domain,
         records: [],
@@ -405,7 +406,7 @@ export class DomainService {
         lastUpdated: new Date().toISOString(),
       };
     } catch (error) {
-      console.error('Failed to get SES quota status:', error);
+      this.logger.error('Failed to get SES quota status:', error);
       throw new BadRequestException(
         `Failed to get SES quota status: ${error instanceof Error ? error.message : 'Unknown error'}`
       );
@@ -445,7 +446,7 @@ export class DomainService {
         success: true,
       };
     } catch (error) {
-      console.error(`Failed to configure warm-up for ${domain}:`, error);
+      this.logger.error(`Failed to configure warm-up for ${domain}:`, error);
       return {
         domain,
         config,
@@ -477,7 +478,7 @@ export class DomainService {
         failedItems,
       };
     } catch (error) {
-      console.error('Failed to get sandbox checklist:', error);
+      this.logger.error('Failed to get sandbox checklist:', error);
       throw new BadRequestException(
         `Failed to get sandbox checklist: ${error instanceof Error ? error.message : 'Unknown error'}`
       );
@@ -497,7 +498,7 @@ export class DomainService {
         ...validation,
       };
     } catch (error) {
-      console.error('Failed to validate region:', error);
+      this.logger.error('Failed to validate region:', error);
       throw new BadRequestException(
         `Failed to validate region: ${error instanceof Error ? error.message : 'Unknown error'}`
       );
@@ -529,7 +530,7 @@ export class DomainService {
       // TODO: Implementar remoção do SES se necessário
       // await this.domainManagementService.removeDomainFromSES(domain);
     } catch (error) {
-      console.error(`Failed to remove domain ${domain}:`, error);
+      this.logger.error(`Failed to remove domain ${domain}:`, error);
       throw new BadRequestException(
         `Failed to remove domain: ${error instanceof Error ? error.message : 'Unknown error'}`
       );

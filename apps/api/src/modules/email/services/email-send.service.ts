@@ -134,7 +134,15 @@ export class EmailSendService {
         },
       });
 
-      console.log(`✅ Email enqueued: outboxId=${outboxId}, jobId=${enqueuedJobId}`);
+      this.logger.log({
+        message: 'Email enqueued successfully',
+        outboxId,
+        jobId: enqueuedJobId,
+        companyId,
+        recipientId: outbox.recipientId,
+        requestId,
+        status: EmailStatus.ENQUEUED,
+      });
     } catch (error) {
       // Rollback outbox em caso de falha ao enfileirar
       await prisma.emailOutbox.delete({ where: { id: outboxId } });
