@@ -10,6 +10,7 @@
 
 import { SESClient } from '@aws-sdk/client-ses';
 import { SESv2Client } from '@aws-sdk/client-sesv2';
+import { promises as dns } from 'dns';
 
 /**
  * Status de verificação de domínio
@@ -298,17 +299,22 @@ export class DomainManagementService {
     const missingRecords: DNSRecord[] = [];
     const incorrectRecords: DNSRecord[] = [];
 
-    // TODO: Implementar verificação real de DNS
-    // Por enquanto, retorna que todos os registros estão ausentes
-    // Em uma implementação real, usaria uma biblioteca como 'dns' do Node.js
-    // ou uma API de verificação DNS
-
+    // Verificar cada registro DNS requerido
     for (const record of requiredRecords) {
-      missingRecords.push(record);
+      try {
+        const exists = await this.checkDNSRecord(record);
+
+        if (!exists) {
+          missingRecords.push(record);
+        }
+      } catch (error) {
+        // Em caso de erro (timeout, etc.), considerar como ausente
+        missingRecords.push(record);
+      }
     }
 
     return {
-      isValid: missingRecords.length === 0,
+      isValid: missingRecords.length === 0 && incorrectRecords.length === 0,
       missingRecords,
       incorrectRecords,
     };
@@ -462,5 +468,136 @@ export class DomainManagementService {
         isRecommended: false,
       };
     }
+  }
+
+  /**
+   * Verifica se um registro DNS existe
+   */
+  private async checkDNSRecord(record: DNSRecord): Promise<boolean> {
+    try {
+      switch (record.type) {
+        case 'TXT':
+          return await this.checkTxtRecord(record.name, record.value);
+        case 'CNAME':
+          return await this.checkCnameRecord(record.name, record.value);
+        case 'MX':
+          return await this.checkMxRecord(record.name, record.value);
+        default:
+          return false;
+      }
+    } catch (error) {
+      return false;
+    }
+  }
+
+  /**
+   * Verifica registro TXT com timeout
+   */
+  private async checkTxtRecord(name: string, expectedValue: string): Promise<boolean> {
+    try {
+      const records = await this.queryTxtRecords(name, 5000);
+
+      // Verificar se algum registro contém o valor esperado
+      // Normaliza valores removendo espaços e aspas
+      const normalizedExpected = expectedValue.replace(/["\s]/g, '').toLowerCase();
+
+      return records.some(record => {
+        const normalizedRecord = record.replace(/["\s]/g, '').toLowerCase();
+        return normalizedRecord.includes(normalizedExpected) || normalizedExpected.includes(normalizedRecord);
+      });
+    } catch (error) {
+      return false;
+    }
+  }
+
+  /**
+   * Verifica registro CNAME com timeout
+   */
+  private async checkCnameRecord(name: string, expectedValue: string): Promise<boolean> {
+    try {
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('DNS query timeout')), 5000)
+      );
+
+      const queryPromise = dns.resolveCname(name);
+      const records = await Promise.race([queryPromise, timeoutPromise]);
+
+      const normalizedExpected = expectedValue.toLowerCase().replace(/\.$/, '');
+
+      return records.some(record => {
+        const normalizedRecord = record.toLowerCase().replace(/\.$/, '');
+        return normalizedRecord === normalizedExpected;
+      });
+    } catch (error) {
+      return false;
+    }
+  }
+
+  /**
+   * Verifica registro MX com timeout
+   */
+  private async checkMxRecord(name: string, expectedValue: string): Promise<boolean> {
+    try {
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('DNS query timeout')), 5000)
+      );
+
+      const queryPromise = dns.resolveMx(name);
+      const records = await Promise.race([queryPromise, timeoutPromise]);
+
+      const normalizedExpected = expectedValue.toLowerCase().replace(/\.$/, '');
+
+      return records.some(record => {
+        const normalizedRecord = record.exchange.toLowerCase().replace(/\.$/, '');
+        return normalizedRecord === normalizedExpected;
+      });
+    } catch (error) {
+      return false;
+    }
+  }
+
+  /**
+   * Consulta registros TXT com timeout e retry
+   */
+  private async queryTxtRecords(
+    domain: string,
+    timeoutMs: number = 5000,
+    maxRetries: number = 2
+  ): Promise<string[]> {
+    let lastError: Error | undefined;
+
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        const timeoutPromise = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('DNS query timeout')), timeoutMs)
+        );
+
+        const queryPromise = dns.resolveTxt(domain);
+        const records = await Promise.race([queryPromise, timeoutPromise]);
+
+        // DNS retorna array de arrays, flatten e join
+        return records.map(record => record.join(''));
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error('Unknown error');
+
+        // Não retenta se for ENOTFOUND ou ENODATA (registro não existe)
+        if (
+          typeof error === 'object' &&
+          error !== null &&
+          'code' in error &&
+          (error.code === 'ENOTFOUND' || error.code === 'ENODATA')
+        ) {
+          return [];
+        }
+
+        // Aguarda antes de retentar (backoff exponencial)
+        if (attempt < maxRetries) {
+          await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
+        }
+      }
+    }
+
+    // Se todas as tentativas falharam, retorna vazio
+    return [];
   }
 }
