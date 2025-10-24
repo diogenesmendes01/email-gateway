@@ -20,6 +20,8 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     this.redis.on('error', (err) => {
       this.logger.error({
         message: 'Redis connection error',
+        service: 'RedisService',
+        timestamp: new Date().toISOString(),
         error: err.message,
         stack: err.stack,
         redisUrl: redisUrl.replace(/:[^:@]+@/, ':***@'), // Mask password in URL
@@ -29,6 +31,8 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     this.redis.on('connect', () => {
       this.logger.log({
         message: 'Connected to Redis successfully',
+        service: 'RedisService',
+        timestamp: new Date().toISOString(),
         redisUrl: redisUrl.replace(/:[^:@]+@/, ':***@'), // Mask password in URL
       });
     });

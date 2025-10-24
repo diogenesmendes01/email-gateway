@@ -149,10 +149,17 @@ export class DomainService {
         errorMessage: verificationInfo.errorMessage,
       };
     } catch (error) {
-      this.logger.error(`Failed to add domain ${request.domain}:`, error);
-      throw new BadRequestException(
-        `Failed to add domain: ${error instanceof Error ? error.message : 'Unknown error'}`
-      );
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorStack = error instanceof Error ? error.stack : undefined;
+
+      this.logger.error({
+        message: 'Failed to add domain',
+        domain: request.domain,
+        error: errorMessage,
+        stack: errorStack,
+      });
+
+      throw new BadRequestException(`Failed to add domain: ${errorMessage}`);
     }
   }
 
@@ -202,12 +209,21 @@ export class DomainService {
         errorMessage: verificationInfo.errorMessage,
       };
     } catch (error) {
-      this.logger.error(`Failed to get domain status for ${domain}:`, error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorStack = error instanceof Error ? error.stack : undefined;
+
+      this.logger.error({
+        message: 'Failed to get domain status',
+        domain,
+        error: errorMessage,
+        stack: errorStack,
+      });
+
       return {
         domain,
         status: DomainVerificationStatus.FAILED,
         dnsRecords: [],
-        errorMessage: error instanceof Error ? error.message : 'Unknown error',
+        errorMessage,
       };
     }
   }
@@ -255,10 +271,17 @@ export class DomainService {
         errorMessage: verificationInfo.errorMessage,
       };
     } catch (error) {
-      this.logger.error(`Failed to verify domain ${domain}:`, error);
-      throw new BadRequestException(
-        `Failed to verify domain: ${error instanceof Error ? error.message : 'Unknown error'}`
-      );
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorStack = error instanceof Error ? error.stack : undefined;
+
+      this.logger.error({
+        message: 'Failed to verify domain',
+        domain,
+        error: errorMessage,
+        stack: errorStack,
+      });
+
+      throw new BadRequestException(`Failed to verify domain: ${errorMessage}`);
     }
   }
 
@@ -290,12 +313,21 @@ export class DomainService {
         isValid: true,
       };
     } catch (error) {
-      this.logger.error(`Failed to get DNS records for ${domain}:`, error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorStack = error instanceof Error ? error.stack : undefined;
+
+      this.logger.error({
+        message: 'Failed to get DNS records',
+        domain,
+        error: errorMessage,
+        stack: errorStack,
+      });
+
       return {
         domain,
         records: [],
         isValid: false,
-        errorMessage: error instanceof Error ? error.message : 'Unknown error',
+        errorMessage,
       };
     }
   }
@@ -341,12 +373,21 @@ export class DomainService {
         isValid: true,
       };
     } catch (error) {
-      this.logger.error(`Failed to enable DKIM for ${domain}:`, error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorStack = error instanceof Error ? error.stack : undefined;
+
+      this.logger.error({
+        message: 'Failed to enable DKIM',
+        domain,
+        error: errorMessage,
+        stack: errorStack,
+      });
+
       return {
         domain,
         records: [],
         isValid: false,
-        errorMessage: error instanceof Error ? error.message : 'Unknown error',
+        errorMessage,
       };
     }
   }
@@ -382,12 +423,21 @@ export class DomainService {
         isValid: validation.isValid,
       };
     } catch (error) {
-      this.logger.error(`Failed to validate DNS for ${domain}:`, error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorStack = error instanceof Error ? error.stack : undefined;
+
+      this.logger.error({
+        message: 'Failed to validate DNS',
+        domain,
+        error: errorMessage,
+        stack: errorStack,
+      });
+
       return {
         domain,
         records: [],
         isValid: false,
-        errorMessage: error instanceof Error ? error.message : 'Unknown error',
+        errorMessage,
       };
     }
   }
@@ -406,10 +456,17 @@ export class DomainService {
         lastUpdated: new Date().toISOString(),
       };
     } catch (error) {
-      this.logger.error('Failed to get SES quota status:', error);
-      throw new BadRequestException(
-        `Failed to get SES quota status: ${error instanceof Error ? error.message : 'Unknown error'}`
-      );
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorStack = error instanceof Error ? error.stack : undefined;
+
+      this.logger.error({
+        message: 'Failed to get SES quota status',
+        companyId,
+        error: errorMessage,
+        stack: errorStack,
+      });
+
+      throw new BadRequestException(`Failed to get SES quota status: ${errorMessage}`);
     }
   }
 
@@ -446,12 +503,22 @@ export class DomainService {
         success: true,
       };
     } catch (error) {
-      this.logger.error(`Failed to configure warm-up for ${domain}:`, error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorStack = error instanceof Error ? error.stack : undefined;
+
+      this.logger.error({
+        message: 'Failed to configure warm-up',
+        domain,
+        companyId,
+        error: errorMessage,
+        stack: errorStack,
+      });
+
       return {
         domain,
         config,
         success: false,
-        errorMessage: error instanceof Error ? error.message : 'Unknown error',
+        errorMessage,
       };
     }
   }
@@ -478,10 +545,17 @@ export class DomainService {
         failedItems,
       };
     } catch (error) {
-      this.logger.error('Failed to get sandbox checklist:', error);
-      throw new BadRequestException(
-        `Failed to get sandbox checklist: ${error instanceof Error ? error.message : 'Unknown error'}`
-      );
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorStack = error instanceof Error ? error.stack : undefined;
+
+      this.logger.error({
+        message: 'Failed to get sandbox checklist',
+        companyId,
+        error: errorMessage,
+        stack: errorStack,
+      });
+
+      throw new BadRequestException(`Failed to get sandbox checklist: ${errorMessage}`);
     }
   }
 
@@ -498,10 +572,18 @@ export class DomainService {
         ...validation,
       };
     } catch (error) {
-      this.logger.error('Failed to validate region:', error);
-      throw new BadRequestException(
-        `Failed to validate region: ${error instanceof Error ? error.message : 'Unknown error'}`
-      );
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorStack = error instanceof Error ? error.stack : undefined;
+
+      this.logger.error({
+        message: 'Failed to validate region',
+        region: region || 'default',
+        companyId,
+        error: errorMessage,
+        stack: errorStack,
+      });
+
+      throw new BadRequestException(`Failed to validate region: ${errorMessage}`);
     }
   }
 
@@ -530,10 +612,18 @@ export class DomainService {
       // TODO: Implementar remoção do SES se necessário
       // await this.domainManagementService.removeDomainFromSES(domain);
     } catch (error) {
-      this.logger.error(`Failed to remove domain ${domain}:`, error);
-      throw new BadRequestException(
-        `Failed to remove domain: ${error instanceof Error ? error.message : 'Unknown error'}`
-      );
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorStack = error instanceof Error ? error.stack : undefined;
+
+      this.logger.error({
+        message: 'Failed to remove domain',
+        domain,
+        companyId,
+        error: errorMessage,
+        stack: errorStack,
+      });
+
+      throw new BadRequestException(`Failed to remove domain: ${errorMessage}`);
     }
   }
 
