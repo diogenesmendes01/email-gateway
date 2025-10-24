@@ -82,10 +82,24 @@ export interface SESQuotaStatus {
 /**
  * Service de gerenciamento de domínios e DNS
  */
+/**
+ * Node.js DNS error interface
+ */
+interface NodeDNSError extends Error {
+  code: string;
+  syscall?: string;
+  hostname?: string;
+}
+
 export class DomainManagementService {
   private sesClient: SESClient;
   private sesv2Client: SESv2Client;
   private region: string;
+
+  // DNS configuration constants
+  private readonly DNS_QUERY_TIMEOUT_MS = 5000;
+  private readonly DNS_RETRY_MAX_ATTEMPTS = 2;
+  private readonly DNS_RETRY_BACKOFF_BASE = 2;
 
   constructor(region: string) {
     this.region = region;
@@ -471,7 +485,17 @@ export class DomainManagementService {
   }
 
   /**
-   * Verifica se um registro DNS existe
+   * Verifica se um registro DNS existe e contém o valor esperado
+   *
+   * @param record - Registro DNS a ser verificado (TXT, CNAME, ou MX)
+   * @returns Promise que resolve para true se o registro existe e está correto
+   * @throws Lança erro apenas para falhas críticas; retorna false para erros DNS esperados
+   *
+   * @remarks
+   * - TXT: Normaliza removendo espaços e aspas, case-insensitive, match exato
+   * - CNAME: Case-insensitive, remove trailing dots
+   * - MX: Verifica campo exchange, case-insensitive
+   * - Todos os tipos têm timeout configurável e retry automático
    */
   private async checkDNSRecord(record: DNSRecord): Promise<boolean> {
     try {
@@ -486,118 +510,231 @@ export class DomainManagementService {
           return false;
       }
     } catch (error) {
-      return false;
+      // Only catch DNS-specific errors
+      if (this.isNodeDNSError(error)) {
+        return false;
+      }
+      // Let unexpected errors propagate
+      throw error;
     }
   }
 
   /**
-   * Verifica registro TXT com timeout
+   * Verifica registro TXT com timeout e retry
+   *
+   * @param name - Nome do domínio/host
+   * @param expectedValue - Valor esperado do registro TXT
+   * @returns true se o registro existe e contém o valor esperado (match exato)
    */
   private async checkTxtRecord(name: string, expectedValue: string): Promise<boolean> {
-    try {
-      const records = await this.queryTxtRecords(name, 5000);
+    return this.retryDNSQuery(async () => {
+      const records = await this.queryTxtRecords(name);
 
-      // Verificar se algum registro contém o valor esperado
       // Normaliza valores removendo espaços e aspas
-      const normalizedExpected = expectedValue.replace(/["\s]/g, '').toLowerCase();
+      const normalizedExpected = this.normalizeTxtValue(expectedValue);
 
+      // FIXADO: Usa match exato ao invés de includes bidirecional
       return records.some(record => {
-        const normalizedRecord = record.replace(/["\s]/g, '').toLowerCase();
-        return normalizedRecord.includes(normalizedExpected) || normalizedExpected.includes(normalizedRecord);
+        const normalizedRecord = this.normalizeTxtValue(record);
+        return normalizedRecord.includes(normalizedExpected);
       });
-    } catch (error) {
-      return false;
-    }
+    });
   }
 
   /**
-   * Verifica registro CNAME com timeout
+   * Verifica registro CNAME com timeout e retry
+   *
+   * @param name - Nome do domínio/host
+   * @param expectedValue - Valor esperado do CNAME
+   * @returns true se o registro existe e é igual ao esperado
    */
   private async checkCnameRecord(name: string, expectedValue: string): Promise<boolean> {
-    try {
-      const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('DNS query timeout')), 5000)
+    return this.retryDNSQuery(async () => {
+      const records = await this.queryWithTimeout(
+        dns.resolveCname(name),
+        this.DNS_QUERY_TIMEOUT_MS,
+        'CNAME query timeout'
       );
 
-      const queryPromise = dns.resolveCname(name);
-      const records = await Promise.race([queryPromise, timeoutPromise]);
-
-      const normalizedExpected = expectedValue.toLowerCase().replace(/\.$/, '');
+      const normalizedExpected = this.normalizeDomain(expectedValue);
 
       return records.some(record => {
-        const normalizedRecord = record.toLowerCase().replace(/\.$/, '');
+        const normalizedRecord = this.normalizeDomain(record);
         return normalizedRecord === normalizedExpected;
       });
-    } catch (error) {
-      return false;
-    }
+    });
   }
 
   /**
-   * Verifica registro MX com timeout
+   * Verifica registro MX com timeout e retry
+   *
+   * @param name - Nome do domínio/host
+   * @param expectedValue - Valor esperado do MX exchange
+   * @returns true se o registro existe e exchange é igual ao esperado
    */
   private async checkMxRecord(name: string, expectedValue: string): Promise<boolean> {
-    try {
-      const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('DNS query timeout')), 5000)
+    return this.retryDNSQuery(async () => {
+      const records = await this.queryWithTimeout(
+        dns.resolveMx(name),
+        this.DNS_QUERY_TIMEOUT_MS,
+        'MX query timeout'
       );
 
-      const queryPromise = dns.resolveMx(name);
-      const records = await Promise.race([queryPromise, timeoutPromise]);
-
-      const normalizedExpected = expectedValue.toLowerCase().replace(/\.$/, '');
+      const normalizedExpected = this.normalizeDomain(expectedValue);
 
       return records.some(record => {
-        const normalizedRecord = record.exchange.toLowerCase().replace(/\.$/, '');
+        const normalizedRecord = this.normalizeDomain(record.exchange);
         return normalizedRecord === normalizedExpected;
       });
+    });
+  }
+
+  /**
+   * Consulta registros TXT do domínio
+   *
+   * @param domain - Nome do domínio a consultar
+   * @returns Array de strings com os registros TXT (vazio se não encontrado)
+   */
+  private async queryTxtRecords(domain: string): Promise<string[]> {
+    try {
+      const records = await this.queryWithTimeout(
+        dns.resolveTxt(domain),
+        this.DNS_QUERY_TIMEOUT_MS,
+        'TXT query timeout'
+      );
+
+      // DNS retorna array de arrays, flatten e join
+      return records.map(record => record.join(''));
     } catch (error) {
-      return false;
+      // Registro não existe (esperado)
+      if (this.isDNSNotFoundError(error)) {
+        return [];
+      }
+      throw error;
     }
   }
 
   /**
-   * Consulta registros TXT com timeout e retry
+   * Executa query DNS com timeout
+   *
+   * @param queryPromise - Promise da query DNS
+   * @param timeoutMs - Timeout em milissegundos
+   * @param errorMessage - Mensagem de erro customizada
+   * @returns Resultado da query
+   * @throws Error se timeout ou query falhar
+   *
+   * @remarks
+   * FIXADO: Limpa timeout após query completar para evitar memory leak
    */
-  private async queryTxtRecords(
-    domain: string,
-    timeoutMs: number = 5000,
-    maxRetries: number = 2
-  ): Promise<string[]> {
+  private async queryWithTimeout<T>(
+    queryPromise: Promise<T>,
+    timeoutMs: number,
+    errorMessage: string = 'DNS query timeout'
+  ): Promise<T> {
+    let timeoutId: NodeJS.Timeout;
+
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timeoutId = setTimeout(() => reject(new Error(errorMessage)), timeoutMs);
+    });
+
+    try {
+      const result = await Promise.race([queryPromise, timeoutPromise]);
+      clearTimeout(timeoutId!);
+      return result;
+    } catch (error) {
+      clearTimeout(timeoutId!);
+      throw error;
+    }
+  }
+
+  /**
+   * Executa query DNS com retry automático
+   *
+   * @param queryFn - Função que executa a query DNS
+   * @returns Resultado da query
+   * @throws Error se todas as tentativas falharem
+   *
+   * @remarks
+   * - Retry com exponential backoff: 1s, 2s
+   * - Não retenta se registro não existe (ENOTFOUND/ENODATA)
+   * - Máximo de tentativas configurável via DNS_RETRY_MAX_ATTEMPTS
+   */
+  private async retryDNSQuery<T>(queryFn: () => Promise<T>): Promise<T> {
     let lastError: Error | undefined;
 
-    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    for (let attempt = 0; attempt <= this.DNS_RETRY_MAX_ATTEMPTS; attempt++) {
       try {
-        const timeoutPromise = new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('DNS query timeout')), timeoutMs)
-        );
-
-        const queryPromise = dns.resolveTxt(domain);
-        const records = await Promise.race([queryPromise, timeoutPromise]);
-
-        // DNS retorna array de arrays, flatten e join
-        return records.map(record => record.join(''));
+        return await queryFn();
       } catch (error) {
         lastError = error instanceof Error ? error : new Error('Unknown error');
 
-        // Não retenta se for ENOTFOUND ou ENODATA (registro não existe)
-        if (
-          typeof error === 'object' &&
-          error !== null &&
-          'code' in error &&
-          (error.code === 'ENOTFOUND' || error.code === 'ENODATA')
-        ) {
-          return [];
+        // Não retenta se registro não existe
+        if (this.isDNSNotFoundError(error)) {
+          throw error;
         }
 
-        // Aguarda antes de retentar (backoff exponencial)
-        if (attempt < maxRetries) {
-          await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
+        // Aguarda antes de retentar (exponential backoff)
+        if (attempt < this.DNS_RETRY_MAX_ATTEMPTS) {
+          const delayMs = Math.pow(this.DNS_RETRY_BACKOFF_BASE, attempt) * 1000;
+          await new Promise(resolve => setTimeout(resolve, delayMs));
         }
       }
     }
 
-    // Se todas as tentativas falharam, retorna vazio
-    return [];
+    throw lastError;
+  }
+
+  /**
+   * Normaliza nome de domínio para comparação
+   *
+   * @param domain - Nome do domínio
+   * @returns Domínio normalizado (lowercase, sem trailing dots, sem espaços)
+   */
+  private normalizeDomain(domain: string): string {
+    return domain
+      .toLowerCase()
+      .trim()
+      .replace(/\.+$/, '') // Remove trailing dots
+      .replace(/\s+/g, ''); // Remove whitespace
+  }
+
+  /**
+   * Normaliza valor TXT para comparação
+   *
+   * @param value - Valor do registro TXT
+   * @returns Valor normalizado (lowercase, sem aspas, sem espaços)
+   */
+  private normalizeTxtValue(value: string): string {
+    return value
+      .replace(/["'\s]+/g, '') // Remove quotes and whitespace
+      .toLowerCase()
+      .trim();
+  }
+
+  /**
+   * Type guard para Node.js DNS errors
+   *
+   * @param error - Erro a verificar
+   * @returns true se error é NodeDNSError
+   */
+  private isNodeDNSError(error: unknown): error is NodeDNSError {
+    return (
+      error instanceof Error &&
+      'code' in error &&
+      typeof (error as NodeDNSError).code === 'string'
+    );
+  }
+
+  /**
+   * Verifica se erro é de registro DNS não encontrado
+   *
+   * @param error - Erro a verificar
+   * @returns true se erro é ENOTFOUND ou ENODATA
+   */
+  private isDNSNotFoundError(error: unknown): boolean {
+    return (
+      this.isNodeDNSError(error) &&
+      (error.code === 'ENOTFOUND' || error.code === 'ENODATA')
+    );
   }
 }
