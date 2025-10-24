@@ -117,10 +117,13 @@ export class RateLimitGuard implements CanActivate {
       }
 
       // Em caso de erro no Redis, permite a requisição (fail-open)
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorStack = error instanceof Error ? error.stack : undefined;
+
       this.logger.error({
         message: 'Redis rate limiting error - failing open',
-        error: error.message,
-        stack: error.stack,
+        error: errorMessage,
+        stack: errorStack,
         companyId: (context.switchToHttp().getRequest() as any)['companyId'],
       });
       return true;
@@ -160,10 +163,13 @@ export class RateLimitGuard implements CanActivate {
         burstRemaining: Math.max(0, config.burst - burstCount),
       };
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorStack = error instanceof Error ? error.stack : undefined;
+
       this.logger.error({
         message: 'Error getting rate limit stats',
-        error: error.message,
-        stack: error.stack,
+        error: errorMessage,
+        stack: errorStack,
         companyId,
       });
       return null;
