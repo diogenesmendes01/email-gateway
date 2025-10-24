@@ -10,6 +10,7 @@
 import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
 import { EmailSendJobData, PIPELINE_CONSTANTS } from '@email-gateway/shared';
 import { ErrorMappingService, type MappedError } from './error-mapping.service';
+import CircuitBreaker from 'opossum';
 
 /**
  * Configuração do SES
@@ -36,22 +37,92 @@ export interface SESSendResult {
 export class SESService {
   private client: SESClient;
   private config: SESConfig;
+  private circuitBreaker: CircuitBreaker<
+    [EmailSendJobData, string],
+    SESSendResult
+  >;
 
   constructor(config: SESConfig) {
     this.config = config;
     this.client = new SESClient({
       region: config.region,
     });
+
+    // TASK-009: Initialize circuit breaker
+    this.initializeCircuitBreaker();
+  }
+
+  private initializeCircuitBreaker() {
+    this.circuitBreaker = new CircuitBreaker(
+      this.sendEmailInternal.bind(this),
+      {
+        timeout: 5000, // 5s timeout
+        errorThresholdPercentage: 50, // Open after 50% errors
+        resetTimeout: 30000, // Try to close after 30s
+        rollingCountTimeout: 10000, // 10s window
+        rollingCountBuckets: 10, // 10 buckets of 1s each
+        volumeThreshold: 10, // Minimum 10 calls to evaluate
+      }
+    );
+
+    // Circuit breaker events
+    this.circuitBreaker.on('open', () => {
+      console.error({
+        message: 'Circuit breaker OPEN - SES unavailable',
+        state: 'OPEN',
+      });
+    });
+
+    this.circuitBreaker.on('halfOpen', () => {
+      console.warn({
+        message: 'Circuit breaker HALF-OPEN - Testing SES',
+        state: 'HALF_OPEN',
+      });
+    });
+
+    this.circuitBreaker.on('close', () => {
+      console.log({
+        message: 'Circuit breaker CLOSED - SES recovered',
+        state: 'CLOSED',
+      });
+    });
+
+    // Fallback when circuit is open
+    this.circuitBreaker.fallback(() => ({
+      success: false,
+      error: {
+        type: 'TRANSIENT',
+        code: 'SES_CIRCUIT_OPEN',
+        message: 'SES temporarily unavailable (circuit breaker open)',
+        isRetryable: true,
+      } as MappedError,
+    }));
   }
 
   /**
-   * Envia email via AWS SES
+   * Envia email via AWS SES com circuit breaker
+   * TASK-009: Wrapped with circuit breaker for resilience
    *
    * @param jobData - Dados do job
    * @param htmlContent - Conteúdo HTML do email
    * @returns Resultado do envio
    */
   async sendEmail(
+    jobData: EmailSendJobData,
+    htmlContent: string,
+  ): Promise<SESSendResult> {
+    return this.circuitBreaker.fire(jobData, htmlContent);
+  }
+
+  /**
+   * Internal method to send email via AWS SES
+   * TASK-009: Wrapped by circuit breaker
+   *
+   * @param jobData - Dados do job
+   * @param htmlContent - Conteúdo HTML do email
+   * @returns Resultado do envio
+   */
+  private async sendEmailInternal(
     jobData: EmailSendJobData,
     htmlContent: string,
   ): Promise<SESSendResult> {
@@ -163,6 +234,21 @@ export class SESService {
         reject(new Error('Request timeout'));
       }, timeoutMs);
     });
+  }
+
+  /**
+   * Get circuit breaker stats for monitoring
+   * TASK-009: Expose circuit breaker state and statistics
+   */
+  getCircuitBreakerStats() {
+    return {
+      state: this.circuitBreaker.opened
+        ? 'OPEN'
+        : this.circuitBreaker.halfOpen
+          ? 'HALF_OPEN'
+          : 'CLOSED',
+      stats: this.circuitBreaker.stats,
+    };
   }
 
   /**
