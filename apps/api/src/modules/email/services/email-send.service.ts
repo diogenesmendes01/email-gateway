@@ -39,6 +39,11 @@ interface SendEmailParams {
 @Injectable()
 export class EmailSendService {
   private readonly logger = new Logger(EmailSendService.name);
+  private readonly ENCRYPTION_SLOW_THRESHOLD_MS = parseInt(
+    process.env.ENCRYPTION_SLOW_THRESHOLD_MS || '200',
+    10
+  );
+
   constructor(private readonly queueService: QueueService) {}
   /**
    * Send email asynchronously
@@ -258,11 +263,46 @@ export class EmailSendService {
     }
 
     if (recipient.cpfCnpj) {
-      const hash = hashCpfCnpjSha256(recipient.cpfCnpj);
-      const { encrypted, salt } = encryptCpfCnpj(recipient.cpfCnpj, this.getEncryptionKey());
-      recipientData.cpfCnpjHash = hash;
-      recipientData.cpfCnpjEnc = encrypted;
-      recipientData.cpfCnpjSalt = salt;
+      const startTime = performance.now();
+
+      try {
+        const hash = hashCpfCnpjSha256(recipient.cpfCnpj);
+        const { encrypted, salt } = encryptCpfCnpj(recipient.cpfCnpj, this.getEncryptionKey());
+
+        const durationMs = performance.now() - startTime;
+
+        // Log slow encryption (TASK-012)
+        if (durationMs > this.ENCRYPTION_SLOW_THRESHOLD_MS) {
+          this.logger.warn({
+            message: 'Slow CPF/CNPJ encryption detected',
+            durationMs: Math.round(durationMs),
+            threshold: this.ENCRYPTION_SLOW_THRESHOLD_MS,
+            companyId,
+          });
+        }
+
+        // Log metrics (debug level)
+        this.logger.debug({
+          message: 'CPF/CNPJ encrypted',
+          durationMs: Math.round(durationMs),
+          companyId,
+        });
+
+        recipientData.cpfCnpjHash = hash;
+        recipientData.cpfCnpjEnc = encrypted;
+        recipientData.cpfCnpjSalt = salt;
+      } catch (error) {
+        const durationMs = performance.now() - startTime;
+
+        this.logger.error({
+          message: 'CPF/CNPJ encryption failed',
+          error: error instanceof Error ? error.message : 'Unknown error',
+          durationMs: Math.round(durationMs),
+          companyId,
+        });
+
+        throw error;
+      }
     }
 
     if (recipient.nome) {
