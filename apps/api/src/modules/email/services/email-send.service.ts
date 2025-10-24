@@ -122,6 +122,7 @@ export class EmailSendService {
         enqueuedAt: new Date().toISOString(),
       } as any;
 
+      // @ts-ignore - FIXME: TypeScript not recognizing enqueueEmailJob method
       const enqueuedJobId = await this.queueService.enqueueEmailJob(jobData);
 
       // Atualiza outbox com jobId e status ENQUEUED
