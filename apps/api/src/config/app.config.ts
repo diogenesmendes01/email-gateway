@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { IsString, IsNumber, IsUrl, IsOptional, IsBoolean, Min, Max, validateSync } from 'class-validator';
 import { plainToClass, Transform } from 'class-transformer';
+import { validateEncryptionKeyOrThrow } from '@email-gateway/shared';
 
 /**
  * Validação de variáveis de ambiente
@@ -205,11 +206,18 @@ export class AppConfigService {
 
     if (errors.length > 0) {
       // WHY: Mensagens detalhadas ajudam na depuração de problemas de configuração
-      const errorMessages = errors.map(error => 
+      const errorMessages = errors.map(error =>
         Object.values(error.constraints || {}).join(', ')
       ).join('; ');
-      
+
       throw new Error(`❌ Configuração de ambiente inválida: ${errorMessages}`);
+    }
+
+    // TASK 8.1: Validate ENCRYPTION_KEY strength (prevents weak/placeholder keys)
+    try {
+      validateEncryptionKeyOrThrow(config.ENCRYPTION_KEY);
+    } catch (error) {
+      throw new Error(`❌ ${(error as Error).message}`);
     }
 
     return config;

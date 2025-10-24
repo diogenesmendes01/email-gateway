@@ -1,13 +1,15 @@
-import { Global, Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+/**
+ * TASK 8.2 - Queue Module
+ *
+ * Global module that provides QueueService to entire application
+ */
+
+import { Module, Global } from '@nestjs/common';
 import { QueueService } from './queue.service';
 
-@Global()
+@Global() // Make available everywhere without importing
 @Module({
-  imports: [ConfigModule],
   providers: [QueueService],
   exports: [QueueService],
 })
 export class QueueModule {}
-
-

@@ -23,6 +23,7 @@ export * from './services/domain-management.service';
 // Utils
 export * from './utils/masking.util';
 export * from './utils/encryption.util';
+export * from './utils/key-validation.util';
 export * from './utils/retention.util';
 export * from './utils/access-control.util';
 export * from './utils/html-sanitization.util';
