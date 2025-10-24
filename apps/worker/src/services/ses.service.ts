@@ -42,7 +42,7 @@ export interface SESSendResult {
 export class SESService {
   private client: SESClient;
   private config: SESConfig;
-  private circuitBreaker: CircuitBreaker<
+  private circuitBreaker!: CircuitBreaker<
     [EmailSendJobData, string],
     SESSendResult
   >;
