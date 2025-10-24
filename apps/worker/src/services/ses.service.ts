@@ -8,8 +8,14 @@
  */
 
 import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
-import { EmailSendJobData, PIPELINE_CONSTANTS } from '@email-gateway/shared';
+import {
+  EmailSendJobData,
+  PIPELINE_CONSTANTS,
+  ErrorCode,
+  ErrorCategory,
+} from '@email-gateway/shared';
 import { ErrorMappingService, type MappedError } from './error-mapping.service';
+import CircuitBreaker from 'opossum';
 
 /**
  * Configuração do SES
@@ -36,22 +42,95 @@ export interface SESSendResult {
 export class SESService {
   private client: SESClient;
   private config: SESConfig;
+  private circuitBreaker!: CircuitBreaker<
+    [EmailSendJobData, string],
+    SESSendResult
+  >;
 
   constructor(config: SESConfig) {
     this.config = config;
     this.client = new SESClient({
       region: config.region,
     });
+
+    // TASK-009: Initialize circuit breaker
+    this.initializeCircuitBreaker();
+  }
+
+  private initializeCircuitBreaker() {
+    this.circuitBreaker = new CircuitBreaker(
+      this.sendEmailInternal.bind(this),
+      {
+        timeout: 35000, // 35s timeout (longer than SES SDK default)
+        errorThresholdPercentage: 70, // Open after 70% errors
+        resetTimeout: 60000, // Try to close after 60s
+        rollingCountTimeout: 10000, // 10s window
+        rollingCountBuckets: 10, // 10 buckets of 1s each
+        volumeThreshold: 10, // Minimum 10 calls to evaluate
+      }
+    );
+
+    // Circuit breaker events
+    this.circuitBreaker.on('open', () => {
+      console.error('[SES Circuit Breaker] OPEN - SES unavailable', {
+        state: 'OPEN',
+        timestamp: new Date().toISOString(),
+        stats: this.circuitBreaker.stats,
+      });
+    });
+
+    this.circuitBreaker.on('halfOpen', () => {
+      console.warn('[SES Circuit Breaker] HALF-OPEN - Testing SES recovery', {
+        state: 'HALF_OPEN',
+        timestamp: new Date().toISOString(),
+      });
+    });
+
+    this.circuitBreaker.on('close', () => {
+      console.log('[SES Circuit Breaker] CLOSED - SES recovered', {
+        state: 'CLOSED',
+        timestamp: new Date().toISOString(),
+        stats: this.circuitBreaker.stats,
+      });
+    });
+
+    // Fallback when circuit is open
+    this.circuitBreaker.fallback(() => ({
+      success: false,
+      error: {
+        code: ErrorCode.SES_CIRCUIT_OPEN,
+        category: ErrorCategory.TRANSIENT_ERROR,
+        retryable: true,
+        message: 'SES temporarily unavailable (circuit breaker open)',
+        originalCode: 'CIRCUIT_BREAKER_OPEN',
+      } as MappedError,
+    }));
   }
 
   /**
-   * Envia email via AWS SES
+   * Envia email via AWS SES com circuit breaker
+   * TASK-009: Wrapped with circuit breaker for resilience
    *
    * @param jobData - Dados do job
    * @param htmlContent - Conteúdo HTML do email
    * @returns Resultado do envio
    */
   async sendEmail(
+    jobData: EmailSendJobData,
+    htmlContent: string,
+  ): Promise<SESSendResult> {
+    return this.circuitBreaker.fire(jobData, htmlContent);
+  }
+
+  /**
+   * Internal method to send email via AWS SES
+   * TASK-009: Wrapped by circuit breaker
+   *
+   * @param jobData - Dados do job
+   * @param htmlContent - Conteúdo HTML do email
+   * @returns Resultado do envio
+   */
+  private async sendEmailInternal(
     jobData: EmailSendJobData,
     htmlContent: string,
   ): Promise<SESSendResult> {
@@ -90,15 +169,12 @@ export class SESService {
         Tags: this.buildTags(jobData),
       });
 
-      // Envia com timeout
-      const response = await Promise.race([
-        this.client.send(command),
-        this.createTimeoutPromise(PIPELINE_CONSTANTS.SES_SEND_TIMEOUT_MS),
-      ]);
+      // Envia email (circuit breaker handles timeout)
+      const response = await this.client.send(command);
 
-      // Verifica se deu timeout
+      // Verifica resposta
       if (!response || !('MessageId' in response)) {
-        throw new Error('SES request timeout');
+        throw new Error('SES request failed - no MessageId returned');
       }
 
       return {
@@ -109,6 +185,18 @@ export class SESService {
       // Mapeia o erro para nossa taxonomia
       const mappedError = ErrorMappingService.mapSESError(error);
 
+      // TASK-009: Throw retryable errors so circuit breaker can detect failures
+      // Non-retryable errors are returned as failed results
+      if (mappedError.retryable) {
+        const enrichedError = new Error(
+          `${mappedError.code}: ${mappedError.message}`,
+        );
+        // Attach mapped error for debugging
+        (enrichedError as any).mappedError = mappedError;
+        throw enrichedError;
+      }
+
+      // Non-retryable errors don't count toward circuit breaker
       return {
         success: false,
         error: mappedError,
@@ -155,14 +243,18 @@ export class SESService {
   }
 
   /**
-   * Cria uma promise que rejeita após timeout
+   * Get circuit breaker stats for monitoring
+   * TASK-009: Expose circuit breaker state and statistics
    */
-  private createTimeoutPromise(timeoutMs: number): Promise<never> {
-    return new Promise((_, reject) => {
-      setTimeout(() => {
-        reject(new Error('Request timeout'));
-      }, timeoutMs);
-    });
+  getCircuitBreakerStats() {
+    return {
+      state: this.circuitBreaker.opened
+        ? 'OPEN'
+        : this.circuitBreaker.halfOpen
+          ? 'HALF_OPEN'
+          : 'CLOSED',
+      stats: this.circuitBreaker.stats,
+    };
   }
 
   /**
