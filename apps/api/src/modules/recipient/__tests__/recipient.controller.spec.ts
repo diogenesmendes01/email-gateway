@@ -5,7 +5,8 @@
  */
 
 import { Test, TestingModule } from '@nestjs/testing';
-import { NotFoundException } from '@nestjs/common';
+import { NotFoundException, BadRequestException } from '@nestjs/common';
+import { ThrottlerGuard } from '@nestjs/throttler';
 import { RecipientController } from '../recipient.controller';
 import { RecipientService } from '../recipient.service';
 import { ApiKeyGuard } from '../../auth/auth.guard';
@@ -53,6 +54,8 @@ describe('RecipientController', () => {
       ],
     })
       .overrideGuard(ApiKeyGuard)
+      .useValue({ canActivate: () => true })
+      .overrideGuard(ThrottlerGuard)
       .useValue({ canActivate: () => true })
       .overrideInterceptor(AuditInterceptor)
       .useValue({ intercept: (context: any, next: any) => next.handle() })
@@ -138,9 +141,12 @@ describe('RecipientController', () => {
       );
     });
 
-    it('should throw NotFoundException if hash parameter is missing', async () => {
+    it('should throw BadRequestException if hash parameter is missing', async () => {
       await expect(controller.search('', mockRequest)).rejects.toThrow(
-        NotFoundException,
+        BadRequestException,
+      );
+      await expect(controller.search('', mockRequest)).rejects.toThrow(
+        'Hash query parameter is required',
       );
     });
   });

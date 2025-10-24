@@ -45,14 +45,18 @@ describe('RecipientService', () => {
   };
 
   beforeEach(async () => {
+    // Set environment variables BEFORE module compilation (exactly 32 bytes for AES-256)
+    process.env.ENCRYPTION_KEY = '12345678901234567890123456789012'; // 32 bytes
+    process.env.HASH_SECRET = 'test-hash-secret-key-for-hmac-generation';
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [RecipientService],
     }).compile();
 
     service = module.get<RecipientService>(RecipientService);
 
-    // Set environment variable (exactly 32 bytes for AES-256)
-    process.env.ENCRYPTION_KEY = '12345678901234567890123456789012'; // 32 bytes
+    // Initialize the service (calls onModuleInit)
+    await service.onModuleInit();
 
     // Clear all mocks
     jest.clearAllMocks();
@@ -60,6 +64,7 @@ describe('RecipientService', () => {
 
   afterEach(() => {
     delete process.env.ENCRYPTION_KEY;
+    delete process.env.HASH_SECRET;
   });
 
   describe('create', () => {
@@ -114,29 +119,45 @@ describe('RecipientService', () => {
       expect(result).toEqual(mockRecipient);
     });
 
-    it('should throw error if ENCRYPTION_KEY is not set', async () => {
+    it('should throw error on module init if ENCRYPTION_KEY is not set', async () => {
       delete process.env.ENCRYPTION_KEY;
 
-      const dto = {
-        email: 'test@example.com',
-        cpfCnpj: '12345678901',
-      };
+      const module: TestingModule = await Test.createTestingModule({
+        providers: [RecipientService],
+      }).compile();
 
-      await expect(service.create(mockCompanyId, dto)).rejects.toThrow(
+      const newService = module.get<RecipientService>(RecipientService);
+
+      await expect(newService.onModuleInit()).rejects.toThrow(
         'ENCRYPTION_KEY environment variable is not set',
       );
     });
 
-    it('should throw error if ENCRYPTION_KEY is not 32 bytes', async () => {
+    it('should throw error on module init if ENCRYPTION_KEY is not 32 bytes', async () => {
       process.env.ENCRYPTION_KEY = 'short-key'; // Not 32 bytes
 
-      const dto = {
-        email: 'test@example.com',
-        cpfCnpj: '12345678901',
-      };
+      const module: TestingModule = await Test.createTestingModule({
+        providers: [RecipientService],
+      }).compile();
 
-      await expect(service.create(mockCompanyId, dto)).rejects.toThrow(
+      const newService = module.get<RecipientService>(RecipientService);
+
+      await expect(newService.onModuleInit()).rejects.toThrow(
         'ENCRYPTION_KEY must be exactly 32 bytes for AES-256',
+      );
+    });
+
+    it('should throw error on module init if HASH_SECRET is not set', async () => {
+      delete process.env.HASH_SECRET;
+
+      const module: TestingModule = await Test.createTestingModule({
+        providers: [RecipientService],
+      }).compile();
+
+      const newService = module.get<RecipientService>(RecipientService);
+
+      await expect(newService.onModuleInit()).rejects.toThrow(
+        'HASH_SECRET environment variable is required for security',
       );
     });
 

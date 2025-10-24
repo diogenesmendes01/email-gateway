@@ -107,8 +107,10 @@ model Recipient {
   emailLogs   EmailLog[]
 
   @@unique([companyId, externalId])
-  @@index([companyId, cpfCnpjHash])
-  @@index([companyId, email])
+  // Composite indexes for optimal query performance
+  @@index([companyId, cpfCnpjHash, deletedAt]) // Search by CPF/CNPJ hash
+  @@index([companyId, email, deletedAt])       // Search by email with soft delete
+  @@index([companyId, deletedAt, createdAt])   // List/pagination with soft delete
   @@map("recipients")
 }
 

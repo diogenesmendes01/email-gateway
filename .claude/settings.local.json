@@ -31,7 +31,13 @@
       "Bash(gh pr checks:*)",
       "Bash(gh run view:*)",
       "Bash(git fetch:*)",
-      "Bash(gh pr comment:*)"
+      "Bash(gh pr comment:*)",
+      "Bash(gh pr merge:*)",
+      "Bash(git pull:*)",
+      "Bash(cd C:UsersPC DiDesktopCODIGOemail-gateway)",
+      "Bash(git restore:*)",
+      "Bash(cd:*)",
+      "Bash(node -e:*)"
     ],
     "deny": [],
     "ask": []

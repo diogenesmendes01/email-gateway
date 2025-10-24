@@ -11,7 +11,8 @@
  * @see task/TASK-004-RECIPIENT-API.md
  */
 
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, OnModuleInit } from '@nestjs/common';
+import { Recipient } from '@prisma/client';
 import { prisma } from '@email-gateway/database';
 import {
   hashCpfCnpjHmac,
@@ -22,15 +23,69 @@ import { CreateRecipientDto } from './dto/create-recipient.dto';
 import { UpdateRecipientDto } from './dto/update-recipient.dto';
 import { RecipientQueryDto } from './dto/recipient-query.dto';
 
+// Constants for pagination
+const DEFAULT_PAGE_SIZE = 20;
+const MAX_PAGE_SIZE = 100;
+
+/**
+ * Interface for paginated recipient list response
+ */
+interface PaginatedRecipients {
+  data: Recipient[];
+  total: number;
+}
+
+/**
+ * Interface for encrypted CPF/CNPJ data
+ */
+interface EncryptedCpfCnpj {
+  hash: string;
+  encrypted: string;
+  salt: string;
+}
+
 @Injectable()
-export class RecipientService {
+export class RecipientService implements OnModuleInit {
+  private encryptionKey!: string;
+  private hashSecret!: string;
+
+  /**
+   * Initialize and validate encryption keys on module startup
+   * This ensures early failure if configuration is invalid
+   */
+  async onModuleInit() {
+    const encKey = process.env.ENCRYPTION_KEY;
+    if (!encKey) {
+      throw new Error('ENCRYPTION_KEY environment variable is not set');
+    }
+    if (Buffer.from(encKey).length !== 32) {
+      throw new Error('ENCRYPTION_KEY must be exactly 32 bytes for AES-256');
+    }
+    this.encryptionKey = encKey;
+
+    const hashSec = process.env.HASH_SECRET;
+    if (!hashSec) {
+      throw new Error('HASH_SECRET environment variable is required for security');
+    }
+    this.hashSecret = hashSec;
+  }
+
+  /**
+   * Encrypt CPF/CNPJ and generate hash for searching
+   * Extracted to avoid code duplication
+   */
+  private encryptCpfCnpjData(cpfCnpj: string): EncryptedCpfCnpj {
+    const hash = hashCpfCnpjHmac(cpfCnpj, this.hashSecret);
+    const { encrypted, salt } = encryptCpfCnpj(cpfCnpj, this.encryptionKey);
+    return { hash, encrypted, salt };
+  }
   /**
    * Create a new recipient
    */
   async create(
     companyId: string,
     dto: CreateRecipientDto,
-  ): Promise<any> {
+  ): Promise<Recipient> {
     const data: any = {
       email: dto.email,
       externalId: dto.externalId,
@@ -39,18 +94,7 @@ export class RecipientService {
 
     // Encrypt CPF/CNPJ if provided
     if (dto.cpfCnpj) {
-      const encryptionKey = process.env.ENCRYPTION_KEY;
-      if (!encryptionKey) {
-        throw new Error('ENCRYPTION_KEY environment variable is not set');
-      }
-      if (Buffer.from(encryptionKey).length !== 32) {
-        throw new Error('ENCRYPTION_KEY must be exactly 32 bytes for AES-256');
-      }
-
-      const hashSecret = process.env.HASH_SECRET || encryptionKey;
-      const hash = hashCpfCnpjHmac(dto.cpfCnpj, hashSecret);
-      const { encrypted, salt } = encryptCpfCnpj(dto.cpfCnpj, encryptionKey);
-
+      const { hash, encrypted, salt } = this.encryptCpfCnpjData(dto.cpfCnpj);
       data.cpfCnpjHash = hash;
       data.cpfCnpjEnc = encrypted;
       data.cpfCnpjSalt = salt;
@@ -75,7 +119,7 @@ export class RecipientService {
   async findAll(
     companyId: string,
     query: RecipientQueryDto,
-  ): Promise<{ data: any[]; total: number }> {
+  ): Promise<PaginatedRecipients> {
     const where: any = {
       companyId,
       deletedAt: null,
@@ -83,11 +127,13 @@ export class RecipientService {
 
     // Email filter (contains search)
     if (query.email) {
-      where.email = { contains: query.email, mode: 'insensitive' };
+      // Sanitize email input to prevent injection
+      const sanitizedEmail = query.email.replace(/[<>]/g, '');
+      where.email = { contains: sanitizedEmail, mode: 'insensitive' };
     }
 
     const skip = query.skip || 0;
-    const limit = query.limit || 20;
+    const limit = Math.min(query.limit || DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
 
     // Fetch data and total count in parallel
     const [data, total] = await Promise.all([
@@ -106,7 +152,7 @@ export class RecipientService {
   /**
    * Find one recipient by ID
    */
-  async findOne(companyId: string, id: string): Promise<any | null> {
+  async findOne(companyId: string, id: string): Promise<Recipient | null> {
     return prisma.recipient.findFirst({
       where: { id, companyId, deletedAt: null },
     });
@@ -118,7 +164,7 @@ export class RecipientService {
   async findByHash(
     companyId: string,
     cpfCnpjHash: string,
-  ): Promise<any | null> {
+  ): Promise<Recipient | null> {
     return prisma.recipient.findFirst({
       where: { companyId, cpfCnpjHash, deletedAt: null },
     });
@@ -131,33 +177,22 @@ export class RecipientService {
     companyId: string,
     id: string,
     dto: UpdateRecipientDto,
-  ): Promise<any> {
+  ): Promise<Recipient> {
     // Check if recipient exists and belongs to company
     const recipient = await this.findOne(companyId, id);
     if (!recipient) {
       throw new NotFoundException('Recipient not found');
     }
 
-    const data: any = { ...dto };
+    const data: Partial<Recipient> = { ...dto };
 
     // If updating CPF/CNPJ, re-encrypt
     if (dto.cpfCnpj) {
-      const encryptionKey = process.env.ENCRYPTION_KEY;
-      if (!encryptionKey) {
-        throw new Error('ENCRYPTION_KEY environment variable is not set');
-      }
-      if (Buffer.from(encryptionKey).length !== 32) {
-        throw new Error('ENCRYPTION_KEY must be exactly 32 bytes for AES-256');
-      }
-
-      const hashSecret = process.env.HASH_SECRET || encryptionKey;
-      const hash = hashCpfCnpjHmac(dto.cpfCnpj, hashSecret);
-      const { encrypted, salt } = encryptCpfCnpj(dto.cpfCnpj, encryptionKey);
-
+      const { hash, encrypted, salt } = this.encryptCpfCnpjData(dto.cpfCnpj);
       data.cpfCnpjHash = hash;
       data.cpfCnpjEnc = encrypted;
       data.cpfCnpjSalt = salt;
-      delete data.cpfCnpj; // Remove plain text from update
+      delete (data as any).cpfCnpj; // Remove plain text from update
     }
 
     return prisma.recipient.update({
