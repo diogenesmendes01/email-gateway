@@ -4,6 +4,7 @@ import {
   ExecutionContext,
   HttpException,
   HttpStatus,
+  Logger,
 } from '@nestjs/common';
 import { Request } from 'express';
 import { AuthService, RateLimitConfig } from './auth.service';
@@ -11,6 +12,7 @@ import { RedisService } from './redis.service';
 
 @Injectable()
 export class RateLimitGuard implements CanActivate {
+  private readonly logger = new Logger(RateLimitGuard.name);
   private readonly defaultConfig: RateLimitConfig = {
     rps: 60,        // 60 requests per second
     burst: 120,     // burst de 120 requests
@@ -113,9 +115,17 @@ export class RateLimitGuard implements CanActivate {
       if (error instanceof HttpException) {
         throw error;
       }
-      
+
       // Em caso de erro no Redis, permite a requisição (fail-open)
-      console.error('Redis rate limiting error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorStack = error instanceof Error ? error.stack : undefined;
+
+      this.logger.error({
+        message: 'Redis rate limiting error - failing open',
+        error: errorMessage,
+        stack: errorStack,
+        companyId: (context.switchToHttp().getRequest() as any)['companyId'],
+      });
       return true;
     }
   }
@@ -153,7 +163,15 @@ export class RateLimitGuard implements CanActivate {
         burstRemaining: Math.max(0, config.burst - burstCount),
       };
     } catch (error) {
-      console.error('Error getting rate limit stats:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorStack = error instanceof Error ? error.stack : undefined;
+
+      this.logger.error({
+        message: 'Error getting rate limit stats',
+        error: errorMessage,
+        stack: errorStack,
+        companyId,
+      });
       return null;
     }
   }
