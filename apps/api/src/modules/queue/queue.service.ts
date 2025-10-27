@@ -22,8 +22,8 @@ export interface QueueHealth {
 @Injectable()
 export class QueueService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(QueueService.name);
-  private queue: Queue;
-  private redis: Redis;
+  private queue!: Queue;
+  private redis!: Redis;
 
   async onModuleInit() {
     // Initialize Redis connection for BullMQ
@@ -43,12 +43,12 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
     // Wait for Redis connection
     await new Promise<void>((resolve, reject) => {
       this.redis.once('ready', () => {
-        this.logger.log(\`✅ Redis connected: \${process.env.REDIS_HOST}:\${process.env.REDIS_PORT}\`);
+        this.logger.log(`Redis connected: ${process.env.REDIS_HOST}:${process.env.REDIS_PORT}`);
         resolve();
       });
 
       this.redis.once('error', (error) => {
-        this.logger.error(\`❌ Redis connection failed: \${error.message}\`);
+        this.logger.error(`Redis connection failed: ${error.message}`);
         reject(error);
       });
     });
@@ -74,26 +74,26 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
 
     this.queue = new Queue(EMAIL_JOB_CONFIG.QUEUE_NAME, queueOptions);
 
-    this.logger.log(\`✅ Queue initialized: \${EMAIL_JOB_CONFIG.QUEUE_NAME}\`);
-    this.logger.log(\`   Max attempts: \${EMAIL_JOB_CONFIG.MAX_ATTEMPTS}\`);
-    this.logger.log(\`   Backoff delays: \${EMAIL_JOB_CONFIG.BACKOFF_DELAYS.join(', ')}ms\`);
+    this.logger.log(`Queue initialized: ${EMAIL_JOB_CONFIG.QUEUE_NAME}`);
+    this.logger.log(`   Max attempts: ${EMAIL_JOB_CONFIG.MAX_ATTEMPTS}`);
+    this.logger.log(`   Backoff delays: ${EMAIL_JOB_CONFIG.BACKOFF_DELAYS.join(', ')}ms`);
 
     // Log initial queue health
     const health = await this.getQueueHealth();
-    this.logger.log(\`📊 Queue health: waiting=\${health.waiting}, active=\${health.active}, failed=\${health.failed}\`);
+    this.logger.log(`Queue health: waiting=${health.waiting}, active=${health.active}, failed=${health.failed}`);
   }
 
   async onModuleDestroy() {
-    this.logger.log('🛑 Shutting down queue service...');
+    this.logger.log('Shutting down queue service...');
 
     if (this.queue) {
       await this.queue.close();
-      this.logger.log('✅ Queue closed');
+      this.logger.log('Queue closed');
     }
 
     if (this.redis) {
       await this.redis.quit();
-      this.logger.log('✅ Redis disconnected');
+      this.logger.log('Redis disconnected');
     }
   }
 
@@ -112,7 +112,7 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
         jobData,
         {
           jobId: jobData.outboxId, // Idempotency key
-          priority: jobData.priority || 1, // Lower number = higher priority
+          priority: 1, // Lower number = higher priority
         }
       );
 
@@ -122,7 +122,6 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
         outboxId: jobData.outboxId,
         companyId: jobData.companyId,
         to: jobData.to,
-        priority: jobData.priority,
         requestId: jobData.requestId,
       });
 

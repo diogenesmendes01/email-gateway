@@ -75,7 +75,7 @@ export const EMAIL_JOB_CONFIG = {
   /**
    * Nome da fila BullMQ
    */
-  QUEUE_NAME: 'email:send',
+  QUEUE_NAME: 'email-send',
 
   /**
    * TTL padrão: 24 horas em milissegundos

@@ -450,7 +450,7 @@ describe('Email Job Schemas', () => {
 
   describe('EMAIL_JOB_CONFIG', () => {
     it('deve ter valores corretos de configuração', () => {
-      expect(EMAIL_JOB_CONFIG.QUEUE_NAME).toBe('email:send');
+      expect(EMAIL_JOB_CONFIG.QUEUE_NAME).toBe('email-send');
       expect(EMAIL_JOB_CONFIG.DEFAULT_TTL).toBe(86400000); // 24h
       expect(EMAIL_JOB_CONFIG.DEFAULT_PRIORITY).toBe(5);
       expect(EMAIL_JOB_CONFIG.MAX_ATTEMPTS).toBe(5);
