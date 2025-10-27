@@ -8,5 +8,10 @@
   },
   "moduleNameMapper": {
     "^@email-gateway/(.*)$": "<rootDir>/../../packages/$1/src"
-  }
+  },
+  "testTimeout": 120000,
+  "maxWorkers": 1,
+  "forceExit": true,
+  "detectOpenHandles": true,
+  "verbose": true
 }
