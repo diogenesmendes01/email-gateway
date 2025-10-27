@@ -1,0 +1,249 @@
+{
+  "dashboard": {
+    "title": "Email Gateway - Overview",
+    "tags": ["email-gateway", "overview"],
+    "timezone": "browser",
+    "refresh": "30s",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Emails Sent (rate per minute)",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "sum(rate(email_sent_total[1m])) by (company_id) * 60",
+            "legendFormat": "Company {{company_id}}"
+          },
+          {
+            "expr": "sum(rate(email_sent_total[1m])) * 60",
+            "legendFormat": "Total"
+          }
+        ],
+        "yaxes": [
+          {
+            "label": "emails/min",
+            "format": "short"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 0
+        }
+      },
+      {
+        "id": 2,
+        "title": "Email Failure Rate (%)",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "(sum(rate(email_failed_total[5m])) / (sum(rate(email_sent_total[5m])) + sum(rate(email_failed_total[5m])))) * 100",
+            "legendFormat": "Failure Rate %"
+          }
+        ],
+        "yaxes": [
+          {
+            "label": "%",
+            "format": "percent",
+            "max": 100,
+            "min": 0
+          }
+        ],
+        "alert": {
+          "name": "High Failure Rate",
+          "conditions": [
+            {
+              "evaluator": {
+                "params": [5],
+                "type": "gt"
+              },
+              "operator": {
+                "type": "and"
+              },
+              "query": {
+                "params": ["A", "5m", "now"]
+              },
+              "reducer": {
+                "params": [],
+                "type": "avg"
+              },
+              "type": "query"
+            }
+          ]
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 0
+        }
+      },
+      {
+        "id": 3,
+        "title": "Queue Size",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "email_queue_size{queue=\"email_queue_waiting\"}",
+            "legendFormat": "Waiting"
+          },
+          {
+            "expr": "email_queue_size{queue=\"email_queue_active\"}",
+            "legendFormat": "Active"
+          },
+          {
+            "expr": "email_queue_size{queue=\"email_queue_failed\"}",
+            "legendFormat": "Failed (DLQ)"
+          },
+          {
+            "expr": "email_queue_size{queue=\"email_queue_delayed\"}",
+            "legendFormat": "Delayed"
+          }
+        ],
+        "yaxes": [
+          {
+            "label": "jobs",
+            "format": "short"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 8
+        }
+      },
+      {
+        "id": 4,
+        "title": "Email Send Duration (p50, p95, p99)",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.50, sum(rate(email_send_duration_seconds_bucket[5m])) by (le))",
+            "legendFormat": "p50"
+          },
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(email_send_duration_seconds_bucket[5m])) by (le))",
+            "legendFormat": "p95"
+          },
+          {
+            "expr": "histogram_quantile(0.99, sum(rate(email_send_duration_seconds_bucket[5m])) by (le))",
+            "legendFormat": "p99"
+          }
+        ],
+        "yaxes": [
+          {
+            "label": "seconds",
+            "format": "s"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 8
+        }
+      },
+      {
+        "id": 5,
+        "title": "Encryption Duration (p95)",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(encryption_duration_seconds_bucket[5m]))",
+            "legendFormat": "p95 Encryption"
+          }
+        ],
+        "yaxes": [
+          {
+            "label": "seconds",
+            "format": "s"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 16
+        }
+      },
+      {
+        "id": 6,
+        "title": "Failed Emails by Reason",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "sum(rate(email_failed_total[5m])) by (reason)",
+            "legendFormat": "{{reason}}"
+          }
+        ],
+        "yaxes": [
+          {
+            "label": "failures/s",
+            "format": "short"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 16
+        }
+      },
+      {
+        "id": 7,
+        "title": "Retry Rate",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "sum(rate(email_retry_total[5m])) by (attempt)",
+            "legendFormat": "Attempt {{attempt}}"
+          }
+        ],
+        "yaxes": [
+          {
+            "label": "retries/s",
+            "format": "short"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 24
+        }
+      },
+      {
+        "id": 8,
+        "title": "System Health",
+        "type": "singlestat",
+        "targets": [
+          {
+            "expr": "up{job=~\"email-gateway-.*\"}",
+            "legendFormat": "{{job}}"
+          }
+        ],
+        "valueName": "current",
+        "valueMaps": [
+          {
+            "value": "1",
+            "text": "UP"
+          },
+          {
+            "value": "0",
+            "text": "DOWN"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 24
+        }
+      }
+    ],
+    "schemaVersion": 16,
+    "version": 0
+  }
+}
