@@ -258,6 +258,48 @@ export class DomainController {
   }
 
   /**
+   * GET /v1/domains/:id
+   * Obtém detalhes de um domínio específico por ID
+   * TASK-028: Endpoint para detalhes do domínio
+   */
+  @Get(':id')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Obtém detalhes de um domínio específico' })
+  @ApiParam({ name: 'id', description: 'ID do domínio' })
+  @ApiResponse({
+    status: 200,
+    description: 'Detalhes do domínio retornados com sucesso',
+  })
+  async getDomainById(
+    @Param('id') id: string,
+    @Request() req: any,
+  ): Promise<DomainVerificationResponse> {
+    const companyId = req.companyId;
+    return this.domainService.getDomainById(companyId, id);
+  }
+
+  /**
+   * PATCH /v1/domains/:id/default
+   * Define um domínio como padrão para a empresa
+   * TASK-028: Endpoint para definir domínio padrão
+   */
+  @Put(':id/default')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Define um domínio como padrão para a empresa' })
+  @ApiParam({ name: 'id', description: 'ID do domínio' })
+  @ApiResponse({
+    status: 200,
+    description: 'Domínio definido como padrão com sucesso',
+  })
+  async setDefaultDomain(
+    @Param('id') id: string,
+    @Request() req: any,
+  ) {
+    const companyId = req.companyId;
+    return this.domainService.setDefaultDomain(companyId, id);
+  }
+
+  /**
    * DELETE /v1/domains/:domain
    * Remove um domínio
    */
