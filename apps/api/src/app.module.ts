@@ -1,5 +1,6 @@
 import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
 import { ThrottlerModule } from '@nestjs/throttler';
+import { ScheduleModule } from '@nestjs/schedule'; // TASK-030: Cron jobs support
 import { PrometheusModule } from '@willsoto/nestjs-prometheus';
 import { RequestIdMiddleware } from './middleware/request-id.middleware';
 
@@ -30,6 +31,9 @@ import { WebhookModule } from './modules/webhook/webhook.module'; // TASK-023
         limit: parseInt(process.env.RATE_LIMIT_MAX || '100', 10),
       },
     ]),
+
+    // TASK-030: Cron jobs for reputation monitoring
+    ScheduleModule.forRoot(),
 
     // TASK-020: Prometheus metrics
     PrometheusModule.register({
