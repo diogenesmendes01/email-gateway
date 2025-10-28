@@ -8,6 +8,7 @@
  * TASK 7.1 — Métricas, logs e tracing
  */
 
+import 'dotenv/config';
 import { Worker, Job, Queue } from 'bullmq';
 import { PrismaClient } from '@email-gateway/database';
 import { EMAIL_JOB_CONFIG, EmailSendJobData } from '@email-gateway/shared';

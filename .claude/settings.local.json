@@ -37,7 +37,20 @@
       "Bash(cd C:UsersPC DiDesktopCODIGOemail-gateway)",
       "Bash(git restore:*)",
       "Bash(cd:*)",
-      "Bash(node -e:*)"
+      "Bash(node -e:*)",
+      "Bash(docker exec:*)",
+      "Bash(npx prisma migrate:*)",
+      "Bash(timeout 15 npm run dev:api:*)",
+      "Bash(timeout 10 npm run dev:api:*)",
+      "Bash(rm:*)",
+      "Bash(npx nest build:*)",
+      "Bash(timeout 10 npx ts-node:*)",
+      "Bash(cp:*)",
+      "Bash(timeout 10 npm run dev:worker:*)",
+      "Bash(timeout 10 npm run dev:*)",
+      "Bash(timeout 15 npm run dev:*)",
+      "Bash(npm install:*)",
+      "Bash(pkill:*)"
     ],
     "deny": [],
     "ask": []

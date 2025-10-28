@@ -14,9 +14,10 @@ import { WebhookService } from './webhook.service';
 import { WebhookQueueService } from './webhook-queue.service';
 import { SESWebhookController } from './ses-webhook.controller'; // TASK-024
 import { SESWebhookService } from './ses-webhook.service'; // TASK-024
+import { AuthModule } from '../auth/auth.module'; // Import AuthModule for ApiKeyGuard
 
 @Module({
-  imports: [ConfigModule],
+  imports: [ConfigModule, AuthModule],
   controllers: [
     WebhookController,
     SESWebhookController, // TASK-024

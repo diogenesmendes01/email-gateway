@@ -1,0 +1,30 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.EMAIL_JOB_CONFIG = exports.EMAIL_JOB_VALIDATION = void 0;
+exports.EMAIL_JOB_VALIDATION = {
+    MAX_EMAIL_LENGTH: 254,
+    MAX_SUBJECT_LENGTH: 150,
+    MAX_HTML_REF_LENGTH: 512,
+    MAX_REQUEST_ID_LENGTH: 128,
+    MAX_NAME_LENGTH: 120,
+    MAX_RAZAO_SOCIAL_LENGTH: 150,
+    MAX_EXTERNAL_ID_LENGTH: 64,
+    SHA256_HEX_LENGTH: 64,
+    MAX_CC_BCC_RECIPIENTS: 5,
+    MAX_TAGS: 5,
+    MAX_TAG_LENGTH: 50,
+    MAX_SES_MESSAGE_ID_LENGTH: 128,
+    MAX_ERROR_CODE_LENGTH: 64,
+    MAX_ERROR_REASON_LENGTH: 500,
+    MIN_PRIORITY: 1,
+    MAX_PRIORITY: 10,
+};
+exports.EMAIL_JOB_CONFIG = {
+    QUEUE_NAME: 'email-send',
+    DEFAULT_TTL: 24 * 60 * 60 * 1000,
+    DEFAULT_PRIORITY: 5,
+    MAX_ATTEMPTS: 5,
+    BACKOFF_DELAYS: [1, 5, 30, 120, 600],
+    DLQ_TTL: 7 * 24 * 60 * 60 * 1000,
+};
+//# sourceMappingURL=email-job.types.js.map

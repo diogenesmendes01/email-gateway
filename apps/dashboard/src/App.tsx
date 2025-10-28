@@ -6,6 +6,7 @@ import { KPIsPage } from './pages/KPIsPage';
 import { EmailsPage } from './pages/EmailsPage';
 import { EmailDetailPage } from './pages/EmailDetailPage';
 import { ErrorBreakdownPage } from './pages/ErrorBreakdownPage';
+import { SendEmailPage } from './pages/SendEmailPage';
 import { AuthProvider } from './contexts/AuthContext';
 import './index.css';
 
@@ -23,13 +24,14 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <Router>
+        <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
           <Routes>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<DashboardLayout />}>
               <Route index element={<KPIsPage />} />
               <Route path="emails" element={<EmailsPage />} />
               <Route path="emails/:id" element={<EmailDetailPage />} />
+              <Route path="send" element={<SendEmailPage />} />
               <Route path="errors" element={<ErrorBreakdownPage />} />
             </Route>
           </Routes>

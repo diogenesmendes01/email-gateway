@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { LoadingSpinner } from './LoadingSpinner';
+import { LoadingSpinner } from '../ui/LoadingSpinner';
 
 export const LoginForm: React.FC = () => {
   const [username, setUsername] = useState('');

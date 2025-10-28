@@ -11,6 +11,7 @@
   ],
   "scripts": {
     "prepare": "husky",
+    "dev": "concurrently -n \"API,WORKER,DASHBOARD\" -c \"blue,green,magenta\" \"npm run dev:api\" \"npm run dev:worker\" \"npm run dev:dashboard\"",
     "dev:api": "npm run dev --workspace=@email-gateway/api",
     "dev:worker": "npm run dev --workspace=@email-gateway/worker",
     "dev:dashboard": "npm run dev --workspace=@email-gateway/dashboard",
@@ -53,6 +54,7 @@
     "@types/node": "^20.11.5",
     "@typescript-eslint/eslint-plugin": "^6.19.0",
     "@typescript-eslint/parser": "^6.19.0",
+    "concurrently": "^9.2.1",
     "eslint": "^8.56.0",
     "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-prettier": "^5.1.3",
