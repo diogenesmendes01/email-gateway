@@ -2,7 +2,7 @@
  * Unit Tests: Queue Comparison Metrics and Cost Analysis
  * 
  * These tests validate the metrics and cost calculations documented in
- * ADR-0001-outbox-queue-vs-sqs.md
+ * ADR-20250101-outbox-queue-vs-sqs.md
  */
 
 describe('Queue Comparison Metrics and Cost Analysis', () => {
