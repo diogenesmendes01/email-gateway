@@ -6,9 +6,10 @@ import { EmailSendService } from './services/email-send.service';
 import { AuthModule } from '../auth/auth.module';
 import { QueueModule } from '../queue/queue.module';
 import { MetricsModule } from '../metrics/metrics.module';
+import { WebhookModule } from '../webhook/webhook.module'; // TASK-023
 
 @Module({
-  imports: [AuthModule, QueueModule, MetricsModule],
+  imports: [AuthModule, QueueModule, MetricsModule, WebhookModule],
   controllers: [EmailController, EmailSendController],
   providers: [EmailService, EmailSendService],
   exports: [EmailService, EmailSendService],
