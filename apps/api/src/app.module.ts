@@ -1,8 +1,10 @@
 import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { PrometheusModule } from '@willsoto/nestjs-prometheus';
 import { RequestIdMiddleware } from './middleware/request-id.middleware';
+
+// Configuration
+import { ConfigModule } from './config/config.module'; // TASK-026: Centralized config with Secrets Manager
 
 // Modules
 import { HealthModule } from './modules/health/health.module';
@@ -18,11 +20,8 @@ import { WebhookModule } from './modules/webhook/webhook.module'; // TASK-023
 
 @Module({
   imports: [
-    // Configuration
-    ConfigModule.forRoot({
-      isGlobal: true,
-      envFilePath: '.env',
-    }),
+    // TASK-026: Configuration with AWS Secrets Manager support
+    ConfigModule,
 
     // Rate limiting (configuração global - será sobrescrito pelos guards customizados)
     ThrottlerModule.forRoot([

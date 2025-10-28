@@ -1,0 +1,108 @@
+#
+# TASK-026: Terraform Variables Example
+#
+# Copy this file to terraform.tfvars and fill in your values
+# cp terraform.tfvars.example terraform.tfvars
+#
+
+# ------------------------------------------------------------------------------
+# General
+# ------------------------------------------------------------------------------
+
+project_name = "email-gateway"
+environment  = "production"  # development | staging | production
+aws_region   = "us-east-1"
+
+# ------------------------------------------------------------------------------
+# Networking
+# ------------------------------------------------------------------------------
+
+vpc_id = "vpc-xxxxxxxxxxxxxxxxx"  # Your VPC ID
+
+# Optional: Allow SSH from specific CIDRs (bastion host)
+ssh_allowed_cidrs = [
+  # "10.0.0.0/16"  # VPC CIDR
+]
+
+# ------------------------------------------------------------------------------
+# Application Load Balancer
+# ------------------------------------------------------------------------------
+
+ssl_certificate_arn = "arn:aws:acm:us-east-1:123456789012:certificate/xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+
+enable_alb_logs = true
+alb_logs_bucket = "email-gateway-alb-logs-production"  # Create this S3 bucket first
+
+# ------------------------------------------------------------------------------
+# API Auto Scaling
+# ------------------------------------------------------------------------------
+
+api_instance_type    = "t3.small"   # 2 vCPU, 2GB RAM
+api_min_size         = 2            # Minimum 2 for high availability
+api_max_size         = 10           # Scale up to 10 during peaks
+api_desired_capacity = 2            # Start with 2 instances
+
+# IAM instance profile with:
+# - SecretsManager:GetSecretValue
+# - SES:SendEmail
+# - CloudWatch:PutMetricData
+# - Logs:CreateLogStream, PutLogEvents
+api_instance_profile_name = "email-gateway-api-instance-profile"
+
+# ------------------------------------------------------------------------------
+# Worker Auto Scaling
+# ------------------------------------------------------------------------------
+
+worker_instance_type    = "t3.medium"  # 2 vCPU, 4GB RAM (higher for email processing)
+worker_min_size         = 1            # Minimum 1 worker
+worker_max_size         = 5            # Scale up to 5 during peaks
+worker_desired_capacity = 2            # Start with 2 workers
+
+# IAM instance profile with:
+# - SecretsManager:GetSecretValue
+# - SES:SendEmail, SendRawEmail
+# - CloudWatch:PutMetricData
+# - Logs:CreateLogStream, PutLogEvents
+worker_instance_profile_name = "email-gateway-worker-instance-profile"
+
+# BullMQ concurrency per worker instance
+worker_queue_concurrency = 16
+
+# ------------------------------------------------------------------------------
+# Database
+# ------------------------------------------------------------------------------
+
+# AWS Secrets Manager secret name containing PostgreSQL connection string
+database_url_secret = "email-gateway/database-url"
+
+# ------------------------------------------------------------------------------
+# Redis (ElastiCache)
+# ------------------------------------------------------------------------------
+
+# Redis endpoint (ElastiCache cluster or Replication Group endpoint)
+redis_host = "email-gateway-redis.xxxxxx.0001.use1.cache.amazonaws.com"
+redis_port = 6379
+
+# ------------------------------------------------------------------------------
+# AWS SES
+# ------------------------------------------------------------------------------
+
+# Verified SES email address
+ses_from_address = "noreply@yourdomain.com"
+
+# ------------------------------------------------------------------------------
+# CloudWatch
+# ------------------------------------------------------------------------------
+
+# Log retention in days (7, 14, 30, 60, 90, 120, 150, 180, 365, 400, 545, 731, 1827, 3653)
+log_retention_days = 30
+
+# ------------------------------------------------------------------------------
+# Additional Tags
+# ------------------------------------------------------------------------------
+
+additional_tags = {
+  Team       = "Platform"
+  CostCenter = "Engineering"
+  Compliance = "LGPD"
+}

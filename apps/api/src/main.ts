@@ -2,6 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { AppConfigService } from './config/app.config';
+import { SecretsService } from './config/secrets.service';
 import { AllExceptionsFilter } from './filters/http-exception.filter';
 import { validateEncryptionKey, getKeyGenerationHelp } from './utils/key-validation';
 
@@ -11,13 +12,44 @@ async function bootstrap() {
   try {
     // Validação das variáveis de ambiente críticas
     const configService = new AppConfigService(null as any);
-    
+
     logger.log('✅ Environment validation passed');
 
+    // TASK-026: Initialize and validate AWS Secrets Manager (if enabled)
+    const secretsService = new SecretsService();
+    let encryptionKey: string;
+
+    if (process.env.NODE_ENV === 'production' ||
+        process.env.NODE_ENV === 'staging' ||
+        process.env.USE_SECRETS_MANAGER === 'true') {
+      logger.log('🔐 Fetching secrets from AWS Secrets Manager...');
+
+      try {
+        // Validate AWS Secrets Manager connectivity and fetch encryption key
+        encryptionKey = await secretsService.getEncryptionKey();
+        logger.log('✅ AWS Secrets Manager integration successful');
+      } catch (error) {
+        logger.error('❌ Failed to fetch secrets from AWS Secrets Manager');
+        logger.error((error as Error).message);
+        logger.error('');
+        logger.error('Ensure:');
+        logger.error('  1. IAM role has secretsmanager:GetSecretValue permission');
+        logger.error('  2. Secrets exist in AWS Secrets Manager:');
+        logger.error('     - email-gateway/encryption-key');
+        logger.error('  3. AWS_REGION is set correctly');
+        logger.error('');
+        logger.error('For development, set USE_SECRETS_MANAGER=false');
+        process.exit(1);
+      }
+    } else {
+      // Development mode: use environment variables
+      logger.warn('⚠️  Using environment variables for secrets (development mode only!)');
+      encryptionKey = process.env.ENCRYPTION_KEY || '';
+    }
+
     // TASK-007: Validate encryption key strength
-    const encryptionKey = process.env.ENCRYPTION_KEY;
     if (!encryptionKey) {
-      logger.error('❌ ENCRYPTION_KEY environment variable is not set');
+      logger.error('❌ ENCRYPTION_KEY is not set');
       logger.error('');
       logger.error(getKeyGenerationHelp());
       process.exit(1);
@@ -42,7 +74,7 @@ async function bootstrap() {
   } catch (error) {
     logger.error('❌ Environment validation failed:', (error as Error).message);
     logger.error('Check your .env file and ensure all required variables are set');
-    logger.error('See env.example for reference');
+    logger.error('See .env.example for reference');
     process.exit(1);
   }
 
