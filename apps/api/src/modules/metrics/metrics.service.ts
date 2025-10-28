@@ -28,6 +28,19 @@ export class MetricsService {
 
     @InjectMetric('encryption_duration_seconds')
     public encryptionDuration: Histogram<string>,
+
+    // TASK-025: Batch email metrics
+    @InjectMetric('email_batch_created_total')
+    public batchCreatedCounter: Counter<string>,
+
+    @InjectMetric('email_batch_completed_total')
+    public batchCompletedCounter: Counter<string>,
+
+    @InjectMetric('email_batch_size')
+    public batchSizeHistogram: Histogram<string>,
+
+    @InjectMetric('email_batch_processing_duration_seconds')
+    public batchProcessingDuration: Histogram<string>,
   ) {}
 
   /**
@@ -85,5 +98,45 @@ export class MetricsService {
    */
   recordEncryptionDuration(durationSeconds: number) {
     this.encryptionDuration.observe(durationSeconds);
+  }
+
+  /**
+   * TASK-025: Track batch created
+   */
+  recordBatchCreated(companyId: string, totalEmails: number) {
+    this.batchCreatedCounter.inc({
+      company_id: companyId,
+    });
+
+    this.batchSizeHistogram.observe(
+      {
+        company_id: companyId,
+      },
+      totalEmails
+    );
+  }
+
+  /**
+   * TASK-025: Track batch completed
+   */
+  recordBatchCompleted(
+    companyId: string,
+    status: string,
+    durationSeconds: number,
+    successCount: number,
+    failedCount: number
+  ) {
+    this.batchCompletedCounter.inc({
+      company_id: companyId,
+      status,
+    });
+
+    this.batchProcessingDuration.observe(
+      {
+        company_id: companyId,
+        status,
+      },
+      durationSeconds
+    );
   }
 }
