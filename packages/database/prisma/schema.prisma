@@ -65,6 +65,14 @@ enum WebhookDeliveryStatus {
   RETRYING
 }
 
+// TASK-025: Batch Email Enums
+enum BatchStatus {
+  PROCESSING
+  COMPLETED
+  PARTIAL
+  FAILED
+}
+
 // ============================================
 // MODELS
 // ============================================
@@ -93,6 +101,7 @@ model Company {
   domains     Domain[]
   webhooks    Webhook[] // TASK-023
   recipientBlocklist RecipientBlocklist[] // TASK-024
+  emailBatches EmailBatch[] // TASK-025
 
   @@map("companies")
 }
@@ -147,15 +156,20 @@ model EmailOutbox {
   enqueuedAt   DateTime?   @map("enqueued_at")
   processedAt  DateTime?   @map("processed_at")
 
+  // TASK-025: Batch tracking
+  batchId      String?     @map("batch_id")
+
   // Relations
-  company   Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  recipient Recipient? @relation(fields: [recipientId], references: [id], onDelete: SetNull)
+  company   Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  recipient Recipient?  @relation(fields: [recipientId], references: [id], onDelete: SetNull)
   emailLog  EmailLog?
+  batch     EmailBatch? @relation(fields: [batchId], references: [id], onDelete: SetNull)
 
   @@index([companyId, status])
   @@index([companyId, externalId])
   @@index([companyId, createdAt])
   @@index([recipientId])
+  @@index([batchId], map: "idx_email_outbox_batch") // TASK-025
   // TASK-017: Composite index for dashboard queries
   // Optimizes: WHERE company_id = X AND status = Y ORDER BY created_at DESC
   // Used by dashboard email list, date range filters, and status-based queries
@@ -348,4 +362,27 @@ model RecipientBlocklist {
   @@unique([companyId, email], map: "idx_blocklist_company_email")
   @@index([reason, blockedAt], map: "idx_blocklist_reason")
   @@map("recipient_blocklist")
+}
+
+// TASK-025: Email Batch Tracking
+model EmailBatch {
+  id             String      @id @default(cuid())
+  companyId      String      @map("company_id")
+  status         BatchStatus @default(PROCESSING)
+  totalEmails    Int         @map("total_emails")
+  processedCount Int         @default(0) @map("processed_count")
+  successCount   Int         @default(0) @map("success_count")
+  failedCount    Int         @default(0) @map("failed_count")
+  metadata       Json?
+  createdAt      DateTime    @default(now()) @map("created_at")
+  updatedAt      DateTime    @updatedAt @map("updated_at")
+  completedAt    DateTime?   @map("completed_at")
+
+  // Relations
+  company Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  emails  EmailOutbox[]
+
+  @@index([companyId, createdAt(sort: Desc)], map: "idx_email_batches_company")
+  @@index([status, createdAt], map: "idx_email_batches_status")
+  @@map("email_batches")
 }
