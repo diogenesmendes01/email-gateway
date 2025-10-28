@@ -628,6 +628,139 @@ export class DomainService {
   }
 
   /**
+   * Obtém detalhes de um domínio específico por ID
+   * TASK-028: Endpoint para obter detalhes do domínio
+   */
+  async getDomainById(
+    companyId: string,
+    domainId: string,
+  ): Promise<DomainVerificationResponse> {
+    // Busca domínio no banco
+    const dbDomain = await prisma.domain.findFirst({
+      where: {
+        id: domainId,
+        companyId,
+      },
+    });
+
+    if (!dbDomain) {
+      throw new NotFoundException(`Domain with ID ${domainId} not found`);
+    }
+
+    try {
+      // Obtém status atualizado do SES
+      const verificationInfo = await this.domainManagementService.verifyDomainStatus(dbDomain.domain);
+
+      // Atualiza status no banco se mudou
+      const newStatus = verificationInfo.status as unknown as PrismaDomainVerificationStatus;
+      if (newStatus !== dbDomain.status) {
+        await prisma.domain.update({
+          where: { id: dbDomain.id },
+          data: {
+            status: newStatus,
+            lastChecked: new Date(),
+          },
+        });
+      }
+
+      return {
+        domain: dbDomain.domain,
+        status: verificationInfo.status,
+        verificationToken: verificationInfo.verificationToken,
+        dnsRecords: verificationInfo.dnsRecords,
+        dkimTokens: verificationInfo.dkimTokens,
+        dkimStatus: verificationInfo.dkimStatus,
+        lastChecked: verificationInfo.lastChecked?.toISOString(),
+        errorMessage: verificationInfo.errorMessage,
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+      this.logger.error({
+        message: 'Failed to get domain details',
+        domainId,
+        companyId,
+        error: errorMessage,
+      });
+
+      // Retorna informações do banco se não conseguir consultar SES
+      return {
+        domain: dbDomain.domain,
+        status: dbDomain.status as unknown as DomainVerificationStatus,
+        dnsRecords: [],
+        errorMessage: `Failed to fetch latest status: ${errorMessage}`,
+      };
+    }
+  }
+
+  /**
+   * Define um domínio como padrão para a empresa
+   * TASK-028: Endpoint para definir domínio padrão
+   */
+  async setDefaultDomain(companyId: string, domainId: string) {
+    // Busca domínio no banco
+    const dbDomain = await prisma.domain.findFirst({
+      where: {
+        id: domainId,
+        companyId,
+      },
+    });
+
+    if (!dbDomain) {
+      throw new NotFoundException(`Domain with ID ${domainId} not found`);
+    }
+
+    // Verifica se o domínio está verificado
+    if (dbDomain.status !== 'VERIFIED') {
+      throw new BadRequestException(
+        `Cannot set unverified domain as default. Current status: ${dbDomain.status}`
+      );
+    }
+
+    try {
+      // Atualiza empresa com o novo domínio padrão
+      const updatedCompany = await prisma.company.update({
+        where: { id: companyId },
+        data: {
+          domainId: dbDomain.id,
+          defaultFromAddress: `noreply@${dbDomain.domain}`, // Endereço padrão
+          defaultFromName: null, // Pode ser configurado depois
+        },
+        include: {
+          defaultDomain: true,
+        },
+      });
+
+      this.logger.log({
+        message: 'Default domain set successfully',
+        companyId,
+        domainId,
+        domain: dbDomain.domain,
+      });
+
+      return {
+        success: true,
+        message: 'Default domain set successfully',
+        domain: dbDomain.domain,
+        defaultFromAddress: updatedCompany.defaultFromAddress,
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorStack = error instanceof Error ? error.stack : undefined;
+
+      this.logger.error({
+        message: 'Failed to set default domain',
+        companyId,
+        domainId,
+        error: errorMessage,
+        stack: errorStack,
+      });
+
+      throw new BadRequestException(`Failed to set default domain: ${errorMessage}`);
+    }
+  }
+
+  /**
    * Valida formato de domínio
    */
   private isValidDomain(domain: string): boolean {
