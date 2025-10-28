@@ -1,6 +1,7 @@
 import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
+import { PrometheusModule } from '@willsoto/nestjs-prometheus';
 import { RequestIdMiddleware } from './middleware/request-id.middleware';
 
 // Modules
@@ -11,6 +12,8 @@ import { RecipientModule } from './modules/recipient/recipient.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { DomainModule } from './modules/domain/domain.module';
+import { MetricsModule } from './modules/metrics/metrics.module';
+import { AdminModule } from './modules/admin/admin.module';
 
 @Module({
   imports: [
@@ -28,6 +31,17 @@ import { DomainModule } from './modules/domain/domain.module';
       },
     ]),
 
+    // TASK-020: Prometheus metrics
+    PrometheusModule.register({
+      path: '/metrics',
+      defaultMetrics: {
+        enabled: true,
+        config: {
+          prefix: 'email_gateway_api_',
+        },
+      },
+    }),
+
     // Feature modules
     HealthModule,
     AuthModule,
@@ -36,6 +50,8 @@ import { DomainModule } from './modules/domain/domain.module';
     RecipientModule,
     DashboardModule,
     DomainModule,
+    MetricsModule,
+    AdminModule, // TASK-021: Admin DLQ management
   ],
 })
 export class AppModule implements NestModule {

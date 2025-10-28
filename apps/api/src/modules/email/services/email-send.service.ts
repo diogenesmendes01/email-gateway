@@ -17,6 +17,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { QueueService } from '../../queue/queue.service';
+import { MetricsService } from '../../metrics/metrics.service';
 import { prisma } from '@email-gateway/database';
 import {
   EmailSendBody,
@@ -44,12 +45,16 @@ export class EmailSendService {
     10
   );
 
-  constructor(private readonly queueService: QueueService) {}
+  constructor(
+    private readonly queueService: QueueService,
+    private readonly metricsService: MetricsService,
+  ) {}
   /**
    * Send email asynchronously
    */
   async sendEmail(params: SendEmailParams): Promise<EmailSendResponse> {
     const { companyId, body, idempotencyKey, requestId } = params;
+    const startTime = performance.now();
 
     // Handle idempotency
     if (idempotencyKey) {
@@ -149,7 +154,21 @@ export class EmailSendService {
         requestId,
         status: EmailStatus.ENQUEUED,
       });
+
+      // TASK-020: Record successful enqueue
+      const duration = (performance.now() - startTime) / 1000;
+      this.metricsService.recordEmailSent(companyId, 'ses');
+      this.metricsService.recordEmailSendDuration(duration, companyId);
     } catch (error) {
+      // TASK-020: Record failure
+      const duration = (performance.now() - startTime) / 1000;
+      this.metricsService.recordEmailFailed(
+        companyId,
+        error instanceof Error ? error.constructor.name : 'UNKNOWN_ERROR',
+        'ses'
+      );
+      this.metricsService.recordEmailSendDuration(duration, companyId);
+
       // Rollback outbox em caso de falha ao enfileirar
       await prisma.emailOutbox.delete({ where: { id: outboxId } });
       throw new InternalServerErrorException({

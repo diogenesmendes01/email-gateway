@@ -17,7 +17,7 @@ export class RequestIdMiddleware implements NestMiddleware {
     // Use existing request ID from header or generate new one
     const requestId =
       (req.headers['x-request-id'] as string) ||
-      \`req_\${crypto.randomUUID()}\`;
+      `req_${crypto.randomUUID()}`;
 
     // Attach to request for use in controllers/services
     (req as any).requestId = requestId;

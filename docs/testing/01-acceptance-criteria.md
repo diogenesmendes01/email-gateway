@@ -685,7 +685,7 @@ Use este checklist para validar o MVP antes do go-live:
 - [System Design Overview](../architecture/01-visao-geral-sistema.md)
 - [Email Send Contract](../api/03-email-send-contract.md)
 - [Email Get Contract](../api/04-email-get-contract.md)
-- [Testing Standards](./TESTING-STANDARDS.md)
+- [Testing Standards](./03-testing-standards.md)
 - [ADR-20250116-escolha-redis-queue](../adrs/ADR-20250116-escolha-redis-queue.md)
 - [ADR-20250120-auth-model-mvp](../adrs/ADR-20250120-auth-model-mvp.md)
 

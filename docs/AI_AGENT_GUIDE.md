@@ -37,7 +37,7 @@ Você **DEVE** ler e seguir **TODOS** esses documentos antes de qualquer ação:
 ### 2️⃣ **Padrões de Código e Testes (CRÍTICO)** ⚠️
 
 - [CODE-QUALITY-STANDARDS.md](CODE-QUALITY-STANDARDS.md) - **OBRIGATÓRIO** - Exception handling, logging, configuration
-- [testing/TESTING-STANDARDS.md](testing/TESTING-STANDARDS.md) - **OBRIGATÓRIO** - Cobertura mínima 70%, padrões de testes
+- [testing/03-testing-standards.md](testing/03-testing-standards.md) - **OBRIGATÓRIO** - Cobertura mínima 70%, padrões de testes
 
 ### 3️⃣ Regras de PR e Review
 

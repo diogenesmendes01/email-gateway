@@ -2,7 +2,7 @@
  * Performance Tests: Outbox+Fila vs SQS Comparison
  * 
  * These tests validate the performance characteristics documented in
- * ADR-0001-outbox-queue-vs-sqs.md
+ * ADR-20250101-outbox-queue-vs-sqs.md
  * 
  * Tests demonstrate:
  * - Latency differences between Redis/BullMQ and SQS

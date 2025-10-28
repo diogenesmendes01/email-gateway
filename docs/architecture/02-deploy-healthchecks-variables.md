@@ -349,7 +349,7 @@ grep "rollback" /var/log/app.log
 
 - [NEW-FEATURES.md](../NEW-FEATURES.md) - Guia de implementação
 - [CODE-QUALITY-STANDARDS.md](../docs/CODE-QUALITY-STANDARDS.md) - Padrões de código
-- [TESTING-STANDARDS.md](../docs/testing/TESTING-STANDARDS.md) - Padrões de teste
+- [03-testing-standards.md](../docs/testing/03-testing-standards.md) - Padrões de teste
 - [Coolify Documentation](https://coolify.io/docs) - Documentação do Coolify
 
 ---

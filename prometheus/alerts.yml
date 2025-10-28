@@ -1,0 +1,183 @@
+groups:
+  - name: email_gateway_alerts
+    interval: 30s
+    rules:
+      # High failure rate alert
+      - alert: HighEmailFailureRate
+        expr: |
+          (
+            rate(email_failed_total[5m])
+            /
+            (rate(email_sent_total[5m]) + rate(email_failed_total[5m]))
+          ) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+          service: email-gateway
+        annotations:
+          summary: "Email failure rate > 5%"
+          description: "Failure rate: {{ $value | humanizePercentage }} for company {{ $labels.company_id }}"
+          action: "Check SES status, database connectivity, and recent deployments"
+
+      # Queue backlog alert
+      - alert: QueueBacklog
+        expr: email_queue_size{queue="email_queue_waiting"} > 10000
+        for: 10m
+        labels:
+          severity: warning
+          service: email-gateway
+        annotations:
+          summary: "Email queue backlog > 10k"
+          description: "Queue size: {{ $value }} emails waiting"
+          action: "Scale worker instances or investigate processing bottleneck"
+
+      # Critical queue backlog
+      - alert: CriticalQueueBacklog
+        expr: email_queue_size{queue="email_queue_waiting"} > 50000
+        for: 5m
+        labels:
+          severity: critical
+          service: email-gateway
+        annotations:
+          summary: "CRITICAL: Email queue backlog > 50k"
+          description: "Queue size: {{ $value }} emails waiting"
+          action: "IMMEDIATE: Scale workers or investigate system failure"
+
+      # High encryption latency
+      - alert: HighEncryptionLatency
+        expr: histogram_quantile(0.95, rate(encryption_duration_seconds_bucket[5m])) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+          service: email-gateway
+        annotations:
+          summary: "Encryption p95 latency > 500ms"
+          description: "95th percentile latency: {{ $value | humanizeDuration }}"
+          action: "Check CPU usage, review encryption key rotation"
+
+      # API high latency
+      - alert: HighAPILatency
+        expr: histogram_quantile(0.95, rate(email_send_duration_seconds_bucket[5m])) > 2
+        for: 5m
+        labels:
+          severity: warning
+          service: email-gateway
+        annotations:
+          summary: "API p95 latency > 2s"
+          description: "95th percentile latency: {{ $value | humanizeDuration }}"
+          action: "Check database, Redis, and queue performance"
+
+      # No metrics from API
+      - alert: APIDown
+        expr: up{job="email-gateway-api"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: email-gateway
+        annotations:
+          summary: "Email Gateway API is down"
+          description: "API has been down for more than 2 minutes"
+          action: "IMMEDIATE: Check API container/process status"
+
+      # No metrics from Worker
+      - alert: WorkerDown
+        expr: up{job="email-gateway-worker"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: email-gateway
+        annotations:
+          summary: "Email Gateway Worker is down"
+          description: "Worker has been down for more than 2 minutes"
+          action: "IMMEDIATE: Check Worker container/process status"
+
+      # High retry rate
+      - alert: HighRetryRate
+        expr: |
+          (
+            sum(rate(email_retry_total[5m]))
+            /
+            sum(rate(email_sent_total[5m]))
+          ) > 0.2
+        for: 10m
+        labels:
+          severity: warning
+          service: email-gateway
+        annotations:
+          summary: "Email retry rate > 20%"
+          description: "Retry rate: {{ $value | humanizePercentage }}"
+          action: "Check SES rate limits, network connectivity"
+
+      # Active queue jobs stuck
+      - alert: ActiveJobsStuck
+        expr: email_queue_size{queue="email_queue_active"} > 100
+        for: 15m
+        labels:
+          severity: warning
+          service: email-gateway
+        annotations:
+          summary: "Active queue jobs > 100 for 15+ minutes"
+          description: "Active jobs: {{ $value }}"
+          action: "Check for worker deadlocks or stuck jobs"
+
+      # TASK-021: DLQ-specific alerts
+
+      # DLQ not empty
+      - alert: DLQNotEmpty
+        expr: dlq_size > 0
+        for: 30m
+        labels:
+          severity: warning
+          service: email-gateway
+        annotations:
+          summary: "Dead Letter Queue is not empty"
+          description: "DLQ size: {{ $value }}. Investigate failed jobs at /admin/dlq"
+          action: "Review failed jobs via GET /admin/dlq endpoint"
+
+      # DLQ critical size
+      - alert: DLQCritical
+        expr: dlq_size > 100
+        for: 15m
+        labels:
+          severity: critical
+          service: email-gateway
+        annotations:
+          summary: "CRITICAL: Dead Letter Queue size > 100"
+          description: "DLQ size: {{ $value }}. Potential systemic issue!"
+          action: "IMMEDIATE: Check SES status, database, Redis. Review /admin/dlq/stats"
+
+      # Old jobs in DLQ
+      - alert: DLQOldJobs
+        expr: dlq_oldest_job_age_hours > 24
+        for: 1h
+        labels:
+          severity: critical
+          service: email-gateway
+        annotations:
+          summary: "CRITICAL: DLQ contains jobs older than 24h"
+          description: "Oldest job: {{ $value }}h old. Immediate investigation required!"
+          action: "IMMEDIATE: Review via /admin/dlq endpoint and retry or remove stale jobs"
+
+      # High DLQ growth rate
+      - alert: HighDLQGrowthRate
+        expr: rate(dlq_size[10m]) > 5
+        for: 10m
+        labels:
+          severity: critical
+          service: email-gateway
+        annotations:
+          summary: "CRITICAL: DLQ growing rapidly (>5 jobs/min)"
+          description: "Growth rate: {{ $value }} jobs/min. Check SES, database, Redis immediately"
+          action: "IMMEDIATE: Check /admin/dlq/stats for failure patterns. Verify external services"
+
+      # DLQ contains stale jobs (>7 days)
+      - alert: DLQStaleJobs
+        expr: dlq_oldest_job_age_hours > 168
+        for: 30m
+        labels:
+          severity: warning
+          service: email-gateway
+        annotations:
+          summary: "DLQ contains jobs older than 7 days"
+          description: "Oldest job: {{ $value }}h ({{ $value | humanizeDuration }})"
+          action: "Consider cleaning old jobs via POST /admin/dlq/clean endpoint"

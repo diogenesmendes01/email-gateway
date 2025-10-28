@@ -2,7 +2,7 @@
  * Integration Tests: Outbox+Fila vs SQS End-to-End Comparison
  * 
  * These tests validate the complete flow documented in
- * ADR-0001-outbox-queue-vs-sqs.md
+ * ADR-20250101-outbox-queue-vs-sqs.md
  * 
  * Tests demonstrate:
  * - Complete API → Queue → Worker flow

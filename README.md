@@ -78,7 +78,7 @@ npx tsx scripts/test-encryption.ts
 **Para padrões de qualidade:**
 
 - [docs/CODE-QUALITY-STANDARDS.md](docs/CODE-QUALITY-STANDARDS.md) - Exception handling, logging, config
-- [docs/testing/TESTING-STANDARDS.md](docs/testing/TESTING-STANDARDS.md) - Testes (cobertura >= 70%)
+- [docs/testing/03-testing-standards.md](docs/testing/03-testing-standards.md) - Testes (cobertura >= 70%)
 
 ### Links Rápidos para Regras
 

@@ -5,7 +5,7 @@
 Antes de fazer ajustes, **SEMPRE** consultar:
 
 - [CODE-QUALITY-STANDARDS.md](./CODE-QUALITY-STANDARDS.md) - Padrões de qualidade obrigatórios
-- [TESTING-STANDARDS.md](./testing/TESTING-STANDARDS.md) - Padrões de testes obrigatórios
+- [03-testing-standards.md](./testing/03-testing-standards.md) - Padrões de testes obrigatórios
 - [PR_REVIEW_RULES.md](./PR_REVIEW_RULES.md) - Critérios de revisão
 
 ---
@@ -23,7 +23,7 @@ Antes de fazer ajustes, **SEMPRE** consultar:
 - 🔴 Exception handling ausente ou incorreto
 
 **Como corrigir:**
-1. Ler documentação relevante (CODE-QUALITY-STANDARDS.md ou TESTING-STANDARDS.md)
+1. Ler documentação relevante (CODE-QUALITY-STANDARDS.md ou 03-testing-standards.md)
 2. Implementar correção seguindo os padrões
 3. Adicionar testes se aplicável
 4. Validar cobertura (`npm run test:cov`)
@@ -177,7 +177,7 @@ async sendEmail(dto: SendEmailDto) {
 }
 ```
 
-**✅ Adicionar testes (seguindo TESTING-STANDARDS.md):**
+**✅ Adicionar testes (seguindo 03-testing-standards.md):**
 ```typescript
 // email.service.spec.ts
 describe('EmailService', () => {
@@ -394,7 +394,7 @@ Antes de cada correção:
 
 1. Abrir documento relevante:
    - **Qualidade/Logs/Config:** [CODE-QUALITY-STANDARDS.md](./CODE-QUALITY-STANDARDS.md)
-   - **Testes:** [TESTING-STANDARDS.md](./testing/TESTING-STANDARDS.md)
+   - **Testes:** [03-testing-standards.md](./testing/03-testing-standards.md)
 2. Ler seção específica do problema
 3. Copiar exemplo de código correto
 
@@ -496,7 +496,7 @@ Antes de solicitar re-review:
 
 Se após ler a documentação você ainda tiver dúvidas:
 
-1. **Re-ler a seção específica** do CODE-QUALITY-STANDARDS.md ou TESTING-STANDARDS.md
+1. **Re-ler a seção específica** do CODE-QUALITY-STANDARDS.md ou 03-testing-standards.md
 2. **Buscar exemplos similares** no código existente
 3. **Perguntar no comentário da PR:**
    ```markdown
