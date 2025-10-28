@@ -44,7 +44,9 @@
     "cleanup:retention": "tsx scripts/cleanup-retention.ts",
     "cleanup:retention:dry": "tsx scripts/cleanup-retention.ts --dry-run",
     "cleanup:retention:stats": "tsx scripts/cleanup-retention.ts --stats",
-    "test:security": "tsx scripts/test-encryption.ts"
+    "test:security": "tsx scripts/test-encryption.ts",
+    "audit:type-safety": "tsx scripts/audit-type-safety.ts",
+    "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",
@@ -56,6 +58,8 @@
     "eslint-plugin-prettier": "^5.1.3",
     "husky": "^9.1.7",
     "prettier": "^3.2.4",
+    "ts-node": "^10.9.2",
+    "tsx": "^4.20.6",
     "typescript": "^5.3.3"
   },
   "engines": {

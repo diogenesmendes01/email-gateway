@@ -1,0 +1,161 @@
+name: Type Safety Audit
+
+# TASK-022: CI/CD workflow to enforce type safety standards
+# Runs on PRs and pushes to main to catch type safety violations
+
+on:
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - '**.ts'
+      - '**.tsx'
+      - '.eslintrc.js'
+      - 'tsconfig*.json'
+      - 'scripts/audit-type-safety.ts'
+      - '.github/workflows/type-safety.yml'
+  push:
+    branches: [main]
+    paths:
+      - '**.ts'
+      - '**.tsx'
+
+jobs:
+  audit:
+    name: TypeScript Type Safety Audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Full history for accurate analysis
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run Type Safety Audit
+        id: audit
+        run: npm run audit:type-safety
+        continue-on-error: true # Don't fail immediately, capture output
+
+      - name: ESLint Type Safety Check
+        id: eslint
+        run: npx eslint . --ext .ts,.tsx --max-warnings 0
+        continue-on-error: true
+
+      - name: TypeScript Strict Check
+        id: typecheck
+        run: npm run typecheck
+        continue-on-error: true
+
+      - name: Report Results
+        if: always()
+        run: |
+          echo "## Type Safety Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ steps.audit.outcome }}" == "success" ]; then
+            echo "✅ Type Safety Audit: PASSED" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ Type Safety Audit: FAILED" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [ "${{ steps.eslint.outcome }}" == "success" ]; then
+            echo "✅ ESLint Type Rules: PASSED" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ ESLint Type Rules: FAILED" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [ "${{ steps.typecheck.outcome }}" == "success" ]; then
+            echo "✅ TypeScript Check: PASSED" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ TypeScript Check: FAILED" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "📖 [Type Safety Documentation](https://github.com/${{ github.repository }}/blob/main/docs/TYPESCRIPT-EXCEPTIONS.md)" >> $GITHUB_STEP_SUMMARY
+
+      - name: Fail if any check failed
+        if: steps.audit.outcome != 'success' || steps.eslint.outcome != 'success' || steps.typecheck.outcome != 'success'
+        run: |
+          echo "❌ Type safety checks failed. See details above."
+          exit 1
+
+  # Optional: Auto-comment on PR with results
+  comment:
+    name: Comment Type Safety Results
+    runs-on: ubuntu-latest
+    needs: audit
+    if: always() && github.event_name == 'pull_request'
+    permissions:
+      pull-requests: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Audit Report
+        id: report
+        run: |
+          echo "## Type Safety Audit Report (TASK-022)" > audit-report.md
+          echo "" >> audit-report.md
+          npm run audit:type-safety >> audit-report.md 2>&1 || true
+          echo "" >> audit-report.md
+          echo "---" >> audit-report.md
+          echo "📖 See [TYPESCRIPT-EXCEPTIONS.md](https://github.com/${{ github.repository }}/blob/main/docs/TYPESCRIPT-EXCEPTIONS.md) for guidelines" >> audit-report.md
+
+      - name: Comment PR
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const report = fs.readFileSync('audit-report.md', 'utf8');
+
+            // Find existing comment
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const botComment = comments.find(comment =>
+              comment.user.type === 'Bot' &&
+              comment.body.includes('Type Safety Audit Report')
+            );
+
+            const commentBody = `${report}\n\n_Automated by type-safety.yml workflow_`;
+
+            if (botComment) {
+              // Update existing comment
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: commentBody,
+              });
+            } else {
+              // Create new comment
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: commentBody,
+              });
+            }
