@@ -16,10 +16,16 @@ import {
   Request,
   HttpCode,
   HttpStatus,
+  UseInterceptors,
+  UploadedFile,
+  BadRequestException,
+  UseGuards,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiConsumes } from '@nestjs/swagger';
 import { ApiKeyOnly } from '../../auth/decorators';
 import { BatchEmailService } from '../services/batch-email.service';
+import { BatchRateLimitGuard } from '../guards/batch-rate-limit.guard';
 import {
   BatchEmailDto,
   BatchStatusResponseDto,
@@ -38,6 +44,7 @@ export class BatchEmailController {
    */
   @Post('batch')
   @ApiKeyOnly()
+  @UseGuards(BatchRateLimitGuard)
   @HttpCode(HttpStatus.ACCEPTED)
   @ApiOperation({
     summary: 'Send batch of emails',
@@ -115,5 +122,51 @@ export class BatchEmailController {
     const companyId = req.user?.companyId || req.companyId;
 
     return this.batchEmailService.getBatchEmails(companyId, batchId);
+  }
+
+  /**
+   * POST /v1/email/batch/csv
+   * Upload CSV file for batch processing
+   */
+  @Post('batch/csv')
+  @ApiKeyOnly()
+  @UseGuards(BatchRateLimitGuard)
+  @HttpCode(HttpStatus.ACCEPTED)
+  @UseInterceptors(FileInterceptor('file'))
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({
+    summary: 'Upload CSV for batch email sending',
+    description:
+      'Upload a CSV file containing email data (up to 1000 emails, max 10MB). ' +
+      'CSV format: to,subject,html,recipient_name,recipient_cpf,recipient_razao_social',
+  })
+  @ApiResponse({
+    status: 202,
+    description: 'CSV uploaded and batch created',
+    type: BatchCreateResponseDto,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid CSV file or format',
+  })
+  async uploadCsv(@UploadedFile() file: Express.Multer.File, @Request() req: any): Promise<BatchCreateResponseDto> {
+    if (!file) {
+      throw new BadRequestException({
+        code: 'FILE_REQUIRED',
+        message: 'CSV file is required',
+      });
+    }
+
+    if (file.mimetype !== 'text/csv' && !file.originalname.endsWith('.csv')) {
+      throw new BadRequestException({
+        code: 'INVALID_FILE_TYPE',
+        message: 'File must be CSV format (.csv)',
+      });
+    }
+
+    const companyId = req.user?.companyId || req.companyId;
+    const requestId = req.headers['x-request-id'];
+
+    return this.batchEmailService.processCsvFile(companyId, file, requestId);
   }
 }
