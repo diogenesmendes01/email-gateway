@@ -63,7 +63,7 @@ START: What are you doing?
 **Essential Docs (Read these 4 only):**
 
 - [docs/CODE-QUALITY-STANDARDS.md](docs/CODE-QUALITY-STANDARDS.md) - Exception handling, logging, config
-- [docs/testing/TESTING-STANDARDS.md](docs/testing/TESTING-STANDARDS.md) - API testing requirements
+- [docs/testing/03-testing-standards.md](docs/testing/03-testing-standards.md) - API testing requirements
 - [docs/api/01-endpoints.md](docs/api/01-endpoints.md) - API patterns and conventions
 - [docs/architecture/01-visao-geral-sistema.md](docs/architecture/01-visao-geral-sistema.md) - System overview
 
@@ -173,7 +173,7 @@ export class YourFeatureDto {
 - [ ] DTO uses class-validator decorators
 - [ ] Service uses Dependency Injection (constructor injection)
 - [ ] Errors throw custom exceptions (see CODE-QUALITY-STANDARDS.md:136)
-- [ ] Integration tests created (see TESTING-STANDARDS.md:260)
+- [ ] Integration tests created (see 03-testing-standards.md:260)
 - [ ] OpenAPI endpoint documented in `docs/api/` if public
 
 **Example Files:**
@@ -397,7 +397,7 @@ model Recipient {
 
 - [docs/CODE-QUALITY-STANDARDS.md](docs/CODE-QUALITY-STANDARDS.md) - Security standards
 - [docs/data/03-data-retention-privacy.md](docs/data/03-data-retention-privacy.md) - PII protection
-- [docs/testing/TESTING-STANDARDS.md](docs/testing/TESTING-STANDARDS.md) - Security testing
+- [docs/testing/03-testing-standards.md](docs/testing/03-testing-standards.md) - Security testing
 - [docs/api/01-endpoints.md](docs/api/01-endpoints.md) - Auth patterns
 
 **Quick Pattern - API Key Auth:**
@@ -639,7 +639,7 @@ this.logger.log({
 **Essential Docs (Read these 3 only):**
 
 - [docs/CODE-QUALITY-STANDARDS.md](docs/CODE-QUALITY-STANDARDS.md) - Code standards
-- [docs/testing/TESTING-STANDARDS.md](docs/testing/TESTING-STANDARDS.md) - Test requirements
+- [docs/testing/03-testing-standards.md](docs/testing/03-testing-standards.md) - Test requirements
 - [docs/PR_ADJUSTMENTS.md](docs/PR_ADJUSTMENTS.md) - How to document fixes
 
 **Bug Fix Workflow:**
@@ -735,7 +735,7 @@ Updated regex to RFC 5322 compliant pattern.
 **Essential Docs (Read these 2 only):**
 
 - [docs/CODE-QUALITY-STANDARDS.md](docs/CODE-QUALITY-STANDARDS.md) - Code organization
-- [docs/testing/TESTING-STANDARDS.md](docs/testing/TESTING-STANDARDS.md) - Test coverage
+- [docs/testing/03-testing-standards.md](docs/testing/03-testing-standards.md) - Test coverage
 
 **Refactoring Principles:**
 
@@ -918,7 +918,7 @@ export class YourService {
 
 **Essential Docs (Read these 2 only):**
 
-- [docs/testing/TESTING-STANDARDS.md](docs/testing/TESTING-STANDARDS.md) - **FULL READ REQUIRED**
+- [docs/testing/03-testing-standards.md](docs/testing/03-testing-standards.md) - **FULL READ REQUIRED**
 - [docs/CODE-QUALITY-STANDARDS.md](docs/CODE-QUALITY-STANDARDS.md) - Code patterns to test
 
 **Coverage Requirements:**
@@ -1576,7 +1576,7 @@ Quick reference to all docs (for when you need more detail):
 ### Standards (CRITICAL)
 
 - [CODE-QUALITY-STANDARDS.md](docs/CODE-QUALITY-STANDARDS.md) - **MUST READ** - Exception handling, logging, config
-- [TESTING-STANDARDS.md](docs/testing/TESTING-STANDARDS.md) - **MUST READ** - Test requirements, coverage
+- [03-testing-standards.md](docs/testing/03-testing-standards.md) - **MUST READ** - Test requirements, coverage
 
 ### Process
 

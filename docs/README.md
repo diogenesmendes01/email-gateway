@@ -28,7 +28,7 @@ docs/
 ### 📘 Padrões e Qualidade de Código
 
 - [Code Quality Standards](./CODE-QUALITY-STANDARDS.md) - **OBRIGATÓRIO** - Padrões de qualidade, exception handling, logging, configuration
-- [Testing Standards](./testing/TESTING-STANDARDS.md) - **OBRIGATÓRIO** - Padrões de testes unitários, integração e E2E
+- [Testing Standards](./testing/03-testing-standards.md) - **OBRIGATÓRIO** - Padrões de testes unitários, integração e E2E
 - [AI Agent Guide](./AI_AGENT_GUIDE.md) - Guia completo para agentes de IA contribuírem no projeto
 
 ### 🏗️ ADRs (Architecture Decision Records)

@@ -60,7 +60,7 @@ Estrutura, legibilidade, coesão, acoplamento, padrões do projeto.
 Há testes automatizados e instruções para validar manualmente.
 
 **Documentos de Referência:**
-- [TESTING-STANDARDS.md](./testing/TESTING-STANDARDS.md) - **OBRIGATÓRIO**
+- [03-testing-standards.md](./testing/03-testing-standards.md) - **OBRIGATÓRIO**
 
 **Verificar:**
 - [ ] **Cobertura de Testes:**
@@ -188,7 +188,7 @@ Não há SLA obrigatório para tratamento de comentários (conforme alinhado). U
 - [ ] Environment variables validadas
 - [ ] TypeScript strict (sem `any`)
 
-### Testes (TESTING-STANDARDS.md)
+### Testes (03-testing-standards.md)
 - [ ] Testes unitários (>= 80% para services)
 - [ ] Testes de integração (>= 70% para APIs/workers)
 - [ ] Cobertura geral >= 70%
