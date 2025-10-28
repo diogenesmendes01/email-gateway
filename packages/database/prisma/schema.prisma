@@ -92,17 +92,47 @@ model Company {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
+  // ===== TASK-026: Multi-Tenant Fields =====
+
+  // Domínio personalizado
+  defaultFromAddress String?  @map("default_from_address") @db.VarChar(254)
+  defaultFromName    String?  @map("default_from_name") @db.VarChar(100)
+  domainId           String?  @map("domain_id")
+
+  // Limites de envio
+  dailyEmailLimit    Int      @default(1000) @map("daily_email_limit")
+  monthlyEmailLimit  Int?     @map("monthly_email_limit")
+
+  // Curadoria e Status
+  isApproved         Boolean  @default(false) @map("is_approved")
+  isSuspended        Boolean  @default(false) @map("is_suspended")
+  suspensionReason   String?  @map("suspension_reason") @db.Text
+  approvedAt         DateTime? @map("approved_at")
+  approvedBy         String?  @map("approved_by") @db.VarChar(128)
+
+  // Métricas em cache (atualizadas por cron job)
+  bounceRate         Float    @default(0) @map("bounce_rate")
+  complaintRate      Float    @default(0) @map("complaint_rate")
+  lastMetricsUpdate  DateTime? @map("last_metrics_update")
+
   // Relations
   recipients   Recipient[]
   emailOutbox  EmailOutbox[]
   emailLogs    EmailLog[]
   idempotencyKeys IdempotencyKey[]
   auditLogs   AuditLog[]
-  domains     Domain[]
+  domains     Domain[] @relation("CompanyDomains")
   webhooks    Webhook[] // TASK-023
   recipientBlocklist RecipientBlocklist[] // TASK-024
   emailBatches EmailBatch[] // TASK-025
 
+  // TASK-026: Domínio padrão
+  defaultDomain Domain? @relation("CompanyDefaultDomain", fields: [domainId], references: [id])
+
+  @@index([isApproved, isSuspended], map: "idx_companies_approval_status")
+  @@index([bounceRate], map: "idx_companies_bounce_rate")
+  @@index([complaintRate], map: "idx_companies_complaint_rate")
+  @@index([domainId], map: "idx_companies_domain_id")
   @@map("companies")
 }
 
@@ -296,7 +326,10 @@ model Domain {
   updatedAt             DateTime                  @updatedAt @map("updated_at")
 
   // Relations
-  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company Company @relation("CompanyDomains", fields: [companyId], references: [id], onDelete: Cascade)
+
+  // TASK-026: Empresas que usam este domínio como padrão
+  defaultForCompanies Company[] @relation("CompanyDefaultDomain")
 
   @@unique([companyId, domain])
   @@index([companyId, status])
