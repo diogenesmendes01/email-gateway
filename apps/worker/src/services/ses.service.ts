@@ -16,6 +16,7 @@ import {
 } from '@email-gateway/shared';
 import { ErrorMappingService, type MappedError } from './error-mapping.service';
 import CircuitBreaker from 'opossum';
+import { prisma } from '@email-gateway/database'; // TASK-027
 
 /**
  * Configuração do SES
@@ -125,6 +126,7 @@ export class SESService {
   /**
    * Internal method to send email via AWS SES
    * TASK-009: Wrapped by circuit breaker
+   * TASK-027: Use company's verified domain
    *
    * @param jobData - Dados do job
    * @param htmlContent - Conteúdo HTML do email
@@ -140,9 +142,76 @@ export class SESService {
         throw new Error('Throttling: Simulated SES 429');
       }
 
+      // TASK-027: Buscar Company com domínio verificado
+      const company = await prisma.company.findUnique({
+        where: { id: jobData.companyId },
+        select: {
+          id: true,
+          name: true,
+          defaultFromAddress: true,
+          defaultFromName: true,
+          domainId: true,
+          isSuspended: true,
+          defaultDomain: {
+            select: {
+              id: true,
+              domain: true,
+              status: true,
+            },
+          },
+        },
+      });
+
+      if (!company) {
+        throw new Error(`Company ${jobData.companyId} not found`);
+      }
+
+      // TASK-027: Verificar se empresa está suspensa
+      if (company.isSuspended) {
+        throw new Error(`Company ${company.id} is suspended. Cannot send emails.`);
+      }
+
+      // TASK-027: Determinar fromAddress e fromName
+      let fromAddress = this.config.fromAddress; // Fallback global
+      let fromName: string | undefined;
+
+      if (company.defaultFromAddress && company.defaultDomain) {
+        // Validar se domínio está verificado
+        if (company.defaultDomain.status === 'VERIFIED') {
+          fromAddress = company.defaultFromAddress;
+          fromName = company.defaultFromName || undefined;
+
+          console.log({
+            message: 'Using company verified domain',
+            companyId: company.id,
+            domain: company.defaultDomain.domain,
+            fromAddress,
+          });
+        } else {
+          console.warn({
+            message: 'Company domain not verified, using global address',
+            companyId: company.id,
+            domainStatus: company.defaultDomain.status,
+            fallbackAddress: fromAddress,
+          });
+        }
+      } else {
+        console.log({
+          message: 'Company has no default domain, using global address',
+          companyId: company.id,
+          fallbackAddress: fromAddress,
+        });
+      }
+
+      // TASK-027: Formatar Source com nome (RFC 5322)
+      // Formato: "Display Name <email@domain.com>"
+      const source = fromName
+        ? `${fromName} <${fromAddress}>`
+        : fromAddress;
+
       // Prepara os parâmetros do comando
       const command = new SendEmailCommand({
-        Source: this.config.fromAddress,
+        Source: source, // TASK-027: era this.config.fromAddress
         Destination: {
           ToAddresses: [jobData.to],
           CcAddresses: jobData.cc || [],
