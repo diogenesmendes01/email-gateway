@@ -57,6 +57,14 @@ enum DKIMVerificationStatus {
   FAILED
 }
 
+// TASK-023: Webhook System Enums
+enum WebhookDeliveryStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  RETRYING
+}
+
 // TASK-025: Batch Email Enums
 enum BatchStatus {
   PROCESSING
@@ -91,6 +99,8 @@ model Company {
   idempotencyKeys IdempotencyKey[]
   auditLogs   AuditLog[]
   domains     Domain[]
+  webhooks    Webhook[] // TASK-023
+  recipientBlocklist RecipientBlocklist[] // TASK-024
   emailBatches EmailBatch[] // TASK-025
 
   @@map("companies")
@@ -184,6 +194,12 @@ model EmailLog {
   createdAt     DateTime    @default(now()) @map("created_at")
   sentAt        DateTime?   @map("sent_at")
   failedAt      DateTime?   @map("failed_at")
+
+  // TASK-024: SES Event Fields
+  bounceType            String?   @map("bounce_type") @db.VarChar(32)
+  bounceSubtype         String?   @map("bounce_subtype") @db.VarChar(64)
+  complaintFeedbackType String?   @map("complaint_feedback_type") @db.VarChar(64)
+  deliveryTimestamp     DateTime? @map("delivery_timestamp")
 
   // Relations
   company     Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
@@ -286,6 +302,66 @@ model Domain {
   @@index([companyId, status])
   @@index([domain])
   @@map("domains")
+}
+
+// TASK-023: Webhook System
+model Webhook {
+  id        String   @id @default(cuid())
+  companyId String   @map("company_id")
+  url       String   @db.VarChar(2048)
+  secret    String   @db.VarChar(64)
+  events    String[] @default([])
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  company    Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  deliveries WebhookDelivery[]
+
+  @@index([companyId, isActive], map: "idx_webhooks_company_active")
+  @@map("webhooks")
+}
+
+model WebhookDelivery {
+  id           String                @id @default(cuid())
+  webhookId    String                @map("webhook_id")
+  eventType    String                @map("event_type") @db.VarChar(64)
+  payload      Json
+  status       WebhookDeliveryStatus @default(PENDING)
+  responseCode Int?                  @map("response_code")
+  responseBody String?               @map("response_body") @db.Text
+  attempts     Int                   @default(0)
+  nextRetryAt  DateTime?             @map("next_retry_at")
+  deliveredAt  DateTime?             @map("delivered_at")
+  createdAt    DateTime              @default(now()) @map("created_at")
+
+  // Relations
+  webhook Webhook @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+
+  @@index([webhookId, createdAt(sort: Desc)], map: "idx_webhook_deliveries_webhook")
+  @@index([status, nextRetryAt], map: "idx_webhook_deliveries_status")
+  @@map("webhook_deliveries")
+}
+
+// TASK-024: Recipient Blocklist (Hard Bounces & Complaints)
+model RecipientBlocklist {
+  id             String   @id @default(cuid())
+  companyId      String   @map("company_id")
+  email          String   @db.VarChar(254)
+  reason         String   @db.VarChar(32) // 'hard_bounce', 'soft_bounce', 'complaint'
+  bounceType     String?  @map("bounce_type") @db.VarChar(32)
+  bounceSubtype  String?  @map("bounce_subtype") @db.VarChar(64)
+  sesMessageId   String?  @map("ses_message_id") @db.VarChar(128)
+  blockedAt      DateTime @default(now()) @map("blocked_at")
+  metadata       Json?
+
+  // Relations
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, email], map: "idx_blocklist_company_email")
+  @@index([reason, blockedAt], map: "idx_blocklist_reason")
+  @@map("recipient_blocklist")
 }
 
 // TASK-025: Email Batch Tracking
