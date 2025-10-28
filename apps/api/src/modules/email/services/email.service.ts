@@ -401,4 +401,48 @@ export class EmailService {
     const normalized = cpfCnpj.replace(/\D/g, '');
     return crypto.createHash('sha256').update(normalized).digest('hex');
   }
+
+  /**
+   * TASK-024: Get all events for a specific email
+   *
+   * Returns chronological list of all events that occurred for an email:
+   * - SENT, BOUNCED, COMPLAINED, DELIVERED, etc.
+   *
+   * Used for debugging delivery issues and tracking email lifecycle.
+   */
+  async getEmailEvents(companyId: string, outboxId: string) {
+    // Find email log by outbox ID
+    const emailLog = await prisma.emailLog.findFirst({
+      where: {
+        outboxId,
+        companyId,
+      },
+      include: {
+        events: {
+          orderBy: {
+            createdAt: 'asc', // Chronological order
+          },
+        },
+      },
+    });
+
+    if (!emailLog) {
+      throw new NotFoundException({
+        code: 'EMAIL_NOT_FOUND',
+        message: `Email with ID ${outboxId} not found`,
+      });
+    }
+
+    // Return formatted response
+    return {
+      outboxId,
+      status: emailLog.status,
+      events: emailLog.events.map((event) => ({
+        id: event.id,
+        type: event.type,
+        timestamp: event.createdAt.toISOString(),
+        metadata: event.metadata,
+      })),
+    };
+  }
 }

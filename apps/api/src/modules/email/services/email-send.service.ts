@@ -67,6 +67,9 @@ export class EmailSendService {
       }
     }
 
+    // TASK-024: Check if recipient is blocked (hard bounce or spam complaint)
+    await this.checkBlocklist(companyId, body.to);
+
     // Generate IDs
     const outboxId = crypto.randomUUID();
     const jobId = outboxId; // Same ID for outbox and job
@@ -476,6 +479,43 @@ export class EmailSendService {
       throw new InternalServerErrorException({
         code: 'DECRYPTION_FAILED',
         message: 'Unable to decrypt sensitive data',
+      });
+    }
+  }
+
+  /**
+   * TASK-024: Check if recipient is in blocklist
+   *
+   * Prevents sending emails to recipients who have:
+   * - Hard bounced (permanent delivery failure)
+   * - Complained (marked as spam)
+   *
+   * This protects sender reputation and prevents AWS SES account suspension.
+   */
+  private async checkBlocklist(companyId: string, email: string): Promise<void> {
+    const blocked = await prisma.recipientBlocklist.findUnique({
+      where: {
+        companyId_email: {
+          companyId,
+          email,
+        },
+      },
+    });
+
+    if (blocked) {
+      this.logger.warn({
+        message: 'Blocked recipient - email send rejected',
+        companyId,
+        email,
+        reason: blocked.reason,
+        blockedAt: blocked.blockedAt,
+      });
+
+      throw new BadRequestException({
+        code: 'RECIPIENT_BLOCKED',
+        message: `Cannot send to ${email}. Recipient blocked due to ${blocked.reason}.`,
+        reason: blocked.reason,
+        blockedAt: blocked.blockedAt,
       });
     }
   }

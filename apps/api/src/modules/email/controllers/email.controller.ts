@@ -84,4 +84,31 @@ export class EmailController {
     // Call service to fetch email details
     return this.emailService.getEmailById(companyId, validatedParams.id);
   }
+
+  /**
+   * GET /v1/emails/:id/events
+   *
+   * Get all events for a specific email (TASK-024)
+   * Events include: BOUNCED, COMPLAINED, DELIVERED, SENT, etc.
+   *
+   * @param params - Path parameters (email ID)
+   * @param req - Request object (contains company info from auth)
+   * @returns List of email events with timestamps and metadata
+   */
+  @Get(':id/events')
+  @ApiKeyOnly()
+  @HttpCode(HttpStatus.OK)
+  async getEmailEvents(
+    @Param() params: EmailByIdParams,
+    @Request() req: any,
+  ) {
+    // Validate path parameters
+    const validatedParams = emailByIdParamsSchema.parse(params);
+
+    // Get company ID from authenticated request
+    const companyId = req.user?.companyId || req.companyId;
+
+    // Call service to fetch email events
+    return this.emailService.getEmailEvents(companyId, validatedParams.id);
+  }
 }
