@@ -1,0 +1,290 @@
+{
+  "dashboard": {
+    "title": "Email Gateway - DLQ Monitoring",
+    "tags": ["email-gateway", "dlq", "monitoring"],
+    "timezone": "browser",
+    "refresh": "1m",
+    "panels": [
+      {
+        "id": 1,
+        "title": "DLQ Size",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "dlq_size",
+            "legendFormat": "Failed Jobs in DLQ"
+          }
+        ],
+        "yaxes": [
+          {
+            "label": "jobs",
+            "format": "short"
+          }
+        ],
+        "alert": {
+          "name": "DLQ Not Empty",
+          "conditions": [
+            {
+              "evaluator": {
+                "params": [0],
+                "type": "gt"
+              },
+              "operator": {
+                "type": "and"
+              },
+              "query": {
+                "params": ["A", "30m", "now"]
+              },
+              "reducer": {
+                "params": [],
+                "type": "avg"
+              },
+              "type": "query"
+            }
+          ]
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 0
+        },
+        "thresholds": [
+          {
+            "value": 0,
+            "colorMode": "custom",
+            "op": "gt",
+            "fill": true,
+            "line": true,
+            "yaxis": "left",
+            "fillColor": "rgba(255, 152, 0, 0.2)",
+            "lineColor": "rgba(255, 152, 0, 1)"
+          },
+          {
+            "value": 100,
+            "colorMode": "custom",
+            "op": "gt",
+            "fill": true,
+            "line": true,
+            "yaxis": "left",
+            "fillColor": "rgba(244, 67, 54, 0.3)",
+            "lineColor": "rgba(244, 67, 54, 1)"
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "title": "DLQ Oldest Job Age",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "dlq_oldest_job_age_hours",
+            "legendFormat": "Age (hours)"
+          }
+        ],
+        "yaxes": [
+          {
+            "label": "hours",
+            "format": "h"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 0
+        },
+        "thresholds": [
+          {
+            "value": 24,
+            "colorMode": "critical",
+            "op": "gt",
+            "fill": true,
+            "line": true,
+            "yaxis": "left"
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "DLQ Growth Rate",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(dlq_size[5m]) * 60",
+            "legendFormat": "Jobs/min"
+          }
+        ],
+        "yaxes": [
+          {
+            "label": "jobs/min",
+            "format": "short"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 8
+        },
+        "thresholds": [
+          {
+            "value": 5,
+            "colorMode": "critical",
+            "op": "gt"
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Recent Failures (Last 1h)",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "sum(increase(email_failed_total[1h])) by (reason)",
+            "legendFormat": "{{reason}}"
+          }
+        ],
+        "yaxes": [
+          {
+            "label": "failures",
+            "format": "short"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 8
+        }
+      },
+      {
+        "id": 5,
+        "title": "DLQ Health Status",
+        "type": "singlestat",
+        "targets": [
+          {
+            "expr": "dlq_size"
+          }
+        ],
+        "valueName": "current",
+        "sparkline": {
+          "show": true,
+          "full": false
+        },
+        "gauge": {
+          "show": true,
+          "minValue": 0,
+          "maxValue": 200,
+          "thresholdMarkers": true,
+          "thresholdLabels": true
+        },
+        "thresholds": "0,50,100",
+        "colors": [
+          "#299c46",
+          "#e0b400",
+          "#d44a3a"
+        ],
+        "colorValue": true,
+        "gridPos": {
+          "h": 8,
+          "w": 6,
+          "x": 0,
+          "y": 16
+        }
+      },
+      {
+        "id": 6,
+        "title": "Time Since Last DLQ Job",
+        "type": "singlestat",
+        "targets": [
+          {
+            "expr": "(time() - max(dlq_oldest_job_age_hours * 3600 + time())) / 60",
+            "legendFormat": "Minutes"
+          }
+        ],
+        "valueName": "current",
+        "format": "m",
+        "gridPos": {
+          "h": 8,
+          "w": 6,
+          "x": 6,
+          "y": 16
+        }
+      },
+      {
+        "id": 7,
+        "title": "DLQ vs Total Failed",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "dlq_size",
+            "legendFormat": "In DLQ"
+          },
+          {
+            "expr": "sum(email_failed_total)",
+            "legendFormat": "Total Failed (all time)"
+          }
+        ],
+        "yaxes": [
+          {
+            "label": "count",
+            "format": "short",
+            "logBase": 10
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 16
+        }
+      },
+      {
+        "id": 8,
+        "title": "Action Items",
+        "type": "text",
+        "mode": "markdown",
+        "content": "## DLQ Management\n\n### Quick Actions\n- **View Failed Jobs**: `GET /admin/dlq`\n- **Get Statistics**: `GET /admin/dlq/stats`\n- **Retry Job**: `POST /admin/dlq/{jobId}/retry`\n- **Remove Job**: `DELETE /admin/dlq/{jobId}`\n- **Bulk Retry**: `POST /admin/dlq/bulk-retry`\n- **Clean Old Jobs**: `POST /admin/dlq/clean?daysOld=7`\n\n### Alert Thresholds\n- ⚠️ **Warning**: DLQ > 0 for 30min\n- 🚨 **Critical**: DLQ > 100 or jobs > 24h old\n- 🔥 **Emergency**: Growth rate > 5 jobs/min\n\n### Investigation Steps\n1. Check `/admin/dlq/stats` for failure patterns\n2. Review recent failures by reason\n3. Identify systemic issues (SES, DB, Redis)\n4. Retry recoverable failures\n5. Remove unfixable jobs\n6. Monitor growth rate",
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 24
+        }
+      },
+      {
+        "id": 9,
+        "title": "Failure Reasons Distribution",
+        "type": "piechart",
+        "targets": [
+          {
+            "expr": "sum(email_failed_total) by (reason)",
+            "legendFormat": "{{reason}}"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 24
+        }
+      }
+    ],
+    "schemaVersion": 16,
+    "version": 0,
+    "annotations": {
+      "list": [
+        {
+          "datasource": "Prometheus",
+          "enable": true,
+          "expr": "ALERTS{alertname=\"DLQNotEmpty\", alertstate=\"firing\"}",
+          "name": "DLQ Alerts",
+          "step": "60s",
+          "titleFormat": "Alert: {{alertname}}",
+          "tagKeys": "severity"
+        }
+      ]
+    }
+  }
+}

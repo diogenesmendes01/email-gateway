@@ -119,3 +119,65 @@ groups:
           summary: "Active queue jobs > 100 for 15+ minutes"
           description: "Active jobs: {{ $value }}"
           action: "Check for worker deadlocks or stuck jobs"
+
+      # TASK-021: DLQ-specific alerts
+
+      # DLQ not empty
+      - alert: DLQNotEmpty
+        expr: dlq_size > 0
+        for: 30m
+        labels:
+          severity: warning
+          service: email-gateway
+        annotations:
+          summary: "Dead Letter Queue is not empty"
+          description: "DLQ size: {{ $value }}. Investigate failed jobs at /admin/dlq"
+          action: "Review failed jobs via GET /admin/dlq endpoint"
+
+      # DLQ critical size
+      - alert: DLQCritical
+        expr: dlq_size > 100
+        for: 15m
+        labels:
+          severity: critical
+          service: email-gateway
+        annotations:
+          summary: "CRITICAL: Dead Letter Queue size > 100"
+          description: "DLQ size: {{ $value }}. Potential systemic issue!"
+          action: "IMMEDIATE: Check SES status, database, Redis. Review /admin/dlq/stats"
+
+      # Old jobs in DLQ
+      - alert: DLQOldJobs
+        expr: dlq_oldest_job_age_hours > 24
+        for: 1h
+        labels:
+          severity: critical
+          service: email-gateway
+        annotations:
+          summary: "CRITICAL: DLQ contains jobs older than 24h"
+          description: "Oldest job: {{ $value }}h old. Immediate investigation required!"
+          action: "IMMEDIATE: Review via /admin/dlq endpoint and retry or remove stale jobs"
+
+      # High DLQ growth rate
+      - alert: HighDLQGrowthRate
+        expr: rate(dlq_size[10m]) > 5
+        for: 10m
+        labels:
+          severity: critical
+          service: email-gateway
+        annotations:
+          summary: "CRITICAL: DLQ growing rapidly (>5 jobs/min)"
+          description: "Growth rate: {{ $value }} jobs/min. Check SES, database, Redis immediately"
+          action: "IMMEDIATE: Check /admin/dlq/stats for failure patterns. Verify external services"
+
+      # DLQ contains stale jobs (>7 days)
+      - alert: DLQStaleJobs
+        expr: dlq_oldest_job_age_hours > 168
+        for: 30m
+        labels:
+          severity: warning
+          service: email-gateway
+        annotations:
+          summary: "DLQ contains jobs older than 7 days"
+          description: "Oldest job: {{ $value }}h ({{ $value | humanizeDuration }})"
+          action: "Consider cleaning old jobs via POST /admin/dlq/clean endpoint"

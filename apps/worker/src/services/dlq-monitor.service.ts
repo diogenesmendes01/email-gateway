@@ -11,7 +11,7 @@
 import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { Queue, Job } from 'bullmq';
 import { ConfigService } from '@nestjs/config';
-import { MetricsService } from '../metrics/metrics.service';
+import { MetricsService } from '../modules/metrics/metrics.service';
 
 export interface DLQJobInfo {
   id: string;
@@ -27,7 +27,7 @@ export interface DLQJobInfo {
 export class DLQMonitorService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(DLQMonitorService.name);
   private queue: Queue;
-  private checkInterval: NodeJS.Timeout;
+  private checkInterval!: NodeJS.Timeout;
   private readonly CHECK_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 
   constructor(
@@ -133,8 +133,8 @@ export class DLQMonitorService implements OnModuleInit, OnModuleDestroy {
     } catch (error) {
       this.logger.error({
         message: 'Failed to monitor DLQ',
-        error: error.message,
-        stack: error.stack,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
       });
     }
   }
@@ -145,15 +145,17 @@ export class DLQMonitorService implements OnModuleInit, OnModuleDestroy {
   async getDLQJobs(limit: number = 100): Promise<DLQJobInfo[]> {
     const failedJobs = await this.queue.getFailed(0, limit);
 
-    return failedJobs.map((job) => ({
-      id: job.id,
-      data: job.data,
-      failedReason: job.failedReason,
-      attemptsMade: job.attemptsMade,
-      timestamp: job.timestamp,
-      ageHours: Math.round((Date.now() - job.timestamp) / (1000 * 60 * 60)),
-      stacktrace: job.stacktrace,
-    }));
+    return failedJobs
+      .filter((job) => job.id !== undefined)
+      .map((job) => ({
+        id: job.id as string,
+        data: job.data,
+        failedReason: job.failedReason,
+        attemptsMade: job.attemptsMade,
+        timestamp: job.timestamp,
+        ageHours: Math.round((Date.now() - job.timestamp) / (1000 * 60 * 60)),
+        stacktrace: job.stacktrace,
+      }));
   }
 
   /**
@@ -213,7 +215,7 @@ export class DLQMonitorService implements OnModuleInit, OnModuleDestroy {
         this.logger.error({
           message: 'Failed to retry job in bulk operation',
           jobId,
-          error: error.message,
+          error: error instanceof Error ? error.message : String(error),
         });
       }
     }

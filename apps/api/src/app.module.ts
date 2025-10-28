@@ -13,6 +13,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { DomainModule } from './modules/domain/domain.module';
 import { MetricsModule } from './modules/metrics/metrics.module';
+import { AdminModule } from './modules/admin/admin.module';
 
 @Module({
   imports: [
@@ -50,6 +51,7 @@ import { MetricsModule } from './modules/metrics/metrics.module';
     DashboardModule,
     DomainModule,
     MetricsModule,
+    AdminModule, // TASK-021: Admin DLQ management
   ],
 })
 export class AppModule implements NestModule {
