@@ -22,6 +22,8 @@ export const SendEmailPage: React.FC = () => {
   const [batchSubject, setBatchSubject] = useState('');
   const [batchHtml, setBatchHtml] = useState('');
   const [preview, setPreview] = useState<any[]>([]);
+  const [batchId, setBatchId] = useState<string | null>(null);
+  const [totalLines, setTotalLines] = useState(0);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -59,14 +61,41 @@ export const SendEmailPage: React.FC = () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setCsvFile(file);
+    setError('');
     const text = await file.text();
-    const lines = text.split('\n').slice(0, 6);
-    const headers = lines[0].split(',');
-    const rows = lines.slice(1).filter(l => l.trim()).map(line => {
+    const allLines = text.split('\n').filter(l => l.trim());
+
+    // Validação: máximo 1000 linhas (excluindo header)
+    if (allLines.length > 1001) {
+      setError('CSV excede o limite de 1000 destinatários');
+      setCsvFile(null);
+      setPreview([]);
+      setTotalLines(0);
+      return;
+    }
+
+    // Validação: formato do header
+    const headers = allLines[0].split(',').map(h => h.trim());
+    const requiredHeaders = ['email'];
+    const missingHeaders = requiredHeaders.filter(h => !headers.includes(h));
+
+    if (missingHeaders.length > 0) {
+      setError(`CSV inválido: faltam colunas obrigatórias: ${missingHeaders.join(', ')}`);
+      setCsvFile(null);
+      setPreview([]);
+      setTotalLines(0);
+      return;
+    }
+
+    setCsvFile(file);
+    setTotalLines(allLines.length - 1); // Excluindo header
+
+    // Preview dos primeiros 5
+    const previewLines = allLines.slice(0, 6); // Header + 5 linhas
+    const rows = previewLines.slice(1).map(line => {
       const values = line.split(',');
       return headers.reduce((obj: any, header, i) => {
-        obj[header.trim()] = values[i]?.trim();
+        obj[header] = values[i]?.trim();
         return obj;
       }, {});
     });
@@ -92,12 +121,13 @@ export const SendEmailPage: React.FC = () => {
       formData.append('html', batchHtml);
 
       const res = await axios.post('/v1/email/batch/csv', formData);
-      setSuccess(`Batch criado! ${res.data.totalEmails} emails enfileirados`);
+      setBatchId(res.data.batchId);
+      setSuccess(`Batch criado com sucesso! ${res.data.totalEmails} emails enfileirados`);
       setCsvFile(null);
       setBatchSubject('');
       setBatchHtml('');
       setPreview([]);
-      setTimeout(() => setSuccess(''), 5000);
+      setTotalLines(0);
     } catch (err: any) {
       setError(err.response?.data?.message || 'Erro ao criar batch');
     } finally {
@@ -137,7 +167,20 @@ export const SendEmailPage: React.FC = () => {
 
       {success && (
         <div className="mb-6 rounded-lg bg-green-50 p-4 border border-green-200">
-          <p className="text-green-800">{success}</p>
+          <p className="text-green-800 font-medium">{success}</p>
+          {batchId && (
+            <div className="mt-3">
+              <p className="text-sm text-green-700">
+                Batch ID: <code className="bg-green-100 px-2 py-1 rounded">{batchId}</code>
+              </p>
+              <p className="text-sm text-green-600 mt-2">
+                Acompanhe o status dos emails em{' '}
+                <a href="/dashboard/emails" className="underline font-medium hover:text-green-800">
+                  Lista de Emails
+                </a>
+              </p>
+            </div>
+          )}
         </div>
       )}
 
@@ -242,11 +285,18 @@ export const SendEmailPage: React.FC = () => {
             <p className="mt-2 text-sm text-gray-500">
               Formato: email,nome,cpfCnpj,razaoSocial (máx 1000 linhas)
             </p>
+            {totalLines > 0 && (
+              <p className="mt-2 text-sm font-semibold text-blue-600">
+                ✓ {totalLines} destinatários carregados
+              </p>
+            )}
           </div>
 
           {preview.length > 0 && (
             <div>
-              <h3 className="text-sm font-medium text-gray-700 mb-2">Preview (primeiros 5):</h3>
+              <h3 className="text-sm font-medium text-gray-700 mb-2">
+                Preview (primeiros {preview.length} de {totalLines}):
+              </h3>
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200 text-sm">
                   <thead className="bg-gray-50">
