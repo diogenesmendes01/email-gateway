@@ -7,6 +7,7 @@ import { EmailsPage } from './pages/EmailsPage';
 import { EmailDetailPage } from './pages/EmailDetailPage';
 import { ErrorBreakdownPage } from './pages/ErrorBreakdownPage';
 import { SendEmailPage } from './pages/SendEmailPage';
+import { DomainsPage } from './pages/DomainsPage'; // TASK-032
 import { AuthProvider } from './contexts/AuthContext';
 import './index.css';
 
@@ -32,6 +33,7 @@ function App() {
               <Route path="emails" element={<EmailsPage />} />
               <Route path="emails/:id" element={<EmailDetailPage />} />
               <Route path="send" element={<SendEmailPage />} />
+              <Route path="domains" element={<DomainsPage />} />
               <Route path="errors" element={<ErrorBreakdownPage />} />
             </Route>
           </Routes>
