@@ -25,6 +25,7 @@ export const DashboardLayout: React.FC = () => {
     { name: 'KPIs', href: '/dashboard', icon: '📊' },
     { name: 'Emails', href: '/dashboard/emails', icon: '📧' },
     { name: 'Enviar Email', href: '/dashboard/send', icon: '📮' },
+    { name: 'Domínios', href: '/dashboard/domains', icon: '🌐' }, // TASK-032
     { name: 'Error Breakdown', href: '/dashboard/errors', icon: '⚠️' },
   ];
 
