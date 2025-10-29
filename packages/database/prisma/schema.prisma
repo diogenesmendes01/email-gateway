@@ -80,6 +80,8 @@ enum BatchStatus {
 model Company {
   id        String   @id @default(cuid())
   name      String
+  email     String   @unique @db.VarChar(254) // TASK-036
+  passwordHash String @map("password_hash") @db.VarChar(128) // TASK-036
   apiKey    String   @unique @map("api_key")
   apiKeyHash String  @unique @map("api_key_hash") @db.VarChar(128)
   apiKeyPrefix String @map("api_key_prefix") @db.VarChar(20)

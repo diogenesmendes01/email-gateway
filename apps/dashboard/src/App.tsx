@@ -9,6 +9,7 @@ import { ErrorBreakdownPage } from './pages/ErrorBreakdownPage';
 import { SendEmailPage } from './pages/SendEmailPage';
 import { DomainsPage } from './pages/DomainsPage'; // TASK-032
 import { AdminPage } from './pages/AdminPage'; // TASK-035
+import { RegisterPage } from './pages/RegisterPage'; // TASK-036
 import { AuthProvider } from './contexts/AuthContext';
 import './index.css';
 
@@ -29,6 +30,7 @@ function App() {
         <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
           <Routes>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            <Route path="/register" element={<RegisterPage />} />
             <Route path="/dashboard" element={<DashboardLayout />}>
               <Route index element={<KPIsPage />} />
               <Route path="emails" element={<EmailsPage />} />
