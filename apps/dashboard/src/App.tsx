@@ -8,6 +8,7 @@ import { EmailDetailPage } from './pages/EmailDetailPage';
 import { ErrorBreakdownPage } from './pages/ErrorBreakdownPage';
 import { SendEmailPage } from './pages/SendEmailPage';
 import { DomainsPage } from './pages/DomainsPage'; // TASK-032
+import { AdminPage } from './pages/AdminPage'; // TASK-035
 import { AuthProvider } from './contexts/AuthContext';
 import './index.css';
 
@@ -34,6 +35,7 @@ function App() {
               <Route path="emails/:id" element={<EmailDetailPage />} />
               <Route path="send" element={<SendEmailPage />} />
               <Route path="domains" element={<DomainsPage />} />
+              <Route path="admin" element={<AdminPage />} />
               <Route path="errors" element={<ErrorBreakdownPage />} />
             </Route>
           </Routes>
