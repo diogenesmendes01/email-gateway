@@ -89,7 +89,7 @@ export class CompanyService {
     const passwordHash = await bcrypt.hash(dto.password, this.BCRYPT_ROUNDS);
 
     // 3. Gerar API Key
-    const { apiKey, apiKeyHash, apiKeyPrefix } = this.generateSecureApiKey();
+    const { apiKey, apiKeyHash, apiKeyPrefix } = await this.generateSecureApiKey();
 
     // 4. Criar empresa
     const company = await prisma.company.create({
@@ -138,11 +138,13 @@ export class CompanyService {
   /**
    * Gera API Key segura
    * Formato: sk_live_[32 bytes hex]
+   * Usa bcrypt para hash (consistente com AuthService.validateApiKey)
    */
-  generateSecureApiKey(): { apiKey: string; apiKeyHash: string; apiKeyPrefix: string } {
+  async generateSecureApiKey(): Promise<{ apiKey: string; apiKeyHash: string; apiKeyPrefix: string }> {
     const randomBytes = crypto.randomBytes(this.API_KEY_BYTES);
     const apiKey = `sk_live_${randomBytes.toString('hex')}`;
-    const apiKeyHash = crypto.createHash('sha256').update(apiKey).digest('hex');
+    // Usa bcrypt para hash (consistente com validateApiKey do AuthService)
+    const apiKeyHash = await bcrypt.hash(apiKey, this.BCRYPT_ROUNDS);
     const apiKeyPrefix = `${apiKey.substring(0, 12)}...`; // Para exibição
 
     return { apiKey, apiKeyHash, apiKeyPrefix };
@@ -316,7 +318,7 @@ export class CompanyService {
     }
 
     // Gerar nova API Key
-    const { apiKey, apiKeyHash, apiKeyPrefix } = this.generateSecureApiKey();
+    const { apiKey, apiKeyHash, apiKeyPrefix } = await this.generateSecureApiKey();
     const expiresAt = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000); // 1 ano
 
     // Atualizar no banco
