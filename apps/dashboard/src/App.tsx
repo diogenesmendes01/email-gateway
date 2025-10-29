@@ -10,6 +10,7 @@ import { SendEmailPage } from './pages/SendEmailPage';
 import { DomainsPage } from './pages/DomainsPage'; // TASK-032
 import { AdminPage } from './pages/AdminPage'; // TASK-035
 import { RegisterPage } from './pages/RegisterPage'; // TASK-036
+import { ProfilePage } from './pages/ProfilePage'; // TASK-037
 import { AuthProvider } from './contexts/AuthContext';
 import './index.css';
 
@@ -38,6 +39,7 @@ function App() {
               <Route path="send" element={<SendEmailPage />} />
               <Route path="domains" element={<DomainsPage />} />
               <Route path="admin" element={<AdminPage />} />
+              <Route path="profile" element={<ProfilePage />} />
               <Route path="errors" element={<ErrorBreakdownPage />} />
             </Route>
           </Routes>
