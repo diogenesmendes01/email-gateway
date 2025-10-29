@@ -18,6 +18,7 @@ import {
 } from '@nestjs/common';
 import { QueueService } from '../../queue/queue.service';
 import { MetricsService } from '../../metrics/metrics.service';
+import { ContentValidationService } from './content-validation.service'; // TASK-031
 import { prisma } from '@email-gateway/database';
 import {
   EmailSendBody,
@@ -48,6 +49,7 @@ export class EmailSendService {
   constructor(
     private readonly queueService: QueueService,
     private readonly metricsService: MetricsService,
+    private readonly contentValidationService: ContentValidationService, // TASK-031
   ) {}
   /**
    * Send email asynchronously
@@ -69,6 +71,41 @@ export class EmailSendService {
 
     // TASK-024: Check if recipient is blocked (hard bounce or spam complaint)
     await this.checkBlocklist(companyId, body.to);
+
+    // TASK-031: Validate email content
+    const validation = await this.contentValidationService.validateEmail({
+      to: body.to,
+      subject: body.subject,
+      html: body.html,
+    });
+
+    if (!validation.valid) {
+      this.logger.warn({
+        message: 'Content validation failed',
+        companyId,
+        score: validation.score,
+        errors: validation.errors,
+        warnings: validation.warnings,
+      });
+
+      throw new BadRequestException({
+        code: 'CONTENT_VALIDATION_FAILED',
+        message: 'Email content validation failed',
+        errors: validation.errors,
+        warnings: validation.warnings,
+        score: validation.score,
+      });
+    }
+
+    // Log warnings if present
+    if (validation.warnings.length > 0) {
+      this.logger.warn({
+        message: 'Content validation warnings',
+        companyId,
+        score: validation.score,
+        warnings: validation.warnings,
+      });
+    }
 
     // Generate IDs
     const outboxId = crypto.randomUUID();
