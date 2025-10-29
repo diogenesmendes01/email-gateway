@@ -18,6 +18,7 @@ import { DomainModule } from './modules/domain/domain.module';
 import { MetricsModule } from './modules/metrics/metrics.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { WebhookModule } from './modules/webhook/webhook.module'; // TASK-023
+import { CompanyModule } from './modules/company/company.module'; // TASK-036
 
 @Module({
   imports: [
@@ -57,6 +58,7 @@ import { WebhookModule } from './modules/webhook/webhook.module'; // TASK-023
     MetricsModule,
     AdminModule, // TASK-021: Admin DLQ management
     WebhookModule, // TASK-023: Webhook notification system
+    CompanyModule, // TASK-036: Company registration
   ],
 })
 export class AppModule implements NestModule {

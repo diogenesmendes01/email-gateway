@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { LoadingSpinner } from '../ui/LoadingSpinner';
 
 export const LoginForm: React.FC = () => {
+  const navigate = useNavigate();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -100,7 +102,17 @@ export const LoginForm: React.FC = () => {
             </button>
           </div>
 
-          <div className="text-center">
+          <div className="text-center space-y-4">
+            <p className="text-sm text-gray-600">
+              Não tem uma conta?{' '}
+              <button
+                type="button"
+                onClick={() => navigate('/register')}
+                className="text-blue-600 hover:text-blue-800 font-medium"
+              >
+                Cadastre-se
+              </button>
+            </p>
             <p className="text-xs text-gray-500">
               Use your dashboard credentials to access the system
             </p>
