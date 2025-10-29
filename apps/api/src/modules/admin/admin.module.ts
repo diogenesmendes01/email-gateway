@@ -11,9 +11,10 @@ import { AdminDLQService } from './services/admin-dlq.service';
 import { AdminGuard } from './guards/admin.guard';
 import { AdminController } from './controllers/admin.controller';
 import { SandboxMonitorService } from './services/sandbox-monitor.service';
+import { AuthModule } from '../auth/auth.module';
 
 @Module({
-  imports: [ConfigModule],
+  imports: [ConfigModule, AuthModule],
   controllers: [AdminDLQController, AdminController],
   providers: [AdminDLQService, AdminGuard, SandboxMonitorService],
   exports: [AdminDLQService],
