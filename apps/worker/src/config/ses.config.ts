@@ -4,12 +4,14 @@
  * Configuração do AWS SES
  */
 
-import type { SESConfig } from '../services/ses.service';
+import { EmailProvider } from '@email-gateway/shared';
+
+import type { SESDriverConfig } from '../drivers/aws-ses/ses-driver';
 
 /**
  * Carrega configuração do SES a partir de variáveis de ambiente
  */
-export function loadSESConfig(): SESConfig {
+export function loadSESConfig(): SESDriverConfig {
   const region = process.env.AWS_REGION || process.env.AWS_SES_REGION;
   const fromAddress = process.env.SES_FROM_ADDRESS;
   const replyToAddress = process.env.SES_REPLY_TO_ADDRESS;
@@ -26,6 +28,7 @@ export function loadSESConfig(): SESConfig {
   }
 
   return {
+    provider: EmailProvider.AWS_SES,
     region,
     fromAddress,
     replyToAddress,
@@ -36,7 +39,7 @@ export function loadSESConfig(): SESConfig {
 /**
  * Valida configuração do SES
  */
-export function validateSESConfig(config: SESConfig): void {
+export function validateSESConfig(config: SESDriverConfig): void {
   // Valida formato de email
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 

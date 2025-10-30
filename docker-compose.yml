@@ -36,6 +36,28 @@ services:
       timeout: 5s
       retries: 5
 
+  postal:
+    image: ghcr.io/postalserver/postal:latest
+    container_name: email-gateway-postal
+    restart: unless-stopped
+    ports:
+      - '25:25'
+      - '587:587'
+      - '5000:5000'
+    environment:
+      POSTAL_DB_HOST: postgres
+      POSTAL_DB_NAME: postal
+      POSTAL_DB_USER: postal
+      POSTAL_DB_PASS: postal_password
+      POSTAL_REDIS_HOST: redis
+    volumes:
+      - postal_data:/opt/postal
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
   # API (desenvolvimento)
   # api:
   #   build:
@@ -81,6 +103,7 @@ services:
 volumes:
   postgres_data:
   redis_data:
+  postal_data:
 
 networks:
   default:

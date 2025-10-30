@@ -33,10 +33,11 @@ import {
 
 import { ValidationService } from '../services/validation.service';
 import { LoggingService } from '../services/logging.service';
-import { SESService } from '../services/ses.service';
 import { ErrorMappingService } from '../services/error-mapping.service';
 import { MetricsService } from '../services/metrics.service';
 import { TracingService, TraceContext } from '../services/tracing.service';
+import { EmailDriverService } from '../services/email-driver.service';
+import type { MappedError } from '../services/error-mapping.service';
 
 /**
  * Processador do job email:send
@@ -47,19 +48,19 @@ import { TracingService, TraceContext } from '../services/tracing.service';
 export class EmailSendProcessor {
   private validationService: ValidationService;
   private loggingService: LoggingService;
-  private sesService: SESService;
+  private emailDriverService: EmailDriverService;
   private metricsService: MetricsService;
   private tracingService: TracingService;
 
   constructor(
     private readonly prisma: PrismaClient,
-    sesService: SESService,
+    emailDriverService: EmailDriverService,
     metricsService: MetricsService,
     tracingService: TracingService,
   ) {
     this.validationService = new ValidationService(prisma);
     this.loggingService = new LoggingService(prisma);
-    this.sesService = sesService;
+    this.emailDriverService = emailDriverService;
     this.metricsService = metricsService;
     this.tracingService = tracingService;
   }
@@ -137,7 +138,7 @@ export class EmailSendProcessor {
       const htmlContent = await this.getHtmlContent(jobData.outboxId);
 
       // Tenta enviar via SES
-      const sendResult = await this.sesService.sendEmail(jobData, htmlContent);
+      const sendResult = await this.emailDriverService.sendEmail(jobData, htmlContent);
 
       const durationMs = Date.now() - startTime;
 
@@ -198,7 +199,7 @@ export class EmailSendProcessor {
     } catch (error) {
       // Erro inesperado no pipeline
       const durationMs = Date.now() - startTime;
-      const mappedError = ErrorMappingService.mapGenericError(error);
+      const mappedError = this.extractMappedError(error);
 
       // TASK 7.1: Record error metrics
       await this.metricsService.recordError(jobData.companyId, mappedError.code);
@@ -217,6 +218,17 @@ export class EmailSendProcessor {
 
       return await this.handleFailure(context, jobData, mappedError, durationMs);
     }
+  }
+
+  private extractMappedError(error: unknown): MappedError {
+    if (error && typeof error === 'object' && 'mappedError' in error) {
+      const mapped = (error as { mappedError?: MappedError }).mappedError;
+      if (mapped) {
+        return mapped;
+      }
+    }
+
+    return ErrorMappingService.mapGenericError(error);
   }
 
   /**
