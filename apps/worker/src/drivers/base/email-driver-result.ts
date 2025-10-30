@@ -1,3 +1,5 @@
+<<<<<<< Current (Your changes)
+=======
 import { EmailProvider } from '@email-gateway/shared';
 import type { MappedError } from '../../services/error-mapping.service';
 
@@ -31,3 +33,4 @@ export type QuotaInfo = ProviderQuotaInfo;
 
 export type DomainVerification = DomainVerificationResult;
 
+>>>>>>> Incoming (Background Agent changes)

@@ -1,3 +1,5 @@
+<<<<<<< Current (Your changes)
+=======
 import { EmailProvider } from '@email-gateway/shared';
 
 export interface DriverAuthConfig {
@@ -76,3 +78,4 @@ export interface DriverSendOptions {
   returnPath?: string;
 }
 
+>>>>>>> Incoming (Background Agent changes)

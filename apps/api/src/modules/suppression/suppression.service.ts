@@ -1,6 +1,13 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
-import { SuppressionReason } from '@certshift/database';
+
+export enum SuppressionReason {
+  HARD_BOUNCE = 'hard_bounce',
+  SOFT_BOUNCE = 'soft_bounce',
+  COMPLAINT = 'complaint',
+  MANUAL = 'manual',
+  ROLE_ACCOUNT = 'role_account'
+}
 
 export interface SuppressionEntry {
   id: string;
