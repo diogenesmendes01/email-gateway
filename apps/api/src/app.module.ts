@@ -19,6 +19,9 @@ import { MetricsModule } from './modules/metrics/metrics.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { WebhookModule } from './modules/webhook/webhook.module'; // TASK-023
 import { CompanyModule } from './modules/company/company.module'; // TASK-036
+import { OnboardingModule } from './modules/onboarding/onboarding.module'; // ESP Migration
+import { ReputationModule } from './modules/reputation/reputation.module'; // ESP Migration
+import { SuppressionModule } from './modules/suppression/suppression.module'; // ESP Migration
 
 @Module({
   imports: [
@@ -59,6 +62,9 @@ import { CompanyModule } from './modules/company/company.module'; // TASK-036
     AdminModule, // TASK-021: Admin DLQ management
     WebhookModule, // TASK-023: Webhook notification system
     CompanyModule, // TASK-036: Company registration
+    OnboardingModule, // ESP Migration: Domain onboarding
+    ReputationModule, // ESP Migration: Reputation monitoring
+    SuppressionModule, // ESP Migration: Email suppression
   ],
 })
 export class AppModule implements NestModule {

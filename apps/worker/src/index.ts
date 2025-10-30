@@ -11,16 +11,17 @@
 import 'dotenv/config';
 import { Worker, Job, Queue } from 'bullmq';
 import { PrismaClient } from '@email-gateway/database';
-import { EMAIL_JOB_CONFIG, EmailSendJobData } from '@email-gateway/shared';
+import { EMAIL_JOB_CONFIG, EmailProvider, EmailSendJobData } from '@email-gateway/shared';
 import Redis from 'ioredis';
 
 import { EmailSendProcessor } from './processors/email-send.processor';
-import { SESService } from './services/ses.service';
 import { MetricsService } from './services/metrics.service';
 import { TracingService } from './services/tracing.service';
 import { SLOService } from './services/slo.service';
 import { loadWorkerConfig } from './config/worker.config';
 import { loadSESConfig, validateSESConfig } from './config/ses.config';
+import { EmailDriverService } from './services/email-driver.service';
+import { loadPostalConfig, validatePostalConfig } from './drivers/postal/postal-config';
 
 /**
  * Classe principal do Worker
@@ -65,16 +66,62 @@ class EmailWorker {
     this.sloService = new SLOService(this.metricsService);
     this.tracingService = new TracingService('email-worker');
 
-    // Carrega e valida configuração do SES
+    // Carrega e valida configurações dos providers
     const sesConfig = loadSESConfig();
     validateSESConfig(sesConfig);
 
-    const sesService = new SESService(sesConfig);
+    const providerToggle = (process.env.EMAIL_PROVIDER as EmailProvider | undefined) ?? EmailProvider.AWS_SES;
+    const fallbackEnabled = (process.env.EMAIL_PROVIDER_FALLBACK ?? 'true').toLowerCase() !== 'false';
+
+    const driverDescriptors = [];
+
+    if (providerToggle === EmailProvider.POSTAL_SMTP) {
+      const postalConfig = loadPostalConfig();
+      validatePostalConfig(postalConfig);
+
+      driverDescriptors.push({
+        id: 'primary-postal-smtp',
+        config: postalConfig,
+        priority: 0,
+        isActive: true,
+      });
+
+      if (fallbackEnabled) {
+        driverDescriptors.push({
+          id: 'fallback-aws-ses',
+          config: sesConfig,
+          priority: 1,
+          isActive: true,
+        });
+      }
+    } else {
+      driverDescriptors.push({
+        id: 'primary-aws-ses',
+        config: sesConfig,
+        priority: 0,
+        isActive: true,
+      });
+    }
+
+    const emailDriverService = new EmailDriverService(driverDescriptors);
+
+    console.log('[EmailWorker] Email providers configured:', driverDescriptors.map((descriptor) => descriptor.config.provider));
+
+    emailDriverService
+      .validatePrimaryConfig()
+      .then((ok) => {
+        if (!ok) {
+          console.warn('[EmailWorker] Primary email provider configuration validation failed during startup');
+        }
+      })
+      .catch((error) => {
+        console.error('[EmailWorker] Error validating primary email provider during startup', error);
+      });
 
     // Inicializa o processador com métricas e tracing (TASK 7.1)
     this.processor = new EmailSendProcessor(
       this.prisma,
-      sesService,
+      emailDriverService,
       this.metricsService,
       this.tracingService
     );

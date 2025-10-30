@@ -1,6 +1,35 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
-import { PrismaService } from '@packages/database';
-import { SuppressionReason } from '@packages/database';
+import { PrismaService } from '../../database/prisma.service';
+
+export enum SuppressionReason {
+  HARD_BOUNCE = 'hard_bounce',
+  SOFT_BOUNCE = 'soft_bounce',
+  COMPLAINT = 'complaint',
+  MANUAL = 'manual',
+  ROLE_ACCOUNT = 'role_account'
+}
+
+export interface SuppressionEntry {
+  id: string;
+  companyId: string | null;
+  email: string;
+  domain: string;
+  reason: SuppressionReason;
+  source: string;
+  suppressedAt: Date;
+  expiresAt?: Date;
+}
+
+export interface SuppressionListResult {
+  suppressions: SuppressionEntry[];
+  total: number;
+}
+
+export interface SuppressionImportResult {
+  imported: number;
+  duplicates: number;
+  errors: string[];
+}
 
 export interface AddSuppressionDto {
   companyId?: string;
@@ -31,40 +60,41 @@ export interface ImportSuppressionDto {
 export class SuppressionService {
   private readonly logger = new Logger(SuppressionService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   /**
    * Adicionar email à lista de supressão
    */
   async addToSuppression(data: AddSuppressionDto): Promise<void> {
+    if (!this.isValidEmail(data.email)) {
+      throw new BadRequestException('Invalid email format');
+    }
+
+    const domain = data.email.split('@')[1];
+
+    this.logger.log(`Adicionando ${data.email} à lista de supressão com motivo: ${data.reason}`);
+
     try {
-      const domain = data.email.split('@')[1];
-
-      // Validar email
-      if (!this.isValidEmail(data.email)) {
-        throw new BadRequestException('Invalid email address');
-      }
-
       await this.prisma.suppression.upsert({
         where: {
-          idx_suppression_company_email: {
+          companyId_email: {
             companyId: data.companyId || null,
             email: data.email,
           },
         },
         create: {
-          companyId: data.companyId || null,
+          companyId: data.companyId,
           email: data.email,
           domain,
           reason: data.reason,
-          source: data.source,
+          source: data.source || 'manual',
           bounceType: data.bounceType,
           diagnosticCode: data.diagnosticCode,
           expiresAt: data.expiresAt,
         },
         update: {
           reason: data.reason,
-          source: data.source,
+          source: data.source || 'manual',
           bounceType: data.bounceType,
           diagnosticCode: data.diagnosticCode,
           suppressedAt: new Date(),
@@ -72,209 +102,321 @@ export class SuppressionService {
         },
       });
 
-      this.logger.log(
-        `Email ${data.email} added to suppression list (reason: ${data.reason})`
-      );
+      this.logger.log(`Email ${data.email} adicionado à lista de supressão com sucesso`);
     } catch (error) {
-      this.logger.error(`Failed to add suppression: ${error.message}`);
-      throw error;
+      this.logger.error(`Erro ao adicionar ${data.email} à supressão:`, error);
+      throw new BadRequestException('Failed to add email to suppression list');
     }
   }
 
   /**
-   * Verificar se email está suprimido
+   * Remover email da lista de supressão
+   */
+  async removeFromSuppression(suppressionId: string): Promise<void> {
+    this.logger.log(`Removendo supressão: ${suppressionId}`);
+
+    try {
+      const result = await this.prisma.suppression.delete({
+        where: { id: suppressionId },
+      });
+
+      this.logger.log(`Email ${result.email} removido da lista de supressão`);
+    } catch (error) {
+      this.logger.error(`Erro ao remover supressão ${suppressionId}:`, error);
+      throw new BadRequestException('Suppression entry not found');
+    }
+  }
+
+  /**
+   * Verificar se email está na lista de supressão
    */
   async checkSuppression(companyId: string, email: string): Promise<{
     suppressed: boolean;
-    reason?: SuppressionReason;
-    expiresAt?: Date;
+    reason?: string;
+    entry?: SuppressionEntry;
   }> {
     try {
-      // Verificar supressão por empresa
-      const companySuppression = await this.prisma.suppression.findUnique({
+      // Verificar supressão específica da empresa
+      let suppression = await this.prisma.suppression.findUnique({
         where: {
-          idx_suppression_company_email: {
-            companyId,
-            email,
-          },
+          companyId_email: { companyId, email },
         },
       });
 
-      if (companySuppression) {
-        // Verificar se expirou
-        if (companySuppression.expiresAt && companySuppression.expiresAt < new Date()) {
-          // Remover se expirou
-          await this.removeSuppression(companySuppression.id);
-          return { suppressed: false };
-        }
-
+      if (suppression) {
         return {
           suppressed: true,
-          reason: companySuppression.reason,
-          expiresAt: companySuppression.expiresAt || undefined,
+          reason: suppression.reason,
+          entry: {
+            id: suppression.id,
+            companyId: suppression.companyId,
+            email: suppression.email,
+            domain: suppression.domain,
+            reason: suppression.reason,
+            source: suppression.source || 'unknown',
+            suppressedAt: suppression.suppressedAt,
+            expiresAt: suppression.expiresAt || undefined,
+          },
         };
       }
 
       // Verificar supressão global
-      const globalSuppression = await this.prisma.suppression.findFirst({
+      suppression = await this.prisma.suppression.findFirst({
         where: {
           companyId: null,
           email,
         },
       });
 
-      if (globalSuppression) {
-        // Verificar se expirou
-        if (globalSuppression.expiresAt && globalSuppression.expiresAt < new Date()) {
-          await this.removeSuppression(globalSuppression.id);
-          return { suppressed: false };
-        }
-
+      if (suppression) {
         return {
           suppressed: true,
-          reason: globalSuppression.reason,
-          expiresAt: globalSuppression.expiresAt || undefined,
+          reason: suppression.reason,
+          entry: {
+            id: suppression.id,
+            companyId: suppression.companyId,
+            email: suppression.email,
+            domain: suppression.domain,
+            reason: suppression.reason,
+            source: suppression.source || 'unknown',
+            suppressedAt: suppression.suppressedAt,
+            expiresAt: suppression.expiresAt || undefined,
+          },
         };
       }
 
-      // Verificar role accounts (admin@, info@, postmaster@, etc)
+      // Verificar contas de função/role
       if (this.isRoleAccount(email)) {
         return {
           suppressed: true,
-          reason: 'ROLE_ACCOUNT' as SuppressionReason,
+          reason: 'ROLE_ACCOUNT',
         };
       }
 
       return { suppressed: false };
     } catch (error) {
-      this.logger.error(`Failed to check suppression: ${error.message}`);
-      throw error;
+      this.logger.error(`Erro ao verificar supressão para ${email}:`, error);
+      return { suppressed: false };
     }
   }
 
   /**
-   * Remover da lista de supressão
-   */
-  async removeSuppression(suppressionId: string): Promise<void> {
-    try {
-      await this.prisma.suppression.delete({
-        where: { id: suppressionId },
-      });
-
-      this.logger.log(`Suppression ${suppressionId} removed`);
-    } catch (error) {
-      this.logger.error(`Failed to remove suppression: ${error.message}`);
-      throw error;
-    }
-  }
-
-  /**
-   * Importar lista de supressões em massa
-   */
-  async importSuppressions(data: ImportSuppressionDto & { companyId?: string }): Promise<{
-    imported: number;
-    failed: number;
-    errors: Array<{ email: string; error: string }>;
-  }> {
-    const results = {
-      imported: 0,
-      failed: 0,
-      errors: [] as Array<{ email: string; error: string }>,
-    };
-
-    try {
-      for (const email of data.emails) {
-        try {
-          if (!this.isValidEmail(email)) {
-            results.failed++;
-            results.errors.push({ email, error: 'Invalid email format' });
-            continue;
-          }
-
-          await this.addToSuppression({
-            companyId: data.companyId,
-            email: email.toLowerCase().trim(),
-            reason: data.reason,
-            source: data.source,
-          });
-
-          results.imported++;
-        } catch (error) {
-          results.failed++;
-          results.errors.push({ email, error: error.message });
-        }
-      }
-
-      this.logger.log(
-        `Imported ${results.imported} suppressions (${results.failed} failed)`
-      );
-    } catch (error) {
-      this.logger.error(`Failed to import suppressions: ${error.message}`);
-    }
-
-    return results;
-  }
-
-  /**
-   * Listar todas as supressões de uma empresa
+   * Listar supressões com paginação
    */
   async listSuppressions(
-    companyId?: string,
-    skip = 0,
-    take = 100,
-  ): Promise<{
-    data: any[];
-    total: number;
-    skip: number;
-    take: number;
-  }> {
-    try {
-      const where = companyId ? { companyId } : { companyId: null };
+    companyId: string,
+    options: {
+      page: number;
+      limit: number;
+      reason?: SuppressionReason;
+      search?: string;
+    }
+  ): Promise<SuppressionListResult> {
+    const { page, limit, reason, search } = options;
+    const skip = (page - 1) * limit;
 
-      const [data, total] = await Promise.all([
+    const where: any = {
+      OR: [
+        { companyId },
+        { companyId: null }, // Supressões globais
+      ],
+    };
+
+    if (reason) {
+      where.reason = reason;
+    }
+
+    if (search) {
+      where.OR = [
+        { email: { contains: search, mode: 'insensitive' } },
+        { domain: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+
+    try {
+      const [suppressions, total] = await Promise.all([
         this.prisma.suppression.findMany({
           where,
-          skip,
-          take,
           orderBy: { suppressedAt: 'desc' },
+          skip,
+          take: limit,
         }),
         this.prisma.suppression.count({ where }),
       ]);
 
-      return { data, total, skip, take };
+      return {
+        suppressions: suppressions.map(s => ({
+          id: s.id,
+          companyId: s.companyId,
+          email: s.email,
+          domain: s.domain,
+          reason: s.reason,
+          source: s.source || 'unknown',
+          suppressedAt: s.suppressedAt,
+          expiresAt: s.expiresAt || undefined,
+        })),
+        total,
+      };
     } catch (error) {
-      this.logger.error(`Failed to list suppressions: ${error.message}`);
-      throw error;
+      this.logger.error('Erro ao listar supressões:', error);
+      throw new BadRequestException('Failed to retrieve suppression list');
     }
   }
 
   /**
-   * Validar email
+   * Importar lista de supressão via CSV
    */
-  private isValidEmail(email: string): boolean {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
+  async importSuppressions(
+    companyId: string,
+    data: ImportSuppressionDto
+  ): Promise<SuppressionImportResult> {
+    this.logger.log('Iniciando importação de lista de supressão');
+
+    const emails = data.emails.filter(email => email.trim());
+    let imported = 0;
+    let duplicates = 0;
+    const errors: string[] = [];
+
+    // Processar em lotes para evitar sobrecarga
+    const batchSize = 100;
+    for (let i = 0; i < emails.length; i += batchSize) {
+      const batch = emails.slice(i, i + batchSize);
+
+      for (const email of batch) {
+        const trimmedEmail = email.trim().toLowerCase();
+
+        if (!this.isValidEmail(trimmedEmail)) {
+          errors.push(`Invalid email format: ${email}`);
+          continue;
+        }
+
+        try {
+          // Verificar se já existe
+          const existing = await this.checkSuppression(companyId, trimmedEmail);
+          if (existing.suppressed) {
+            duplicates++;
+            continue;
+          }
+
+          await this.addToSuppression({
+            companyId,
+            email: trimmedEmail,
+            reason: data.reason,
+            source: data.source || 'import',
+          });
+
+          imported++;
+        } catch (error) {
+          errors.push(`Failed to import ${email}: ${error.message}`);
+        }
+      }
+    }
+
+    this.logger.log(`Importação de supressão concluída: ${imported} importados, ${duplicates} duplicados, ${errors.length} erros`);
+
+    return {
+      imported,
+      duplicates,
+      errors,
+    };
   }
 
   /**
-   * Verificar se é conta de role (admin@, info@, etc)
+   * Limpar supressões expiradas
+   */
+  async cleanExpiredSuppressions(): Promise<number> {
+    try {
+      const now = new Date();
+
+      const result = await this.prisma.suppression.deleteMany({
+        where: {
+          expiresAt: {
+            lt: now,
+          },
+        },
+      });
+
+      this.logger.log(`${result.count} supressões expiradas removidas`);
+      return result.count;
+    } catch (error) {
+      this.logger.error('Erro ao limpar supressões expiradas:', error);
+      return 0;
+    }
+  }
+
+  /**
+   * Obter estatísticas de supressão
+   */
+  async getSuppressionStats(companyId: string): Promise<{
+    total: number;
+    byReason: Record<SuppressionReason, number>;
+    recent: number; // Últimos 30 dias
+  }> {
+    try {
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+      const [total, byReason, recent] = await Promise.all([
+        this.prisma.suppression.count({
+          where: {
+            OR: [
+              { companyId },
+              { companyId: null },
+            ],
+          },
+        }),
+        this.prisma.suppression.groupBy({
+          by: ['reason'],
+          where: {
+            OR: [
+              { companyId },
+              { companyId: null },
+            ],
+          },
+          _count: true,
+        }),
+        this.prisma.suppression.count({
+          where: {
+            OR: [
+              { companyId },
+              { companyId: null },
+            ],
+            suppressedAt: {
+              gte: thirtyDaysAgo,
+            },
+          },
+        }),
+      ]);
+
+      const reasonStats: Record<SuppressionReason, number> = {} as any;
+      byReason.forEach(item => {
+        reasonStats[item.reason] = item._count;
+      });
+
+      return {
+        total,
+        byReason: reasonStats,
+        recent,
+      };
+    } catch (error) {
+      this.logger.error('Erro ao obter estatísticas de supressão:', error);
+      return {
+        total: 0,
+        byReason: {} as any,
+        recent: 0,
+      };
+    }
+  }
+
+  /**
+   * Verificar se é uma conta de função/role
    */
   private isRoleAccount(email: string): boolean {
     const roleAccounts = [
-      'admin',
-      'info',
-      'postmaster',
-      'abuse',
-      'noreply',
-      'support',
-      'help',
-      'contact',
-      'sales',
-      'webmaster',
-      'hostmaster',
-      'mailer-daemon',
-      'nobody',
-      'root',
+      'admin', 'info', 'postmaster', 'abuse', 'noreply',
+      'support', 'help', 'contact', 'sales', 'webmaster',
+      'root', 'hostmaster', 'mail', 'mailer', 'bounce',
+      'unsubscribe', 'subscribe', 'news', 'newsletter',
     ];
 
     const localPart = email.split('@')[0].toLowerCase();
@@ -282,23 +424,10 @@ export class SuppressionService {
   }
 
   /**
-   * Limpar supressões expiradas
+   * Validação básica de email
    */
-  async cleanupExpiredSuppressions(): Promise<number> {
-    try {
-      const result = await this.prisma.suppression.deleteMany({
-        where: {
-          expiresAt: {
-            lt: new Date(),
-          },
-        },
-      });
-
-      this.logger.log(`Cleaned up ${result.count} expired suppressions`);
-      return result.count;
-    } catch (error) {
-      this.logger.error(`Failed to cleanup suppressions: ${error.message}`);
-      throw error;
-    }
+  private isValidEmail(email: string): boolean {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email) && email.length <= 254;
   }
 }

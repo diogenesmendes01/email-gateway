@@ -11,6 +11,7 @@ import { ConfigModule } from '@nestjs/config';
 
 // Controllers
 import { DomainController } from './domain.controller';
+import { DNSRecordsController } from './dns-records.controller';
 
 // Services
 import { DomainService } from './domain.service';
@@ -23,7 +24,7 @@ import { AuthModule } from '../auth/auth.module';
     ConfigModule,
     AuthModule, // Para usar guards de autenticação
   ],
-  controllers: [DomainController],
+  controllers: [DomainController, DNSRecordsController],
   providers: [DomainService],
   exports: [DomainService],
 })

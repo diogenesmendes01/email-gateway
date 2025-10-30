@@ -1,7 +1,7 @@
 import { Logger } from '@nestjs/common';
 import { Job } from 'bull';
 import { ReputationMonitorService } from './services/reputation-monitor.service';
-import { PrismaService } from '@packages/database';
+import { PrismaService } from '../../database/prisma.service';
 
 /**
  * Reputation Calculator Worker - TRACK 2

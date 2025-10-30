@@ -1,5 +1,7 @@
-import { SESService } from '../ses.service';
+import { SESDriver } from '../../drivers/aws-ses/ses-driver';
 import { prisma } from '@email-gateway/database';
+
+const AWS_SES = 'AWS_SES';
 
 // Mock Prisma
 jest.mock('@email-gateway/database', () => ({
@@ -8,16 +10,24 @@ jest.mock('@email-gateway/database', () => ({
       findUnique: jest.fn(),
     },
   },
-}));
+}), { virtual: true });
 
 // Mock AWS SDK
-jest.mock('@aws-sdk/client-ses');
+jest.mock('@aws-sdk/client-ses', () => {
+  return {
+    SESClient: jest.fn().mockImplementation(() => ({
+      send: jest.fn(),
+    })),
+    SendEmailCommand: jest.fn().mockImplementation((args: any) => ({ input: args })),
+  };
+});
 
-describe('SESService - Company Domain (TASK-027)', () => {
-  let sesService: SESService;
+describe('SESDriver - Company Domain (TASK-027)', () => {
+  let sesDriver: SESDriver;
 
   beforeEach(() => {
-    sesService = new SESService({
+    sesDriver = new SESDriver({
+      provider: AWS_SES as any,
       region: 'us-east-1',
       fromAddress: 'noreply@certshiftsoftware.com.br',
     });
@@ -52,9 +62,9 @@ describe('SESService - Company Domain (TASK-027)', () => {
     const mockSend = jest.fn().mockResolvedValue({
       MessageId: 'msg-123',
     });
-    (sesService as any).client.send = mockSend;
+    (sesDriver as any).client.send = mockSend;
 
-    await sesService.sendEmail(jobData, '<p>Test</p>');
+    await sesDriver.sendEmail({ job: jobData, htmlContent: '<p>Test</p>' });
 
     // Verificar que usou domínio da empresa
     const sentCommand = mockSend.mock.calls[0][0];
@@ -76,37 +86,44 @@ describe('SESService - Company Domain (TASK-027)', () => {
     });
 
     const mockSend = jest.fn().mockResolvedValue({ MessageId: 'msg-456' });
-    (sesService as any).client.send = mockSend;
+    (sesDriver as any).client.send = mockSend;
 
-    await sesService.sendEmail({
-      companyId: 'company-2',
-      to: 'test@example.com',
-      subject: 'Test',
-      html: '<p>Test</p>',
-      requestId: 'req-456',
-      outboxId: 'out-456',
-    } as any, '<p>Test</p>');
+    await sesDriver.sendEmail({
+      job: {
+        companyId: 'company-2',
+        to: 'test@example.com',
+        subject: 'Test',
+        html: '<p>Test</p>',
+        requestId: 'req-456',
+        outboxId: 'out-456',
+      } as any,
+      htmlContent: '<p>Test</p>',
+    });
 
     const sentCommand = mockSend.mock.calls[0][0];
     expect(sentCommand.input.Source).toBe('noreply@certshiftsoftware.com.br');
   });
 
-  it('should throw error when company is suspended', async () => {
+  it('should return failure when company is suspended', async () => {
     (prisma.company.findUnique as jest.Mock).mockResolvedValue({
       id: 'company-3',
       isSuspended: true,
     });
 
-    await expect(
-      sesService.sendEmail({
+    const result = await sesDriver.sendEmail({
+      job: {
         companyId: 'company-3',
         to: 'test@example.com',
         subject: 'Test',
         html: '<p>Test</p>',
         requestId: 'req-789',
         outboxId: 'out-789',
-      } as any, '<p>Test</p>')
-    ).rejects.toThrow('Company company-3 is suspended');
+      } as any,
+      htmlContent: '<p>Test</p>',
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error?.message).toContain('Company company-3 is suspended');
   });
 
   it('should use global fallback when no default domain', async () => {
@@ -120,16 +137,19 @@ describe('SESService - Company Domain (TASK-027)', () => {
     });
 
     const mockSend = jest.fn().mockResolvedValue({ MessageId: 'msg-789' });
-    (sesService as any).client.send = mockSend;
+    (sesDriver as any).client.send = mockSend;
 
-    await sesService.sendEmail({
-      companyId: 'company-4',
-      to: 'test@example.com',
-      subject: 'Test',
-      html: '<p>Test</p>',
-      requestId: 'req-999',
-      outboxId: 'out-999',
-    } as any, '<p>Test</p>');
+    await sesDriver.sendEmail({
+      job: {
+        companyId: 'company-4',
+        to: 'test@example.com',
+        subject: 'Test',
+        html: '<p>Test</p>',
+        requestId: 'req-999',
+        outboxId: 'out-999',
+      } as any,
+      htmlContent: '<p>Test</p>',
+    });
 
     const sentCommand = mockSend.mock.calls[0][0];
     expect(sentCommand.input.Source).toBe('noreply@certshiftsoftware.com.br');
@@ -151,33 +171,40 @@ describe('SESService - Company Domain (TASK-027)', () => {
     });
 
     const mockSend = jest.fn().mockResolvedValue({ MessageId: 'msg-101' });
-    (sesService as any).client.send = mockSend;
+    (sesDriver as any).client.send = mockSend;
 
-    await sesService.sendEmail({
-      companyId: 'company-5',
-      to: 'test@example.com',
-      subject: 'Test',
-      html: '<p>Test</p>',
-      requestId: 'req-101',
-      outboxId: 'out-101',
-    } as any, '<p>Test</p>');
+    await sesDriver.sendEmail({
+      job: {
+        companyId: 'company-5',
+        to: 'test@example.com',
+        subject: 'Test',
+        html: '<p>Test</p>',
+        requestId: 'req-101',
+        outboxId: 'out-101',
+      } as any,
+      htmlContent: '<p>Test</p>',
+    });
 
     const sentCommand = mockSend.mock.calls[0][0];
     expect(sentCommand.input.Source).toBe('contact@company5.com');
   });
 
-  it('should throw error when company not found', async () => {
+  it('should return failure when company not found', async () => {
     (prisma.company.findUnique as jest.Mock).mockResolvedValue(null);
 
-    await expect(
-      sesService.sendEmail({
+    const result = await sesDriver.sendEmail({
+      job: {
         companyId: 'non-existent',
         to: 'test@example.com',
         subject: 'Test',
         html: '<p>Test</p>',
         requestId: 'req-404',
         outboxId: 'out-404',
-      } as any, '<p>Test</p>')
-    ).rejects.toThrow('Company non-existent not found');
+      } as any,
+      htmlContent: '<p>Test</p>',
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error?.message).toContain('Company non-existent not found');
   });
 });
