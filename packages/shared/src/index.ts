@@ -18,6 +18,7 @@ export * from './schemas/attachment.schema'; // TASK-015
 export * from './types/email-pipeline.types';
 export * from './types/domain.types';
 export * from './types/test-utils.types'; // TASK-022
+export * from './types/email-provider.types';
 
 // Services
 export * from './services/domain-management.service';
