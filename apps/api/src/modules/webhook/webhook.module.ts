@@ -1,32 +1,20 @@
-/**
- * TASK-023: Webhook Module
- * TASK-024: SES Event Processing
- *
- * Module configuration for webhook system:
- * - Client webhooks (TASK-023)
- * - AWS SES event webhooks (TASK-024)
- */
-
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
-import { WebhookController } from './webhook.controller';
-import { WebhookService } from './webhook.service';
-import { WebhookQueueService } from './webhook-queue.service';
-import { SESWebhookController } from './ses-webhook.controller'; // TASK-024
-import { SESWebhookService } from './ses-webhook.service'; // TASK-024
-import { AuthModule } from '../auth/auth.module'; // Import AuthModule for ApiKeyGuard
+import { BullModule } from '@nestjs/bull';
+import { PostalWebhookController } from './postal-webhook.controller';
+import { PostalWebhookValidatorService } from './postal-webhook-validator.service';
 
+/**
+ * Webhook Module
+ * Handles incoming webhook events from different email providers
+ */
 @Module({
-  imports: [ConfigModule, AuthModule],
-  controllers: [
-    WebhookController,
-    SESWebhookController, // TASK-024
+  imports: [
+    BullModule.registerQueue({
+      name: 'webhook-ingest',
+    }),
   ],
-  providers: [
-    WebhookService,
-    WebhookQueueService,
-    SESWebhookService, // TASK-024
-  ],
-  exports: [WebhookService, SESWebhookService], // Export for use in email module
+  controllers: [PostalWebhookController],
+  providers: [PostalWebhookValidatorService],
+  exports: [PostalWebhookValidatorService],
 })
 export class WebhookModule {}

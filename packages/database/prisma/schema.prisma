@@ -73,6 +73,54 @@ enum BatchStatus {
   FAILED
 }
 
+// ===== NEW: ESP Self-Hosted Enums =====
+enum EmailProvider {
+  AWS_SES
+  POSTAL_SMTP
+  POSTAL_API
+  MAILU_SMTP
+  HARAKA_API
+  CUSTOM_SMTP
+}
+
+enum IPPoolType {
+  TRANSACTIONAL
+  MARKETING
+  DEDICATED
+  SHARED
+}
+
+enum RateLimitScope {
+  MX_DOMAIN
+  CUSTOMER_DOMAIN
+  IP_ADDRESS
+  GLOBAL
+}
+
+enum SuppressionReason {
+  HARD_BOUNCE
+  SOFT_BOUNCE
+  SPAM_COMPLAINT
+  UNSUBSCRIBE
+  ROLE_ACCOUNT
+  BAD_DOMAIN
+  MANUAL
+}
+
+enum DomainOnboardingStatus {
+  DNS_PENDING
+  DNS_CONFIGURED
+  DKIM_PENDING
+  DKIM_VERIFIED
+  SPF_PENDING
+  SPF_VERIFIED
+  RETURN_PATH_PENDING
+  RETURN_PATH_VERIFIED
+  WARMUP_IN_PROGRESS
+  PRODUCTION_READY
+  FAILED
+}
+
 // ============================================
 // MODELS
 // ============================================
@@ -127,6 +175,13 @@ model Company {
   webhooks    Webhook[] // TASK-023
   recipientBlocklist RecipientBlocklist[] // TASK-024
   emailBatches EmailBatch[] // TASK-025
+  suppressions Suppression[] @relation("SuppressionsByCompany")
+  ipPools IPPool[]
+  rateLimits RateLimit[]
+  dnsRecords DNSRecord[]
+  domainOnboarding DomainOnboarding[]
+  emailTracking EmailTracking[]
+  reputationMetrics ReputationMetric[]
 
   // TASK-026: Domínio padrão
   defaultDomain Domain? @relation("CompanyDefaultDomain", fields: [domainId], references: [id])
@@ -196,6 +251,7 @@ model EmailOutbox {
   recipient Recipient?  @relation(fields: [recipientId], references: [id], onDelete: SetNull)
   emailLog  EmailLog?
   batch     EmailBatch? @relation(fields: [batchId], references: [id], onDelete: SetNull)
+  emailTracking EmailTracking[]
 
   @@index([companyId, status])
   @@index([companyId, externalId])
@@ -238,6 +294,7 @@ model EmailLog {
   recipient   Recipient?   @relation(fields: [recipientId], references: [id], onDelete: SetNull)
   outbox      EmailOutbox  @relation(fields: [outboxId], references: [id], onDelete: Cascade)
   events      EmailEvent[]
+  emailTracking EmailTracking[]
 
   @@index([companyId, status])
   @@index([companyId, createdAt])
@@ -329,9 +386,9 @@ model Domain {
 
   // Relations
   company Company @relation("CompanyDomains", fields: [companyId], references: [id], onDelete: Cascade)
-
-  // TASK-026: Empresas que usam este domínio como padrão
-  defaultForCompanies Company[] @relation("CompanyDefaultDomain")
+  dnsRecords DNSRecord[]
+  domainOnboarding DomainOnboarding[]
+  reputationMetrics ReputationMetric[]
 
   @@unique([companyId, domain])
   @@index([companyId, status])
@@ -420,4 +477,214 @@ model EmailBatch {
   @@index([companyId, createdAt(sort: Desc)], map: "idx_email_batches_company")
   @@index([status, createdAt], map: "idx_email_batches_status")
   @@map("email_batches")
+}
+
+// ===== NEW: ESP Self-Hosted Models =====
+
+// Suppressions - Substitui recipient_blocklist com mais features
+model Suppression {
+  id            String              @id @default(cuid())
+  companyId     String?             @map("company_id") // null = global
+  email         String              @db.VarChar(254)
+  domain        String?             @db.VarChar(253)
+  reason        SuppressionReason
+  
+  // Metadata
+  source        String?             @db.VarChar(64) // bounce, complaint, manual
+  bounceType    String?             @map("bounce_type") @db.VarChar(32)
+  diagnosticCode String?            @map("diagnostic_code") @db.Text
+  
+  // Timing
+  suppressedAt  DateTime            @default(now()) @map("suppressed_at")
+  expiresAt     DateTime?           @map("expires_at") // Para soft bounces
+  
+  // Relations
+  company       Company?            @relation("SuppressionsByCompany", fields: [companyId], references: [id], onDelete: Cascade)
+  
+  @@unique([companyId, email], map: "idx_suppression_company_email")
+  @@index([reason, suppressedAt])
+  @@index([domain, reason])
+  @@map("suppressions")
+}
+
+// IP Pools - Gerenciamento de IPs para envio
+model IPPool {
+  id            String      @id @default(cuid())
+  name          String      @db.VarChar(100)
+  type          IPPoolType
+  ipAddresses   String[]    @map("ip_addresses") // IPs do pool
+  isActive      Boolean     @default(true) @map("is_active")
+  
+  // Limites
+  dailyLimit    Int?        @map("daily_limit")
+  hourlyLimit   Int?        @map("hourly_limit")
+  
+  // Tracking
+  sentToday     Int         @default(0) @map("sent_today")
+  reputation    Float       @default(100.0) // 0-100
+  
+  // Warm-up
+  warmupEnabled Boolean     @default(false) @map("warmup_enabled")
+  warmupConfig  Json?       @map("warmup_config")
+  
+  createdAt     DateTime    @default(now()) @map("created_at")
+  updatedAt     DateTime    @updatedAt @map("updated_at")
+  
+  // Relations
+  reputationMetrics ReputationMetric[]
+  
+  @@index([type, isActive])
+  @@map("ip_pools")
+}
+
+// Rate Limits - Limites por MX, IP, etc
+model RateLimit {
+  id            String          @id @default(cuid())
+  scope         RateLimitScope
+  target        String          @db.VarChar(253) // MX domain, IP, etc
+  
+  // Limites
+  perMinute     Int?            @map("per_minute")
+  perHour       Int?            @map("per_hour")
+  perDay        Int?            @map("per_day")
+  
+  // Janelas deslizantes (Redis)
+  lastMinute    Int             @default(0) @map("last_minute")
+  lastHour      Int             @default(0) @map("last_hour")
+  lastDay       Int             @default(0) @map("last_day")
+  
+  // Tracking
+  lastReset     DateTime        @default(now()) @map("last_reset")
+  
+  createdAt     DateTime        @default(now()) @map("created_at")
+  updatedAt     DateTime        @updatedAt @map("updated_at")
+  
+  @@unique([scope, target])
+  @@index([scope, target, lastReset])
+  @@map("rate_limits")
+}
+
+// DNS Records - Registros DNS para verificação
+model DNSRecord {
+  id            String                    @id @default(cuid())
+  domainId      String                    @map("domain_id")
+  recordType    String                    @db.VarChar(10) // TXT, CNAME, MX
+  name          String                    @db.VarChar(253)
+  value         String                    @db.Text
+  priority      Int?
+  isVerified    Boolean                   @default(false) @map("is_verified")
+  lastChecked   DateTime?                 @map("last_checked")
+  
+  createdAt     DateTime                  @default(now()) @map("created_at")
+  updatedAt     DateTime                  @updatedAt @map("updated_at")
+  
+  // Relations
+  domain        Domain                    @relation(fields: [domainId], references: [id], onDelete: Cascade)
+  
+  @@index([domainId, recordType])
+  @@map("dns_records")
+}
+
+// Domain Onboarding - Status e progresso de onboarding de domínios
+model DomainOnboarding {
+  id            String                    @id @default(cuid())
+  domainId      String                    @unique @map("domain_id")
+  status        DomainOnboardingStatus    @default(DNS_PENDING)
+  
+  // Checklist items
+  dkimGenerated Boolean                   @default(false) @map("dkim_generated")
+  dkimPublic    String?                   @db.Text @map("dkim_public")
+  dkimPrivate   String?                   @db.Text @map("dkim_private") // ENCRYPTED
+  dkimSelector  String?                   @db.VarChar(63) @map("dkim_selector")
+  
+  spfRecord     String?                   @db.VarChar(512) @map("spf_record")
+  returnPath    String?                   @db.VarChar(253) @map("return_path")
+  trackingDomain String?                  @db.VarChar(253) @map("tracking_domain")
+  
+  // Auto-verification
+  lastCheckAt   DateTime?                 @map("last_check_at")
+  nextCheckAt   DateTime?                 @map("next_check_at")
+  checkAttempts Int                       @default(0) @map("check_attempts")
+  
+  // Production readiness
+  readyForProduction Boolean                @default(false) @map("ready_for_production")
+  productionApprovedAt DateTime?            @map("production_approved_at")
+  productionApprovedBy String?              @db.VarChar(128) @map("production_approved_by")
+  
+  createdAt     DateTime                  @default(now()) @map("created_at")
+  updatedAt     DateTime                  @updatedAt @map("updated_at")
+  
+  // Relations
+  domain        Domain                    @relation("DomainOnboarding", fields: [domainId], references: [id], onDelete: Cascade)
+  
+  @@map("domain_onboarding")
+}
+
+// Email Tracking - Rastreamento de opens e clicks
+model EmailTracking {
+  id            String   @id @default(cuid())
+  emailLogId    String   @map("email_log_id")
+  trackingId    String   @unique @db.VarChar(64) @map("tracking_id")
+  
+  // Events
+  openedAt      DateTime? @map("opened_at")
+  openCount     Int       @default(0) @map("open_count")
+  clickedAt     DateTime? @map("clicked_at")
+  clickCount    Int       @default(0) @map("click_count")
+  
+  // Click details
+  clickedUrls   Json?     @map("clicked_urls") // Array de { url, timestamp }
+  
+  // User agent
+  userAgent     String?   @db.Text @map("user_agent")
+  ipAddress     String?   @db.VarChar(45) @map("ip_address")
+  
+  createdAt     DateTime  @default(now()) @map("created_at")
+  
+  // Relations
+  emailLog      EmailLog  @relation("EmailTracking", fields: [emailLogId], references: [id], onDelete: Cascade)
+  
+  @@index([emailLogId])
+  @@index([trackingId])
+  @@map("email_tracking")
+}
+
+// Reputation Metrics - Métricas diárias de reputação
+model ReputationMetric {
+  id              String   @id @default(cuid())
+  companyId       String?  @map("company_id") // null = global
+  domainId        String?  @map("domain_id")
+  ipPoolId        String?  @map("ip_pool_id")
+  
+  date            DateTime @db.Date
+  
+  // Métricas
+  sent            Int      @default(0)
+  delivered       Int      @default(0)
+  bounced         Int      @default(0)
+  bouncedHard     Int      @default(0) @map("bounced_hard")
+  bouncedSoft     Int      @default(0) @map("bounced_soft")
+  complained      Int      @default(0)
+  opened          Int      @default(0)
+  clicked         Int      @default(0)
+  
+  // Taxas calculadas
+  bounceRate      Float    @default(0) @map("bounce_rate")
+  complaintRate   Float    @default(0) @map("complaint_rate")
+  openRate        Float    @default(0) @map("open_rate")
+  clickRate       Float    @default(0) @map("click_rate")
+  
+  // Reputação
+  reputationScore Float    @default(100) @map("reputation_score")
+  
+  createdAt       DateTime @default(now()) @map("created_at")
+  
+  // Relations
+  company         Company?  @relation("ReputationMetrics", fields: [companyId], references: [id], onDelete: Cascade)
+  domain          Domain?   @relation("DomainReputationMetrics", fields: [domainId], references: [id], onDelete: Cascade)
+  ipPool          IPPool?   @relation(fields: [ipPoolId], references: [id], onDelete: Cascade)
+  
+  @@unique([companyId, domainId, ipPoolId, date])
+  @@index([date, companyId])
+  @@map("reputation_metrics")
 }
