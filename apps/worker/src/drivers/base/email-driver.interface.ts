@@ -1,3 +1,5 @@
+<<<<<<< Current (Your changes)
+=======
 import { EmailSendJobData } from '@email-gateway/shared';
 
 import type { DriverConfig, DriverQuotaInfo } from './driver-config.types';
@@ -48,3 +50,4 @@ export type EmailDriverConstructor<TConfig extends DriverConfig = DriverConfig> 
   config: TConfig,
 ) => IEmailDriver;
 
+>>>>>>> Incoming (Background Agent changes)
