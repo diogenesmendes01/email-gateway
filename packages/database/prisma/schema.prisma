@@ -175,16 +175,8 @@ model Company {
   webhooks    Webhook[] // TASK-023
   recipientBlocklist RecipientBlocklist[] // TASK-024
   emailBatches EmailBatch[] // TASK-025
-  suppressions Suppression[] @relation("SuppressionsByCompany")
-  ipPools IPPool[]
-  rateLimits RateLimit[]
-  dnsRecords DNSRecord[]
-  domainOnboarding DomainOnboarding[]
-  emailTracking EmailTracking[]
-  reputationMetrics ReputationMetric[]
 
   // TASK-026: Domínio padrão
-  defaultDomain Domain? @relation("CompanyDefaultDomain", fields: [domainId], references: [id])
 
   @@index([isApproved, isSuspended], map: "idx_companies_approval_status")
   @@index([bounceRate], map: "idx_companies_bounce_rate")
@@ -251,7 +243,6 @@ model EmailOutbox {
   recipient Recipient?  @relation(fields: [recipientId], references: [id], onDelete: SetNull)
   emailLog  EmailLog?
   batch     EmailBatch? @relation(fields: [batchId], references: [id], onDelete: SetNull)
-  emailTracking EmailTracking[]
 
   @@index([companyId, status])
   @@index([companyId, externalId])
@@ -294,7 +285,6 @@ model EmailLog {
   recipient   Recipient?   @relation(fields: [recipientId], references: [id], onDelete: SetNull)
   outbox      EmailOutbox  @relation(fields: [outboxId], references: [id], onDelete: Cascade)
   events      EmailEvent[]
-  emailTracking EmailTracking[]
 
   @@index([companyId, status])
   @@index([companyId, createdAt])
@@ -386,9 +376,6 @@ model Domain {
 
   // Relations
   company Company @relation("CompanyDomains", fields: [companyId], references: [id], onDelete: Cascade)
-  dnsRecords DNSRecord[]
-  domainOnboarding DomainOnboarding[]
-  reputationMetrics ReputationMetric[]
 
   @@unique([companyId, domain])
   @@index([companyId, status])
@@ -499,12 +486,9 @@ model Suppression {
   expiresAt     DateTime?           @map("expires_at") // Para soft bounces
   
   // Relations
-  company       Company?            @relation("SuppressionsByCompany", fields: [companyId], references: [id], onDelete: Cascade)
-  
   @@unique([companyId, email], map: "idx_suppression_company_email")
   @@index([reason, suppressedAt])
   @@index([domain, reason])
-  @@map("suppressions")
 }
 
 // IP Pools - Gerenciamento de IPs para envio
@@ -531,7 +515,6 @@ model IPPool {
   updatedAt     DateTime    @updatedAt @map("updated_at")
   
   // Relations
-  reputationMetrics ReputationMetric[]
   
   @@index([type, isActive])
   @@map("ip_pools")
@@ -579,8 +562,6 @@ model DNSRecord {
   updatedAt     DateTime                  @updatedAt @map("updated_at")
   
   // Relations
-  domain        Domain                    @relation(fields: [domainId], references: [id], onDelete: Cascade)
-  
   @@index([domainId, recordType])
   @@map("dns_records")
 }
@@ -615,8 +596,6 @@ model DomainOnboarding {
   updatedAt     DateTime                  @updatedAt @map("updated_at")
   
   // Relations
-  domain        Domain                    @relation("DomainOnboarding", fields: [domainId], references: [id], onDelete: Cascade)
-  
   @@map("domain_onboarding")
 }
 
@@ -642,8 +621,6 @@ model EmailTracking {
   createdAt     DateTime  @default(now()) @map("created_at")
   
   // Relations
-  emailLog      EmailLog  @relation("EmailTracking", fields: [emailLogId], references: [id], onDelete: Cascade)
-  
   @@index([emailLogId])
   @@index([trackingId])
   @@map("email_tracking")
@@ -680,10 +657,6 @@ model ReputationMetric {
   createdAt       DateTime @default(now()) @map("created_at")
   
   // Relations
-  company         Company?  @relation("ReputationMetrics", fields: [companyId], references: [id], onDelete: Cascade)
-  domain          Domain?   @relation("DomainReputationMetrics", fields: [domainId], references: [id], onDelete: Cascade)
-  ipPool          IPPool?   @relation(fields: [ipPoolId], references: [id], onDelete: Cascade)
-  
   @@unique([companyId, domainId, ipPoolId, date])
   @@index([date, companyId])
   @@map("reputation_metrics")

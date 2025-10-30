@@ -4,14 +4,18 @@ import {
   ComplaintInfo,
   ARFFeedbackType,
   ARF_FEEDBACK_TYPE_MAP,
-  ARF_HEADERS,
   ARFParseError,
-  AuthFailureReport,
 } from '../types/arf-report.types';
 
 /**
  * ARF Parser Service (RFC 5965)
  * Parses Abuse Reporting Format messages to extract complaint/abuse information
+ *
+ * ARF Structure (RFC 5965):
+ * - multipart/report message
+ * - First part: human-readable explanation (optional)
+ * - Second part: machine-readable ARF headers
+ * - Third part: original message (optional)
  */
 @Injectable()
 export class ARFParserService {
@@ -24,65 +28,258 @@ export class ARFParserService {
    */
   parseARF(rawARF: string): ARFReport {
     try {
-      const lines = rawARF.split('\n');
-      const headers: Record<string, string> = {};
-      let bodyStartIdx = 0;
-      let originalMessage = '';
+      this.logger.debug(`Parsing ARF message (${rawARF.length} chars)`);
 
-      // Parse headers until empty line
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i];
+      // ARF messages are multipart/report
+      // Extract the feedback-report part (machine-readable)
+      const feedbackReportPart = this.extractFeedbackReportPart(rawARF);
 
-        // Empty line marks end of headers
-        if (!line.trim()) {
-          bodyStartIdx = i + 1;
-          break;
-        }
-
-        // Parse header line (Key: value)
-        if (line.includes(':')) {
-          const [key, ...valueParts] = line.split(':');
-          const value = valueParts.join(':').trim();
-          headers[key.trim().toLowerCase()] = value;
-        }
+      if (!feedbackReportPart) {
+        throw new Error('No feedback-report part found in ARF');
       }
 
-      // Extract body (original message)
-      if (bodyStartIdx > 0 && bodyStartIdx < lines.length) {
-        originalMessage = lines.slice(bodyStartIdx).join('\n');
-      }
+      // Parse the feedback report content
+      const report = this.parseFeedbackReport(feedbackReportPart);
 
-      // Build ARF report
-      const report: ARFReport = {
-        version: headers['version'] || '1.0',
-        userAgent: headers['user-agent'],
-        feedbackType: this.parseFeedbackType(headers['feedback-type']),
-        timestamp: this.parseDate(headers['arrival-date']),
-        originalHeaders: this.extractOriginalHeaders(originalMessage),
-        originalMessage: this.truncateMessage(originalMessage),
-        mimeVersion: headers['mime-version'] || '1.0',
-        contentType: headers['content-type'] || 'multipart/report',
-        sourceIP: headers['source-ip'],
-        reportingMUA: headers['reporting-mua'],
-        authFailure: headers['auth-failure'],
-      };
+      // Try to extract original message if present
+      report.originalMessage = this.extractOriginalMessage(rawARF);
 
+      this.logger.debug(`Successfully parsed ARF: ${report.feedbackType} from ${report.userAgent}`);
       return report;
     } catch (error) {
-      this.logger.error(`Failed to parse ARF: ${error.message}`);
-      throw {
-        code: 'ARF_PARSE_ERROR',
-        message: 'Failed to parse ARF message',
-        originalText: rawARF.substring(0, 200),
-      } as ARFParseError;
+      this.logger.error(`ARF parsing failed: ${error.message}`);
+      throw new ARFParseError('ARF_PARSING_FAILED', `Failed to parse ARF: ${error.message}`);
     }
+  }
+
+  /**
+   * Extract the feedback-report part from multipart ARF
+   * RFC 5965 Section 3
+   */
+  private extractFeedbackReportPart(rawARF: string): string | null {
+    // ARF is multipart/report with Content-Type: message/feedback-report
+    const boundaryMatch = rawARF.match(/boundary="([^"]+)"/) || rawARF.match(/boundary=([^\s;]+)/);
+    if (!boundaryMatch) {
+      // Not multipart, check if it's a simple feedback report
+      if (rawARF.includes('Feedback-Type:') || rawARF.includes('Version:')) {
+        return rawARF;
+      }
+      return null;
+    }
+
+    const boundary = boundaryMatch[1];
+    const parts = rawARF.split(`--${boundary}`);
+
+    for (const part of parts) {
+      if (part.includes('Content-Type: message/feedback-report') ||
+          part.includes('Feedback-Type:') ||
+          part.includes('Version:')) {
+        // Extract content after headers
+        const contentStart = part.indexOf('\n\n');
+        if (contentStart !== -1) {
+          return part.substring(contentStart + 2).trim();
+        }
+        return part.trim();
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Parse the feedback-report content
+   * RFC 5965 Section 3
+   */
+  private parseFeedbackReport(content: string): ARFReport {
+    const lines = content.split('\n').map(line => line.trim());
+    const report: Partial<ARFReport> = {
+      originalHeaders: {},
+    };
+
+    let inOriginalHeaders = false;
+    let originalHeadersBuffer: string[] = [];
+
+    for (const line of lines) {
+      if (!line) continue;
+
+      if (line.includes(':')) {
+        const [key, ...valueParts] = line.split(':');
+        const headerKey = key.trim();
+        const headerValue = valueParts.join(':').trim();
+
+        // RFC 5965 required headers
+        switch (headerKey.toLowerCase()) {
+          case 'version':
+            report.version = headerValue;
+            break;
+          case 'user-agent':
+            report.userAgent = headerValue;
+            break;
+          case 'feedback-type':
+            report.feedbackType = this.parseFeedbackType(headerValue);
+            break;
+          case 'original-mail-from':
+            report.originalHeaders!.from = headerValue;
+            break;
+          case 'original-rcpt-to':
+            if (!report.originalHeaders!.to) {
+              report.originalHeaders!.to = headerValue;
+            } else if (Array.isArray(report.originalHeaders!.to)) {
+              (report.originalHeaders!.to as string[]).push(headerValue);
+            } else {
+              report.originalHeaders!.to = [report.originalHeaders!.to as string, headerValue];
+            }
+            break;
+          case 'received-date':
+            report.originalHeaders!.date = headerValue;
+            report.timestamp = new Date(headerValue);
+            break;
+          case 'message-id':
+            report.originalHeaders!.messageID = headerValue;
+            break;
+          case 'subject':
+            report.originalHeaders!.subject = headerValue;
+            break;
+          case 'source-ip':
+            report.sourceIP = headerValue;
+            break;
+          case 'reported-domain':
+            // Can be used for additional validation
+            break;
+          case 'authentication-results':
+            report.authFailure = headerValue;
+            break;
+          case 'removal-recipient':
+            // Additional recipient information
+            break;
+          default:
+            // Store other headers
+            if (headerKey.toLowerCase().startsWith('x-') ||
+                headerKey.toLowerCase().startsWith('original-')) {
+              report.originalHeaders![headerKey] = headerValue;
+            }
+            break;
+        }
+      }
+    }
+
+    // Set defaults if not provided
+    if (!report.version) report.version = '1.0';
+    if (!report.feedbackType) report.feedbackType = 'other';
+    if (!report.timestamp) report.timestamp = new Date();
+
+    // MIME version and content type are standard for ARF
+    report.mimeVersion = '1.0';
+    report.contentType = 'message/feedback-report';
+
+    return report as ARFReport;
+  }
+
+  /**
+   * Extract original message from ARF (if present)
+   */
+  private extractOriginalMessage(rawARF: string): string | undefined {
+    const boundaryMatch = rawARF.match(/boundary="([^"]+)"/) || rawARF.match(/boundary=([^\s;]+)/);
+    if (!boundaryMatch) return undefined;
+
+    const boundary = boundaryMatch[1];
+    const parts = rawARF.split(`--${boundary}`);
+
+    // Look for the part after the feedback-report
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i];
+      if (part.includes('Content-Type: message/feedback-report') ||
+          part.includes('Feedback-Type:')) {
+        // Next part should be the original message
+        if (i + 1 < parts.length) {
+          const nextPart = parts[i + 1];
+          const contentStart = nextPart.indexOf('\n\n');
+          if (contentStart !== -1) {
+            return nextPart.substring(contentStart + 2).trim();
+          }
+          return nextPart.trim();
+        }
+        break;
+      }
+    }
+
+    return undefined;
+  }
+
+  /**
+   * Parse feedback type from header value
+   */
+  private parseFeedbackType(feedbackTypeStr: string): ARFFeedbackType {
+    const normalized = feedbackTypeStr.toLowerCase().trim();
+
+    // Check if it's a known feedback type
+    if (ARF_FEEDBACK_TYPE_MAP[normalized]) {
+      return ARF_FEEDBACK_TYPE_MAP[normalized];
+    }
+
+    // Try to match partial strings
+    for (const [key, value] of Object.entries(ARF_FEEDBACK_TYPE_MAP)) {
+      if (normalized.includes(key)) {
+        return value;
+      }
+    }
+
+    // Check for common variations and patterns
+    if (normalized.includes('spam') || normalized.includes('abuse') || normalized.includes('bulk')) {
+      return 'abuse';
+    }
+    if (normalized.includes('fraud') || normalized.includes('phish') || normalized.includes('scam')) {
+      return 'fraud';
+    }
+    if (normalized.includes('auth') || normalized.includes('dkim') || normalized.includes('spf') || normalized.includes('dmarc')) {
+      return 'auth-failure';
+    }
+    if (normalized.includes('complaint') || normalized.includes('report')) {
+      return 'complaint';
+    }
+    if (normalized.includes('not-spam') || normalized.includes('whitelist') || normalized.includes('good')) {
+      return 'not-spam';
+    }
+    if (normalized.includes('opt-out') || normalized.includes('unsubscribe') || normalized.includes('remove')) {
+      return 'opt-out';
+    }
+
+    // Default to other
+    return 'other';
   }
 
   /**
    * Extract complaint information from ARF report
    */
   extractComplaint(arf: ARFReport): ComplaintInfo {
-    const email = this.extractEmailFromOriginalHeaders(arf.originalHeaders);
+    // Try to extract email from various header fields
+    let email = 'unknown@example.com';
+
+    // Try original-rcpt-to first (most reliable)
+    if (arf.originalHeaders['original-rcpt-to']) {
+      const rcptTo = arf.originalHeaders['original-rcpt-to'];
+      if (Array.isArray(rcptTo)) {
+        email = rcptTo[0];
+      } else {
+        email = rcptTo as string;
+      }
+    }
+    // Try to field
+    else if (arf.originalHeaders.to) {
+      const toField = arf.originalHeaders.to;
+      if (Array.isArray(toField)) {
+        email = toField[0];
+      } else {
+        email = toField as string;
+      }
+    }
+    // Try from field (less common but possible)
+    else if (arf.originalHeaders.from) {
+      email = arf.originalHeaders.from as string;
+    }
+
+    // Clean up email (remove display names, angle brackets, etc.)
+    email = this.extractEmailFromHeader(email);
 
     return {
       email,
@@ -90,21 +287,62 @@ export class ARFParserService {
       timestamp: arf.timestamp,
       sourceIP: arf.sourceIP,
       userAgent: arf.userAgent,
-      complaint: `${arf.feedbackType} complaint received`,
+      complaint: this.generateComplaintDescription(arf),
     };
   }
 
   /**
-   * Extract auth failure information from ARF
+   * Extract clean email address from header field
+   */
+  private extractEmailFromHeader(headerValue: string): string {
+    if (!headerValue) return 'unknown@example.com';
+
+    // Remove display name: "Display Name" <email@domain.com>
+    const angleBracketMatch = headerValue.match(/<([^>]+)>/);
+    if (angleBracketMatch) {
+      return angleBracketMatch[1].trim();
+    }
+
+    // Remove quotes and extra spaces
+    let clean = headerValue.replace(/["']/g, '').trim();
+
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (emailRegex.test(clean)) {
+      return clean;
+    }
+
+    // If no valid email found, return unknown
+    return 'unknown@example.com';
+  }
+
+  /**
+   * Extract authentication failure information from ARF report
    */
   extractAuthFailure(arf: ARFReport): AuthFailureReport | null {
-    if (!arf.authFailure) {
+    if (arf.feedbackType !== 'auth-failure' || !arf.authFailure) {
       return null;
     }
 
-    // Parse auth failure (e.g., "dkim" or "spf")
-    const authMethod = arf.authFailure.toLowerCase() as 'dkim' | 'spf' | 'dmarc';
-    const domain = arf.originalHeaders.from?.split('@')[1] || 'unknown';
+    // Parse authentication failure details
+    const authFailure = arf.authFailure.toLowerCase();
+
+    let authMethod: 'dkim' | 'spf' | 'dmarc' = 'dkim';
+    if (authFailure.includes('spf')) {
+      authMethod = 'spf';
+    } else if (authFailure.includes('dmarc')) {
+      authMethod = 'dmarc';
+    }
+
+    // Extract domain from headers if possible
+    let domain = 'unknown';
+    if (arf.originalHeaders.from) {
+      const fromEmail = this.extractEmailFromHeader(arf.originalHeaders.from as string);
+      const atIndex = fromEmail.indexOf('@');
+      if (atIndex !== -1) {
+        domain = fromEmail.substring(atIndex + 1);
+      }
+    }
 
     return {
       authMethod,
@@ -115,119 +353,30 @@ export class ARFParserService {
   }
 
   /**
-   * Parse feedback type from string
+   * Generate human-readable complaint description
    */
-  private parseFeedbackType(feedbackTypeStr?: string): ARFFeedbackType {
-    if (!feedbackTypeStr) {
-      return 'other';
+  private generateComplaintDescription(arf: ARFReport): string {
+    const descriptions: Record<ARFFeedbackType, string> = {
+      'abuse': 'Email marked as spam/abuse by recipient',
+      'fraud': 'Email reported as fraudulent/phishing attempt',
+      'auth-failure': 'Email failed authentication checks',
+      'not-spam': 'Email incorrectly marked as spam (false positive)',
+      'complaint': 'General recipient complaint about email',
+      'opt-out': 'Recipient requested to unsubscribe/opt-out',
+      'other': 'Other type of complaint or feedback',
+    };
+
+    let description = descriptions[arf.feedbackType] || 'Unknown complaint type';
+
+    if (arf.sourceIP) {
+      description += ` from IP ${arf.sourceIP}`;
     }
 
-    const normalized = feedbackTypeStr.toLowerCase().trim();
-    return ARF_FEEDBACK_TYPE_MAP[normalized] || 'other';
-  }
-
-  /**
-   * Parse date from various formats
-   */
-  private parseDate(dateStr?: string): Date {
-    if (!dateStr) {
-      return new Date();
+    if (arf.userAgent) {
+      description += ` via ${arf.userAgent}`;
     }
 
-    try {
-      return new Date(dateStr);
-    } catch (error) {
-      this.logger.warn(`Failed to parse date: ${dateStr}`);
-      return new Date();
-    }
-  }
-
-  /**
-   * Extract original email headers from message body
-   */
-  private extractOriginalHeaders(
-    originalMessage: string
-  ): Record<string, any> {
-    const headers: Record<string, any> = {};
-    const lines = originalMessage.split('\n');
-
-    for (const line of lines) {
-      if (!line.trim()) {
-        // End of headers
-        break;
-      }
-
-      if (line.includes(':')) {
-        const [key, ...valueParts] = line.split(':');
-        const value = valueParts.join(':').trim();
-        const normalizedKey = key.trim().toLowerCase();
-
-        if (normalizedKey === 'message-id') {
-          headers.messageID = value;
-        } else if (normalizedKey === 'date') {
-          try {
-            headers.date = new Date(value);
-          } catch (e) {
-            headers.date = value;
-          }
-        } else if (normalizedKey === 'from') {
-          headers.from = this.parseEmailAddress(value);
-        } else if (normalizedKey === 'to') {
-          headers.to = this.parseEmailAddress(value);
-        } else if (normalizedKey === 'subject') {
-          headers.subject = value;
-        } else {
-          headers[normalizedKey] = value;
-        }
-      }
-    }
-
-    return headers;
-  }
-
-  /**
-   * Parse email address from field value
-   * Handles: "Name <email@domain.com>" or just "email@domain.com"
-   */
-  private parseEmailAddress(value: string): string {
-    const match = value.match(/<(.+?)>/);
-    if (match) {
-      return match[1];
-    }
-    return value.trim();
-  }
-
-  /**
-   * Extract email from original headers
-   */
-  private extractEmailFromOriginalHeaders(headers: Record<string, any>): string {
-    // Try to extract from To field
-    if (headers.to) {
-      const to = headers.to;
-      if (typeof to === 'string') {
-        return this.parseEmailAddress(to);
-      }
-    }
-
-    // Try to extract from From field
-    if (headers.from) {
-      const from = headers.from;
-      if (typeof from === 'string') {
-        return this.parseEmailAddress(from);
-      }
-    }
-
-    return 'unknown@unknown.com';
-  }
-
-  /**
-   * Truncate message to 1000 chars for storage
-   */
-  private truncateMessage(message: string, maxLength: number = 1000): string {
-    if (message.length > maxLength) {
-      return message.substring(0, maxLength) + '...';
-    }
-    return message;
+    return description;
   }
 
   /**
@@ -236,43 +385,28 @@ export class ARFParserService {
   validateARF(arf: ARFReport): { valid: boolean; errors: string[] } {
     const errors: string[] = [];
 
+    // RFC 5965 required fields
     if (!arf.feedbackType) {
-      errors.push('Missing feedback-type');
+      errors.push('Missing required Feedback-Type header');
     }
 
+    // Version is optional in practice, though recommended
+    // if (!arf.version) {
+    //   errors.push('Missing recommended Version header');
+    // }
+
+    // Timestamp should be set
     if (!arf.timestamp) {
       errors.push('Missing timestamp');
     }
 
-    if (!arf.originalHeaders || !arf.originalHeaders.messageID) {
-      errors.push('Missing original message-id');
-    }
+    // At least some original headers should be present
+    const hasOriginalHeaders = arf.originalHeaders &&
+      (arf.originalHeaders.messageID || arf.originalHeaders.subject ||
+       arf.originalHeaders.from || arf.originalHeaders.to);
 
-    return {
-      valid: errors.length === 0,
-      errors,
-    };
-  }
-
-  /**
-   * Validate DSN report structure
-   */
-  static validateComplaintInfo(complaint: ComplaintInfo): {
-    valid: boolean;
-    errors: string[];
-  } {
-    const errors: string[] = [];
-
-    if (!complaint.email || !complaint.email.includes('@')) {
-      errors.push('Invalid email address');
-    }
-
-    if (!complaint.feedbackType) {
-      errors.push('Missing feedback type');
-    }
-
-    if (!complaint.timestamp) {
-      errors.push('Missing timestamp');
+    if (!hasOriginalHeaders) {
+      errors.push('Missing original message headers');
     }
 
     return {
