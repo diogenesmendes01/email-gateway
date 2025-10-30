@@ -2,8 +2,8 @@ import nodemailer, { Transporter } from 'nodemailer';
 
 import { EmailProvider, EmailSendJobData } from '@email-gateway/shared';
 
-import type { DriverConfig } from '../base/driver-config.types';
-import type { DriverSendRequest, IEmailDriver } from '../base/email-driver.interface';
+import type { DriverConfig, DriverSendOptions } from '../base/driver-config.types';
+import type { IEmailDriver } from '../base/email-driver.interface';
 import type { SendResult } from '../base/email-driver-result';
 import { ErrorMappingService } from '../../services/error-mapping.service';
 import { ReturnPathGenerator } from './return-path-generator';
@@ -25,20 +25,17 @@ export class PostalSMTPDriver implements IEmailDriver {
     });
   }
 
-  async sendEmail(request: DriverSendRequest, overrideConfig?: DriverConfig): Promise<SendResult> {
-    const effectiveConfig = overrideConfig
-      ? this.normalizeConfig({ ...this.config, ...overrideConfig })
-      : this.config;
+  async sendEmail(job: EmailSendJobData, config: DriverConfig, options: DriverSendOptions): Promise<SendResult> {
+    const effectiveConfig = this.normalizeConfig({ ...this.config, ...config });
 
     try {
-      const message = this.buildMessage(request, effectiveConfig);
+      const message = this.buildMessage(job, options, effectiveConfig);
       const info = await this.transporter.sendMail(message);
 
       return {
         success: true,
         provider: EmailProvider.POSTAL_SMTP,
         messageId: info.messageId,
-        rawResponse: info,
       };
     } catch (error) {
       const mappedError = ErrorMappingService.mapGenericError(error);
@@ -62,8 +59,8 @@ export class PostalSMTPDriver implements IEmailDriver {
     }
   }
 
-  private buildMessage(request: DriverSendRequest, config: PostalSMTPConfig) {
-    const { job, htmlContent } = request;
+  private buildMessage(job: EmailSendJobData, options: DriverSendOptions, config: PostalSMTPConfig) {
+    const { htmlContent } = options;
     const headers = this.composeHeaders(job);
     const envelope = {
       from: this.generateReturnPath(job, config),

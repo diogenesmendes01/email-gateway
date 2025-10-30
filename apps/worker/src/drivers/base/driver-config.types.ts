@@ -1,41 +1,3 @@
-<<<<<<< Current (Your changes)
-=======
-import { EmailProvider } from '@email-gateway/shared';
-
-export interface DriverAuthConfig {
-  user: string;
-  pass: string;
-}
-
-export interface DriverTlsConfig {
-  rejectUnauthorized?: boolean;
-  ca?: string | string[];
-  cert?: string;
-  key?: string;
-}
-
-export interface DriverConfig {
-  provider: EmailProvider;
-  host?: string;
-  port?: number;
-  secure?: boolean;
-  auth?: DriverAuthConfig;
-  apiKey?: string;
-  region?: string;
-  fromAddress?: string;
-  replyToAddress?: string;
-  configurationSetName?: string;
-  ipPoolId?: string;
-  returnPathDomain?: string;
-  tls?: DriverTlsConfig;
-  [key: string]: unknown;
-}
-
-export interface DriverQuotaInfo {
-  max24HourSend?: number;
-  maxSendRate?: number;
-  sentLast24Hours?: number;
-}
 import { EmailProvider } from '@email-gateway/shared';
 
 export interface DriverAuthConfig {
@@ -78,4 +40,8 @@ export interface DriverSendOptions {
   returnPath?: string;
 }
 
->>>>>>> Incoming (Background Agent changes)
+export interface DriverQuotaInfo {
+  max24HourSend?: number;
+  maxSendRate?: number;
+  sentLast24Hours?: number;
+}
