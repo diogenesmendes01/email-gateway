@@ -113,7 +113,7 @@ export class DSNParserService {
    * Classify a bounce based on status code and diagnostic code
    */
   classifyBounce(dsn: DSNReport): {
-    type: 'hard' | 'soft' | 'transient';
+    type: 'hard' | 'soft' | 'transient' | 'undetermined';
     reason: string;
     shouldSuppress: boolean;
   } {
