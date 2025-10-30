@@ -3,7 +3,7 @@ import { Job } from 'bull';
 import { DSNParserService } from './services/dsn-parser.service';
 import { ARFParserService } from './services/arf-parser.service';
 import { BounceClassifierService } from './services/bounce-classifier.service';
-import { PrismaService } from '@packages/database';
+import { PrismaService } from '../../database/database.module';
 
 export interface WebhookIngestJobData {
   provider: 'postal' | 'mailu' | 'haraka' | 'ses';

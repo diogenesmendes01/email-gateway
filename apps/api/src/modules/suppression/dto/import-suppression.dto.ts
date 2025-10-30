@@ -1,5 +1,5 @@
 import { IsArray, IsEnum, IsOptional, IsString, MaxLength, ArrayMinSize } from 'class-validator';
-import { SuppressionReason } from '@packages/database';
+import { SuppressionReason } from '@certshift/database';
 
 export class ImportSuppressionDto {
   @IsArray()

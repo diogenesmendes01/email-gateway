@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { PrismaService } from '@packages/database';
+import { PrismaService } from '../../database/prisma.service';
 
 export interface WarmupSchedule {
   startDate: Date;

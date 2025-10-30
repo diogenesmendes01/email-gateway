@@ -4,15 +4,43 @@ import {
   Get,
   Param,
   Body,
-  HttpException,
-  HttpStatus,
+  BadRequestException,
   Logger,
 } from '@nestjs/common';
+import { IsString, IsNotEmpty, IsOptional, ValidateIf, IsUUID } from 'class-validator';
 import { DKIMGeneratorService } from './dkim-generator.service';
 import { DNSVerifierService } from './dns-verifier.service';
 import { ChecklistGeneratorService } from './checklist-generator.service';
 import { ProductionReadinessService } from './production-readiness.service';
 
+/**
+ * DTO de validação para iniciar onboarding
+ */
+export class StartOnboardingDto {
+  @IsString()
+  @IsNotEmpty()
+  @IsUUID()
+  domainId: string;
+}
+
+/**
+ * DTO de validação para aprovar produção
+ */
+export class ApproveProductionDto {
+  @IsString()
+  @IsNotEmpty()
+  approvedBy: string;
+
+  @IsOptional()
+  @IsString()
+  notes?: string;
+}
+
+/**
+ * Onboarding Controller - TRACK 3
+ * Gerencia o processo de onboarding de domínios para ESP self-hosted
+ * CORREÇÕES: Input validation com DTOs, error handling robusto
+ */
 @Controller('domains/:domainId/onboarding')
 export class OnboardingController {
   private readonly logger = new Logger(OnboardingController.name);
@@ -26,11 +54,17 @@ export class OnboardingController {
 
   /**
    * POST /domains/:domainId/onboarding/start
-   * Start the onboarding process for a domain
+   * Iniciar o processo de onboarding para um domínio
+   * CORREÇÃO: Adicionada validação de UUID para domainId
    */
   @Post('start')
   async startOnboarding(@Param('domainId') domainId: string) {
     try {
+      // Validar UUID format
+      if (!this.isValidUUID(domainId)) {
+        throw new BadRequestException('Invalid domain ID format');
+      }
+
       this.logger.log(`Starting onboarding process for domain: ${domainId}`);
 
       const result = await this.checklistGenerator.initializeOnboarding(domainId);
@@ -44,25 +78,35 @@ export class OnboardingController {
       };
     } catch (error) {
       this.logger.error(`Failed to start onboarding for domain ${domainId}:`, error);
-      throw new HttpException(
-        {
-          statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
-          message: 'Failed to start domain onboarding',
-          error: error.message,
-        },
-        HttpStatus.INTERNAL_SERVER_ERROR,
+
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+
+      throw new BadRequestException(
+        error instanceof Error ? error.message : 'Failed to start domain onboarding'
       );
     }
   }
 
   /**
    * GET /domains/:domainId/onboarding/status
-   * Get current onboarding status
+   * Obter status atual do onboarding
+   * CORREÇÃO: Melhor tratamento de erros
    */
   @Get('status')
   async getOnboardingStatus(@Param('domainId') domainId: string) {
     try {
+      // Validar UUID format
+      if (!this.isValidUUID(domainId)) {
+        throw new BadRequestException('Invalid domain ID format');
+      }
+
       const status = await this.checklistGenerator.getOnboardingStatus(domainId);
+
+      if (!status) {
+        throw new BadRequestException('Onboarding status not found for this domain');
+      }
 
       return {
         domainId,
@@ -74,30 +118,41 @@ export class OnboardingController {
       };
     } catch (error) {
       this.logger.error(`Failed to get onboarding status for domain ${domainId}:`, error);
-      throw new HttpException(
-        {
-          statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
-          message: 'Failed to retrieve onboarding status',
-          error: error.message,
-        },
-        HttpStatus.INTERNAL_SERVER_ERROR,
+
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+
+      throw new BadRequestException(
+        error instanceof Error ? error.message : 'Failed to retrieve onboarding status'
       );
     }
   }
 
   /**
    * POST /domains/:domainId/onboarding/generate-dkim
-   * Generate DKIM key pair for domain
+   * Gerar par de chaves DKIM para domínio
+   * CORREÇÃO: Validação de entrada melhorada
    */
   @Post('generate-dkim')
   async generateDKIM(@Param('domainId') domainId: string) {
     try {
+      // Validar UUID format
+      if (!this.isValidUUID(domainId)) {
+        throw new BadRequestException('Invalid domain ID format');
+      }
+
       this.logger.log(`Generating DKIM for domain: ${domainId}`);
 
       // Get domain info first
       const domain = await this.checklistGenerator.getDomainInfo(domainId);
       if (!domain) {
-        throw new HttpException('Domain not found', HttpStatus.NOT_FOUND);
+        throw new BadRequestException('Domain not found');
+      }
+
+      // Validate domain format
+      if (!this.isValidDomain(domain.domain)) {
+        throw new BadRequestException('Invalid domain format');
       }
 
       // Generate DKIM keys
@@ -132,24 +187,30 @@ export class OnboardingController {
       };
     } catch (error) {
       this.logger.error(`Failed to generate DKIM for domain ${domainId}:`, error);
-      throw new HttpException(
-        {
-          statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
-          message: 'Failed to generate DKIM keys',
-          error: error.message,
-        },
-        HttpStatus.INTERNAL_SERVER_ERROR,
+
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+
+      throw new BadRequestException(
+        error instanceof Error ? error.message : 'Failed to generate DKIM keys'
       );
     }
   }
 
   /**
    * POST /domains/:domainId/onboarding/verify
-   * Manually trigger DNS verification
+   * Disparar manualmente a verificação de DNS
+   * CORREÇÃO: Validação de entrada e melhor tratamento de erros
    */
   @Post('verify')
   async verifyDNS(@Param('domainId') domainId: string) {
     try {
+      // Validar UUID format
+      if (!this.isValidUUID(domainId)) {
+        throw new BadRequestException('Invalid domain ID format');
+      }
+
       this.logger.log(`Triggering DNS verification for domain: ${domainId}`);
 
       const verificationResult = await this.dnsVerifier.verifyAllRecords(domainId);
@@ -164,25 +225,35 @@ export class OnboardingController {
       };
     } catch (error) {
       this.logger.error(`Failed to verify DNS for domain ${domainId}:`, error);
-      throw new HttpException(
-        {
-          statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
-          message: 'Failed to verify DNS records',
-          error: error.message,
-        },
-        HttpStatus.INTERNAL_SERVER_ERROR,
+
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+
+      throw new BadRequestException(
+        error instanceof Error ? error.message : 'Failed to verify DNS records'
       );
     }
   }
 
   /**
    * GET /domains/:domainId/onboarding/checklist
-   * Get complete onboarding checklist
+   * Obter checklist completo de onboarding
+   * CORREÇÃO: Validação de entrada
    */
   @Get('checklist')
   async getChecklist(@Param('domainId') domainId: string) {
     try {
+      // Validar UUID format
+      if (!this.isValidUUID(domainId)) {
+        throw new BadRequestException('Invalid domain ID format');
+      }
+
       const checklist = await this.checklistGenerator.generateChecklist(domainId);
+
+      if (!checklist || !checklist.items) {
+        throw new BadRequestException('Checklist not found for this domain');
+      }
 
       return {
         domainId,
@@ -196,28 +267,43 @@ export class OnboardingController {
       };
     } catch (error) {
       this.logger.error(`Failed to get checklist for domain ${domainId}:`, error);
-      throw new HttpException(
-        {
-          statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
-          message: 'Failed to generate checklist',
-          error: error.message,
-        },
-        HttpStatus.INTERNAL_SERVER_ERROR,
+
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+
+      throw new BadRequestException(
+        error instanceof Error ? error.message : 'Failed to generate checklist'
       );
     }
   }
 
   /**
    * POST /domains/:domainId/onboarding/approve-production
-   * Mark domain as production ready (admin only)
+   * Marcar domínio como pronto para produção (apenas admin)
+   * CORREÇÃO: Validação completa de body com DTO
    */
   @Post('approve-production')
   async approveForProduction(
     @Param('domainId') domainId: string,
-    @Body() body: { approvedBy: string; notes?: string }
+    @Body() body: ApproveProductionDto
   ) {
     try {
-      this.logger.log(`Approving domain for production: ${domainId}`);
+      // Validar UUID format
+      if (!this.isValidUUID(domainId)) {
+        throw new BadRequestException('Invalid domain ID format');
+      }
+
+      // Validar body - basic validation (class-validator deveria ser usado em interceptor)
+      if (!body.approvedBy || typeof body.approvedBy !== 'string' || body.approvedBy.trim().length === 0) {
+        throw new BadRequestException('approvedBy is required and must be a non-empty string');
+      }
+
+      if (body.notes !== undefined && typeof body.notes !== 'string') {
+        throw new BadRequestException('notes must be a string if provided');
+      }
+
+      this.logger.log(`Approving domain for production: ${domainId} by ${body.approvedBy}`);
 
       const result = await this.productionReadiness.markProductionReady(
         domainId,
@@ -234,14 +320,30 @@ export class OnboardingController {
       };
     } catch (error) {
       this.logger.error(`Failed to approve domain for production ${domainId}:`, error);
-      throw new HttpException(
-        {
-          statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
-          message: 'Failed to approve domain for production',
-          error: error.message,
-        },
-        HttpStatus.INTERNAL_SERVER_ERROR,
+
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+
+      throw new BadRequestException(
+        error instanceof Error ? error.message : 'Failed to approve domain for production'
       );
     }
+  }
+
+  /**
+   * Validar formato de UUID v4
+   */
+  private isValidUUID(uuid: string): boolean {
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    return uuidRegex.test(uuid);
+  }
+
+  /**
+   * Validar formato de domínio
+   */
+  private isValidDomain(domain: string): boolean {
+    const domainRegex = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)*[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/i;
+    return domainRegex.test(domain);
   }
 }

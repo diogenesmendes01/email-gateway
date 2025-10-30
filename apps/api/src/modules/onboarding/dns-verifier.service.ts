@@ -1,8 +1,8 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, InternalServerErrorException } from '@nestjs/common';
 import { DNSCheckerService } from './dns-checker.service';
 import { DKIMGeneratorService } from './dkim-generator.service';
-import { PrismaService } from '../../database/prisma.service';
-import { DomainOnboardingStatus } from '@certshift/database';
+import { PrismaService } from '@packages/database';
+import { DomainOnboardingStatus } from '@packages/database';
 
 export interface VerificationResult {
   domain: string;
@@ -20,6 +20,11 @@ export interface DNSCheckResult {
   error?: string;
 }
 
+/**
+ * DNS Verifier Service - TRACK 3
+ * Verifica todos os registros DNS necessários para autenticação de email
+ * CORREÇÕES: N+1 queries eliminadas, error handling robusto, transações Prisma
+ */
 @Injectable()
 export class DNSVerifierService {
   private readonly logger = new Logger(DNSVerifierService.name);
@@ -31,69 +36,86 @@ export class DNSVerifierService {
   ) {}
 
   /**
-   * Verify all DNS records for a domain
+   * Verificar todos os registros DNS de um domínio
+   * CORREÇÃO: Agora faz um fetch único com includes em vez de N+1 queries
    */
   async verifyAllRecords(domainId: string): Promise<VerificationResult> {
-    this.logger.log(`Starting DNS verification for domain: ${domainId}`);
-
     try {
-      // Get domain and onboarding info
-      const domain = await this.prisma.domain.findUnique({
+      this.logger.log(`Starting DNS verification for domain: ${domainId}`);
+
+      // FIX N+1: Buscar domínio e onboarding em uma única query com select específico
+      const domainWithOnboarding = await this.prisma.domain.findUnique({
         where: { id: domainId },
-        select: { domain: true },
-      });
-
-      if (!domain) {
-        throw new Error('Domain not found');
-      }
-
-      const onboarding = await this.prisma.domainOnboarding.findUnique({
-        where: { domainId },
         select: {
-          dkimGenerated: true,
-          dkimSelector: true,
-          spfRecord: true,
-          returnPath: true,
-          trackingDomain: true,
+          id: true,
+          domain: true,
+          onboarding: {
+            select: {
+              id: true,
+              dkimGenerated: true,
+              dkimSelector: true,
+              dkimPublic: true,
+              spfRecord: true,
+              returnPath: true,
+              trackingDomain: true,
+            },
+          },
         },
       });
 
-      if (!onboarding) {
-        throw new Error('Domain onboarding not found');
+      if (!domainWithOnboarding) {
+        throw new NotFoundException(`Domain with ID ${domainId} not found`);
       }
+
+      if (!domainWithOnboarding.onboarding) {
+        throw new NotFoundException(`Onboarding configuration for domain ${domainId} not found`);
+      }
+
+      const domain = domainWithOnboarding.domain;
+      const onboarding = domainWithOnboarding.onboarding;
 
       // Run all checks in parallel
       const checks = await Promise.all([
-        this.verifyDKIM(domain.domain, onboarding),
-        this.verifySPF(domain.domain, onboarding),
-        this.verifyReturnPath(domain.domain, onboarding),
-        this.verifyTrackingDomain(domain.domain, onboarding),
+        this.verifyDKIM(domain, onboarding),
+        this.verifySPF(domain, onboarding),
+        this.verifyReturnPath(domain, onboarding),
+        this.verifyTrackingDomain(domain, onboarding),
       ]);
 
-      // Update onboarding status based on results
+      // Determine new status
       const allPassed = checks.every(check => check.valid);
       const newStatus = allPassed
         ? DomainOnboardingStatus.PRODUCTION_READY
         : DomainOnboardingStatus.DNS_CONFIGURED;
 
+      // Update verification status in a single transaction
       await this.updateVerificationStatus(domainId, checks, newStatus);
 
-      this.logger.log(`DNS verification completed for domain ${domain.domain}: ${allPassed ? 'PASSED' : 'FAILED'}`);
+      this.logger.log(
+        `DNS verification completed for domain ${domain}: ${allPassed ? 'PASSED' : 'FAILED'}`
+      );
 
       return {
-        domain: domain.domain,
+        domain,
         checks,
         allPassed,
         productionReady: allPassed,
       };
     } catch (error) {
       this.logger.error(`DNS verification failed for domain ${domainId}:`, error);
-      throw new Error(`DNS verification failed: ${error.message}`);
+
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+
+      throw new InternalServerErrorException(
+        `DNS verification failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
     }
   }
 
   /**
-   * Verify DKIM DNS record
+   * Verificar registro DKIM DNS
    */
   private async verifyDKIM(domain: string, onboarding: any): Promise<DNSCheckResult> {
     if (!onboarding.dkimGenerated || !onboarding.dkimSelector) {
@@ -107,9 +129,21 @@ export class DNSVerifierService {
     }
 
     const recordName = `${onboarding.dkimSelector}._domainkey.${domain}`;
-    const expectedValue = await this.getExpectedDKIMValue(domain, onboarding.dkimSelector);
 
     try {
+      // Use cached public key from onboarding instead of looking up again
+      const expectedValue = onboarding.dkimPublic;
+
+      if (!expectedValue) {
+        return {
+          type: 'DKIM',
+          record: recordName,
+          expected: 'DKIM public key',
+          valid: false,
+          error: 'DKIM public key not found in onboarding',
+        };
+      }
+
       const result = await this.dnsChecker.lookupTXT(recordName);
       const foundValue = result.join('');
 
@@ -119,8 +153,8 @@ export class DNSVerifierService {
       return {
         type: 'DKIM',
         record: recordName,
-        expected: expectedValue,
-        found: foundValue,
+        expected: expectedValue.substring(0, 50) + '...',
+        found: foundValue.substring(0, 50) + '...',
         valid,
         error: valid ? undefined : 'DKIM record does not match expected value',
       };
@@ -128,15 +162,15 @@ export class DNSVerifierService {
       return {
         type: 'DKIM',
         record: recordName,
-        expected: expectedValue,
+        expected: 'DKIM public key',
         valid: false,
-        error: `DNS lookup failed: ${error.message}`,
+        error: `DNS lookup failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
       };
     }
   }
 
   /**
-   * Verify SPF DNS record
+   * Verificar registro SPF DNS
    */
   private async verifySPF(domain: string, onboarding: any): Promise<DNSCheckResult> {
     const recordName = domain;
@@ -175,13 +209,13 @@ export class DNSVerifierService {
         record: recordName,
         expected: 'v=spf1 include:_spf.certshift.com ~all',
         valid: false,
-        error: `DNS lookup failed: ${error.message}`,
+        error: `DNS lookup failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
       };
     }
   }
 
   /**
-   * Verify Return-Path domain
+   * Verificar domínio Return-Path
    */
   private async verifyReturnPath(domain: string, onboarding: any): Promise<DNSCheckResult> {
     const returnPathDomain = onboarding.returnPath || `bounce.${domain}`;
@@ -202,13 +236,13 @@ export class DNSVerifierService {
         record: returnPathDomain,
         expected: 'A/AAAA record exists',
         valid: false,
-        error: `Return-path domain not resolvable: ${error.message}`,
+        error: `Return-path domain not resolvable: ${error instanceof Error ? error.message : 'Unknown error'}`,
       };
     }
   }
 
   /**
-   * Verify Tracking domain
+   * Verificar domínio de Tracking
    */
   private async verifyTrackingDomain(domain: string, onboarding: any): Promise<DNSCheckResult> {
     const trackingDomain = onboarding.trackingDomain || `track.${domain}`;
@@ -229,80 +263,70 @@ export class DNSVerifierService {
         record: trackingDomain,
         expected: 'A/AAAA record exists',
         valid: false,
-        error: `Tracking domain not resolvable: ${error.message}`,
+        error: `Tracking domain not resolvable: ${error instanceof Error ? error.message : 'Unknown error'}`,
       };
     }
   }
 
   /**
-   * Get expected DKIM value for verification
-   */
-  private async getExpectedDKIMValue(domain: string, selector: string): Promise<string> {
-    // Get the public key from database
-    const privateKey = await this.dkimGenerator.getPrivateKeyForSigning(domain);
-    if (!privateKey) {
-      throw new Error('DKIM private key not found');
-    }
-
-    // For verification, we need the public key part
-    // This is a simplified version - in production you'd derive from private key
-    const onboarding = await this.prisma.domainOnboarding.findFirst({
-      where: { dkimSelector: selector },
-      select: { dkimPublic: true },
-    });
-
-    if (!onboarding?.dkimPublic) {
-      throw new Error('DKIM public key not found');
-    }
-
-    return onboarding.dkimPublic;
-  }
-
-  /**
-   * Update verification status in database
+   * Atualizar status de verificação no banco (com transação)
+   * CORREÇÃO: Agora usa transação Prisma para garantir atomicidade
    */
   private async updateVerificationStatus(
     domainId: string,
     checks: DNSCheckResult[],
     newStatus: DomainOnboardingStatus
   ): Promise<void> {
-    const now = new Date();
+    try {
+      const now = new Date();
 
-    await this.prisma.domainOnboarding.update({
-      where: { domainId },
-      data: {
-        status: newStatus,
-        lastCheckAt: now,
-        nextCheckAt: new Date(now.getTime() + 60 * 60 * 1000), // Next check in 1 hour
-        checkAttempts: { increment: 1 },
-        updatedAt: now,
-      },
-    });
-
-    // Update individual DNS records
-    for (const check of checks) {
-      await this.prisma.dnsRecord.upsert({
-        where: {
-          domainId_recordType_name: {
-            domainId,
-            recordType: 'TXT',
-            name: check.record,
+      // Use transaction to ensure atomicity
+      await this.prisma.$transaction(async (tx) => {
+        // Update domain onboarding status
+        await tx.domainOnboarding.update({
+          where: { domainId },
+          data: {
+            status: newStatus,
+            lastCheckAt: now,
+            nextCheckAt: new Date(now.getTime() + 60 * 60 * 1000), // Next check in 1 hour
+            checkAttempts: { increment: 1 },
+            updatedAt: now,
           },
-        },
-        create: {
-          domainId,
-          recordType: 'TXT',
-          name: check.record,
-          value: check.found || '',
-          isVerified: check.valid,
-          lastChecked: now,
-        },
-        update: {
-          value: check.found || '',
-          isVerified: check.valid,
-          lastChecked: now,
-        },
+        });
+
+        // Update individual DNS records
+        for (const check of checks) {
+          await tx.dnsRecord.upsert({
+            where: {
+              idx_dns_record_domain_type_name: {
+                domainId,
+                recordType: 'TXT',
+                name: check.record,
+              },
+            },
+            create: {
+              domainId,
+              recordType: 'TXT',
+              name: check.record,
+              value: check.found || '',
+              isVerified: check.valid,
+              lastChecked: now,
+              createdAt: now,
+            },
+            update: {
+              value: check.found || '',
+              isVerified: check.valid,
+              lastChecked: now,
+            },
+          });
+        }
       });
+    } catch (error) {
+      this.logger.error(
+        `Failed to update verification status for domain ${domainId}:`,
+        error
+      );
+      throw new InternalServerErrorException('Failed to update verification status');
     }
   }
 }
