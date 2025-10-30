@@ -1,8 +1,8 @@
 import { EmailSendJobData } from '@email-gateway/shared';
 
 import { DriverFactory } from '../drivers/driver-factory';
-import type { DriverConfig } from '../drivers/base/driver-config.types';
-import type { DriverSendRequest, IEmailDriver } from '../drivers/base/email-driver.interface';
+import type { DriverConfig, DriverSendOptions } from '../drivers/base/driver-config.types';
+import type { IEmailDriver } from '../drivers/base/email-driver.interface';
 import type { SendResult } from '../drivers/base/email-driver-result';
 import { ErrorMappingService, type MappedError } from './error-mapping.service';
 
@@ -37,7 +37,7 @@ export class EmailDriverService {
   }
 
   async sendEmail(job: EmailSendJobData, htmlContent: string): Promise<SendResult> {
-    const request: DriverSendRequest = { job, htmlContent };
+    const options: DriverSendOptions = { htmlContent };
 
     let lastError: MappedError | undefined;
 
@@ -47,7 +47,7 @@ export class EmailDriverService {
       }
 
       try {
-        const result = await driver.sendEmail(request, descriptor.config);
+        const result = await driver.sendEmail(job, descriptor.config, options);
 
         if (result.success) {
           return result;

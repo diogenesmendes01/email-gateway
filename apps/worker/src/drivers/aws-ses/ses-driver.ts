@@ -8,9 +8,8 @@ import {
   ErrorCode,
 } from '@email-gateway/shared';
 
-import type { DriverConfig } from '../base/driver-config.types';
+import type { DriverConfig, DriverSendOptions } from '../base/driver-config.types';
 import type {
-  DriverSendRequest,
   IEmailDriver,
 } from '../base/email-driver.interface';
 import type { SendResult } from '../base/email-driver-result';
@@ -27,7 +26,7 @@ export class SESDriver implements IEmailDriver {
   private client: SESClient;
   private readonly config: SESDriverConfig;
   private circuitBreaker!: CircuitBreaker<
-    [DriverSendRequest],
+    [EmailSendJobData, DriverConfig, DriverSendOptions],
     SendResult
   >;
 
@@ -37,8 +36,8 @@ export class SESDriver implements IEmailDriver {
     this.initializeCircuitBreaker();
   }
 
-  async sendEmail(request: DriverSendRequest, _config?: DriverConfig): Promise<SendResult> {
-    return this.circuitBreaker.fire(request);
+  async sendEmail(job: EmailSendJobData, config: DriverConfig, options: DriverSendOptions): Promise<SendResult> {
+    return this.circuitBreaker.fire(job, config, options);
   }
 
   async validateConfig(config: DriverConfig = this.config): Promise<boolean> {
@@ -119,8 +118,8 @@ export class SESDriver implements IEmailDriver {
     }));
   }
 
-  private async sendEmailInternal(request: DriverSendRequest): Promise<SendResult> {
-    const { job, htmlContent } = request;
+  private async sendEmailInternal(job: EmailSendJobData, config: DriverConfig, options: DriverSendOptions): Promise<SendResult> {
+    const { htmlContent } = options;
 
     try {
       if (process.env.CHAOS_SES_429 === 'true') {
@@ -136,13 +135,6 @@ export class SESDriver implements IEmailDriver {
           defaultFromName: true,
           domainId: true,
           isSuspended: true,
-          defaultDomain: {
-            select: {
-              id: true,
-              domain: true,
-              status: true,
-            },
-          },
         },
       });
 
@@ -157,24 +149,14 @@ export class SESDriver implements IEmailDriver {
       let fromAddress = this.config.fromAddress;
       let fromName: string | undefined;
 
-      if (company.defaultFromAddress && company.defaultDomain) {
-        if (company.defaultDomain.status === 'VERIFIED') {
-          fromAddress = company.defaultFromAddress;
-          fromName = company.defaultFromName || undefined;
-          console.log({
-            message: '[SESDriver] Using company verified domain',
-            companyId: company.id,
-            domain: company.defaultDomain.domain,
-            fromAddress,
-          });
-        } else {
-          console.warn({
-            message: '[SESDriver] Company domain not verified, using global address',
-            companyId: company.id,
-            domainStatus: company.defaultDomain.status,
-            fallbackAddress: fromAddress,
-          });
-        }
+      if (company.defaultFromAddress) {
+        fromAddress = company.defaultFromAddress;
+        fromName = company.defaultFromName || undefined;
+        console.log({
+          message: '[SESDriver] Using company default address',
+          companyId: company.id,
+          fromAddress,
+        });
       } else {
         console.log({
           message: '[SESDriver] Company has no default domain, using global address',
@@ -223,7 +205,6 @@ export class SESDriver implements IEmailDriver {
         success: true,
         messageId: response.MessageId,
         provider: EmailProvider.AWS_SES,
-        rawResponse: response,
       };
     } catch (error) {
       const mappedError = ErrorMappingService.mapSESError(error);
