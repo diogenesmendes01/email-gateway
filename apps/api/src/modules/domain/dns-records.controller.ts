@@ -10,7 +10,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { IsString, IsNotEmpty, IsOptional, IsNumber, IsIn } from 'class-validator';
-import { PrismaService } from '@packages/database';
+import { PrismaService } from '../../database/prisma.service';
 
 /**
  * DTO para criar DNS record
