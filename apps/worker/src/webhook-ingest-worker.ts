@@ -54,7 +54,7 @@ export class WebhookIngestWorker {
           return { status: 'skipped', reason: 'unknown_provider' };
       }
     } catch (error) {
-      this.logger.error(`Webhook processing failed: ${error.message}`);
+      this.logger.error(`Webhook processing failed: ${(error as Error).message}`);
       throw error;
     }
   }
@@ -121,7 +121,7 @@ export class WebhookIngestWorker {
       this.logger.log(`Delivery confirmed for ${emailLog.to}`);
       return { status: 'processed', type: 'delivery' };
     } catch (error) {
-      this.logger.error(`Failed to process delivery: ${error.message}`);
+      this.logger.error(`Failed to process delivery: ${(error as Error).message}`);
       throw error;
     }
   }
@@ -208,7 +208,7 @@ export class WebhookIngestWorker {
       );
       return { status: 'processed', type: 'bounce', suppressed: classification.shouldSuppress };
     } catch (error) {
-      this.logger.error(`Failed to process bounce: ${error.message}`);
+      this.logger.error(`Failed to process bounce: ${(error as Error).message}`);
       throw error;
     }
   }
@@ -286,7 +286,7 @@ export class WebhookIngestWorker {
       this.logger.log(`Complaint processed for ${emailLog.to} (type: ${feedbackType})`);
       return { status: 'processed', type: 'complaint', feedbackType };
     } catch (error) {
-      this.logger.error(`Failed to process complaint: ${error.message}`);
+      this.logger.error(`Failed to process complaint: ${(error as Error).message}`);
       throw error;
     }
   }
@@ -328,7 +328,7 @@ export class WebhookIngestWorker {
       this.logger.log(`Open recorded for ${emailLog.to}`);
       return { status: 'processed', type: 'open' };
     } catch (error) {
-      this.logger.error(`Failed to process open: ${error.message}`);
+      this.logger.error(`Failed to process open: ${(error as Error).message}`);
       throw error;
     }
   }
@@ -377,7 +377,7 @@ export class WebhookIngestWorker {
       this.logger.log(`Click recorded for ${emailLog.to}: ${clickUrl}`);
       return { status: 'processed', type: 'click', url: clickUrl };
     } catch (error) {
-      this.logger.error(`Failed to process click: ${error.message}`);
+      this.logger.error(`Failed to process click: ${(error as Error).message}`);
       throw error;
     }
   }
@@ -423,7 +423,7 @@ export class WebhookIngestWorker {
         );
       }
     } catch (error) {
-      this.logger.error(`Failed to trigger client webhook: ${error.message}`);
+      this.logger.error(`Failed to trigger client webhook: ${(error as Error).message}`);
     }
   }
 

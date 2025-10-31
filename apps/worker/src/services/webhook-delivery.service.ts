@@ -64,7 +64,7 @@ export class WebhookDeliveryService implements OnModuleInit, OnModuleDestroy {
         jobId: job?.id,
         webhookId: job?.data?.webhookId,
         eventType: job?.data?.eventType,
-        error: error.message,
+        error: (error as Error).message,
         attempts: job?.attemptsMade,
       });
     });

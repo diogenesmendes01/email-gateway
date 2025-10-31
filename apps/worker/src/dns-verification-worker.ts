@@ -1,8 +1,8 @@
 import { Processor, WorkerHost, OnWorkerEvent } from '@nestjs/bullmq';
 import { Injectable, Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
-import { DNSVerifierService } from '../api/src/modules/onboarding/dns-verifier.service';
-import { PrismaService } from '../api/src/database/prisma.service';
+// import { DNSVerifierService } from '../api/src/modules/onboarding/dns-verifier.service';
+import { PrismaClient } from '@email-gateway/database';
 
 export interface DomainVerificationJob {
   domainId: string;

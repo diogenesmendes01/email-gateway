@@ -171,7 +171,7 @@ export class TracingService {
       phase: 'error',
       error: {
         name: error.name,
-        message: error.message,
+        message: (error as Error).message,
         stack: error.stack,
       },
     });

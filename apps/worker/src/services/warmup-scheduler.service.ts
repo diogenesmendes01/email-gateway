@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { PrismaService } from '../../database/prisma.service';
+import { PrismaClient } from '@email-gateway/database';
 
 export interface WarmupSchedule {
   startDate: Date;
@@ -18,7 +18,7 @@ export interface WarmupSchedule {
 export class WarmupSchedulerService {
   private readonly logger = new Logger(WarmupSchedulerService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaClient) {}
 
   /**
    * Obter limite diário para um domínio com warm-up ativo
@@ -45,7 +45,7 @@ export class WarmupSchedulerService {
       // Calcular limite baseado no horário atual
       return this.calculateWarmupLimit(daysSinceStart, config);
     } catch (error) {
-      this.logger.error(`Failed to get daily limit: ${error.message}`);
+      this.logger.error(`Failed to get daily limit: ${(error as Error).message}`);
       return null;
     }
   }
@@ -65,7 +65,7 @@ export class WarmupSchedulerService {
       // Mas aplicar fator de segurança para picos
       return Math.ceil(dailyLimit / 24 * 1.2); // 20% de margem
     } catch (error) {
-      this.logger.error(`Failed to get hourly limit: ${error.message}`);
+      this.logger.error(`Failed to get hourly limit: ${(error as Error).message}`);
       return null;
     }
   }
@@ -111,7 +111,7 @@ export class WarmupSchedulerService {
         data: {
           warmupEnabled: true,
           warmupStartDate: defaultConfig.startDate,
-          warmupConfig: defaultConfig,
+          warmupConfig: defaultConfig as any,
         },
       });
 
@@ -119,7 +119,7 @@ export class WarmupSchedulerService {
         `Warm-up started for domain ${domainId}: ${defaultConfig.startVolume} → ${defaultConfig.maxDailyVolume} over ${defaultConfig.maxDays} days`
       );
     } catch (error) {
-      this.logger.error(`Failed to start warmup: ${error.message}`);
+      this.logger.error(`Failed to start warmup: ${(error as Error).message}`);
       throw error;
     }
   }
@@ -138,7 +138,7 @@ export class WarmupSchedulerService {
 
       this.logger.log(`Warm-up paused for domain ${domainId}`);
     } catch (error) {
-      this.logger.error(`Failed to pause warmup: ${error.message}`);
+      this.logger.error(`Failed to pause warmup: ${(error as Error).message}`);
       throw error;
     }
   }
@@ -158,7 +158,7 @@ export class WarmupSchedulerService {
 
       this.logger.log(`Warm-up resumed for domain ${domainId}`);
     } catch (error) {
-      this.logger.error(`Failed to resume warmup: ${error.message}`);
+      this.logger.error(`Failed to resume warmup: ${(error as Error).message}`);
       throw error;
     }
   }
@@ -178,7 +178,7 @@ export class WarmupSchedulerService {
 
       this.logger.log(`Warm-up completed for domain ${domainId}`);
     } catch (error) {
-      this.logger.error(`Failed to complete warmup: ${error.message}`);
+      this.logger.error(`Failed to complete warmup: ${(error as Error).message}`);
       throw error;
     }
   }
@@ -223,7 +223,7 @@ export class WarmupSchedulerService {
         estimatedCompletionDate: estimatedCompletion,
       };
     } catch (error) {
-      this.logger.error(`Failed to get warmup status: ${error.message}`);
+      this.logger.error(`Failed to get warmup status: ${(error as Error).message}`);
       return null;
     }
   }
@@ -263,7 +263,7 @@ export class WarmupSchedulerService {
         };
       });
     } catch (error) {
-      this.logger.error(`Failed to list active warmups: ${error.message}`);
+      this.logger.error(`Failed to list active warmups: ${(error as Error).message}`);
       return [];
     }
   }
@@ -301,7 +301,7 @@ export class WarmupSchedulerService {
 
       return completed;
     } catch (error) {
-      this.logger.error(`Failed to auto-complete warmups: ${error.message}`);
+      this.logger.error(`Failed to auto-complete warmups: ${(error as Error).message}`);
       return 0;
     }
   }
@@ -361,7 +361,7 @@ export class WarmupSchedulerService {
 
       return recommendations;
     } catch (error) {
-      this.logger.error(`Failed to generate recommendations: ${error.message}`);
+      this.logger.error(`Failed to generate recommendations: ${(error as Error).message}`);
       return [];
     }
   }

@@ -1,4 +1,6 @@
-import nodemailer, { Transporter } from 'nodemailer';
+import type { Transporter } from 'nodemailer';
+// @ts-ignore - nodemailer types
+import nodemailer from 'nodemailer';
 
 import { EmailProvider, EmailSendJobData } from '@email-gateway/shared';
 

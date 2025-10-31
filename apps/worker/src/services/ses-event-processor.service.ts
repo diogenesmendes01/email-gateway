@@ -129,7 +129,7 @@ export class SESEventProcessorService implements OnModuleInit, OnModuleDestroy {
         message: 'SES event processing failed',
         jobId: job?.id,
         eventType: job?.data?.eventType,
-        error: error.message,
+        error: (error as Error).message,
         attempts: job?.attemptsMade,
       });
     });

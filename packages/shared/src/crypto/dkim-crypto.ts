@@ -101,7 +101,8 @@ export class DKIMCrypto {
     try {
       // Test signing and verification
       const testData = 'test message for DKIM validation';
-      const sign = createHash('sha256').update(testData).digest();
+      // Basic hash for validation
+      createHash('sha256').update(testData).digest();
 
       // This is a basic validation - in production you'd use proper RSA signing
       return publicKey.includes('BEGIN PUBLIC KEY') && privateKey.includes('BEGIN PRIVATE KEY');

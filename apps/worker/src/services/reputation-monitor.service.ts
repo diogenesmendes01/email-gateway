@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { PrismaService } from '../../database/prisma.service';
+import { PrismaClient } from '@email-gateway/database';
 
 export interface ReputationMetrics {
   sent: number;
@@ -30,7 +30,7 @@ export class ReputationMonitorService {
   private readonly BOUNCE_RATE_THRESHOLD = 0.02; // 2%
   private readonly COMPLAINT_RATE_THRESHOLD = 0.001; // 0.1%
 
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaClient) {}
 
   /**
    * Verificar e aplicar guardrails para uma empresa
@@ -135,7 +135,7 @@ export class ReputationMonitorService {
       };
     } catch (error) {
       this.logger.error(
-        `Failed to check and enforce reputation: ${error.message}`
+        `Failed to check and enforce reputation: ${(error as Error).message}`
       );
       throw error;
     }
@@ -202,13 +202,13 @@ export class ReputationMonitorService {
         }),
         this.prisma.emailTracking.count({
           where: {
-            emailLog: { companyId },
+            emailLogId: { companyId },
             openedAt: { gte: since },
           },
         }),
         this.prisma.emailTracking.count({
           where: {
-            emailLog: { companyId },
+            emailLogId: { companyId },
             clickedAt: { gte: since },
           },
         }),
@@ -232,7 +232,7 @@ export class ReputationMonitorService {
 
       return metrics;
     } catch (error) {
-      this.logger.error(`Failed to calculate metrics: ${error.message}`);
+      this.logger.error(`Failed to calculate metrics: ${(error as Error).message}`);
       throw error;
     }
   }
@@ -252,7 +252,7 @@ export class ReputationMonitorService {
 
       this.logger.warn(`Company ${companyId} suspended: ${reason}`);
     } catch (error) {
-      this.logger.error(`Failed to pause sending: ${error.message}`);
+      this.logger.error(`Failed to pause sending: ${(error as Error).message}`);
     }
   }
 
@@ -264,7 +264,7 @@ export class ReputationMonitorService {
       // Implementar rate limiting via Redis/RateLimit model
       await this.prisma.rateLimit.upsert({
         where: {
-          idx_scope_target: {
+          scope_target: {
             scope: 'CUSTOMER_DOMAIN',
             target: companyId,
           } as any,
@@ -281,7 +281,7 @@ export class ReputationMonitorService {
 
       this.logger.warn(`Company ${companyId} throttled: ${reason}`);
     } catch (error) {
-      this.logger.error(`Failed to throttle sending: ${error.message}`);
+      this.logger.error(`Failed to throttle sending: ${(error as Error).message}`);
     }
   }
 
@@ -304,7 +304,7 @@ export class ReputationMonitorService {
       // Salvar em banco de dados para dashboard
       // await this.prisma.alert.create({ ... });
     } catch (error) {
-      this.logger.error(`Failed to send alert: ${error.message}`);
+      this.logger.error(`Failed to send alert: ${(error as Error).message}`);
     }
   }
 
@@ -329,7 +329,7 @@ export class ReputationMonitorService {
 
       return this.calculateWarmupLimit(daysSinceStart, config);
     } catch (error) {
-      this.logger.error(`Failed to get warmup limit: ${error.message}`);
+      this.logger.error(`Failed to get warmup limit: ${(error as Error).message}`);
       return null;
     }
   }
@@ -412,7 +412,7 @@ export class ReputationMonitorService {
         `Reputation metric saved for ${companyId}: score=${score.toFixed(2)}`
       );
     } catch (error) {
-      this.logger.error(`Failed to save reputation metric: ${error.message}`);
+      this.logger.error(`Failed to save reputation metric: ${(error as Error).message}`);
     }
   }
 
@@ -432,7 +432,7 @@ export class ReputationMonitorService {
       this.logger.log(`Cleaned up ${result.count} expired suppressions`);
       return result.count;
     } catch (error) {
-      this.logger.error(`Failed to cleanup suppressions: ${error.message}`);
+      this.logger.error(`Failed to cleanup suppressions: ${(error as Error).message}`);
       throw error;
     }
   }

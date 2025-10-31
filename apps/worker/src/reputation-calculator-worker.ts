@@ -1,7 +1,7 @@
 import { Logger } from '@nestjs/common';
 import { Job } from 'bull';
 import { ReputationMonitorService } from './services/reputation-monitor.service';
-import { PrismaService } from '../../database/prisma.service';
+import { PrismaClient } from '@email-gateway/database';
 
 /**
  * Reputation Calculator Worker - TRACK 2
@@ -57,7 +57,7 @@ export class ReputationCalculatorWorker {
           }
         } catch (error) {
           this.logger.error(
-            `Failed to process company ${company.id}: ${error.message}`
+            `Failed to process company ${company.id}: ${(error as Error).message}`
           );
         }
       }
@@ -76,7 +76,7 @@ export class ReputationCalculatorWorker {
         cleanedSuppressions,
       };
     } catch (error) {
-      this.logger.error(`Failed to process reputation calculation: ${error.message}`);
+      this.logger.error(`Failed to process reputation calculation: ${(error as Error).message}`);
       throw error;
     }
   }
@@ -93,7 +93,7 @@ export class ReputationCalculatorWorker {
 
       return enforcement;
     } catch (error) {
-      this.logger.error(`Failed to process company ${companyId}: ${error.message}`);
+      this.logger.error(`Failed to process company ${companyId}: ${(error as Error).message}`);
       throw error;
     }
   }

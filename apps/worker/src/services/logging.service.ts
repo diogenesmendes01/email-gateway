@@ -269,7 +269,7 @@ export class LoggingService {
       requestId: jobData.requestId,
       status,
       errorCode: error.code,
-      errorReason: error.message,
+      errorReason: (error as Error).message,
       attempts: jobData.attempt,
       durationMs,
     });
@@ -282,7 +282,7 @@ export class LoggingService {
       metadata: {
         errorCode: error.code,
         errorCategory: error.category,
-        errorMessage: error.message,
+        errorMessage: (error as Error).message,
         originalCode: error.originalCode,
         willRetry,
         attempt: jobData.attempt,

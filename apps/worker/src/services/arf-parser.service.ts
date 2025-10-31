@@ -47,8 +47,8 @@ export class ARFParserService {
       this.logger.debug(`Successfully parsed ARF: ${report.feedbackType} from ${report.userAgent}`);
       return report;
     } catch (error) {
-      this.logger.error(`ARF parsing failed: ${error.message}`);
-      throw new ARFParseError('ARF_PARSING_FAILED', `Failed to parse ARF: ${error.message}`);
+      this.logger.error(`ARF parsing failed: ${(error as Error).message}`);
+      throw new ARFParseError('ARF_PARSING_FAILED', `Failed to parse ARF: ${(error as Error).message}`);
     }
   }
 
