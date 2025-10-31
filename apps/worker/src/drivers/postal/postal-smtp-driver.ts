@@ -36,6 +36,7 @@ export class PostalSMTPDriver implements IEmailDriver {
         success: true,
         provider: EmailProvider.POSTAL_SMTP,
         messageId: info.messageId,
+        ipAddress: options.selectedIpPool?.ipAddresses?.[0],
       };
     } catch (error) {
       const mappedError = ErrorMappingService.mapGenericError(error);
@@ -61,7 +62,7 @@ export class PostalSMTPDriver implements IEmailDriver {
 
   private buildMessage(job: EmailSendJobData, options: DriverSendOptions, config: PostalSMTPConfig) {
     const { htmlContent } = options;
-    const headers = this.composeHeaders(job);
+    const headers = this.composeHeaders(job, options.headers, options.selectedIpPool);
     const envelope = {
       from: this.generateReturnPath(job, config),
       to: job.to,
@@ -80,19 +81,24 @@ export class PostalSMTPDriver implements IEmailDriver {
     };
   }
 
-  private composeHeaders(job: EmailSendJobData): Record<string, string> {
+  private composeHeaders(
+    job: EmailSendJobData,
+    baseHeaders?: Record<string, string>,
+    selectedIpPool?: DriverSendOptions['selectedIpPool'],
+  ): Record<string, string> {
     const headers: Record<string, string> = {
       'X-Request-Id': job.requestId,
       'X-Outbox-Id': job.outboxId,
+      ...(baseHeaders ?? {}),
     };
-
-    if (job.headers) {
-      Object.assign(headers, job.headers);
-    }
 
     const unsubscribeUrl = (job as any).unsubscribeUrl;
     if (!headers['List-Unsubscribe'] && typeof unsubscribeUrl === 'string') {
       headers['List-Unsubscribe'] = `<${unsubscribeUrl}>`;
+    }
+
+    if (selectedIpPool) {
+      headers['X-IP-Pool'] = selectedIpPool.name;
     }
 
     return headers;

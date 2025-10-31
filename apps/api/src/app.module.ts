@@ -22,6 +22,9 @@ import { CompanyModule } from './modules/company/company.module'; // TASK-036
 import { OnboardingModule } from './modules/onboarding/onboarding.module'; // ESP Migration
 import { ReputationModule } from './modules/reputation/reputation.module'; // ESP Migration
 import { SuppressionModule } from './modules/suppression/suppression.module'; // ESP Migration
+// import { ProviderModule } from './modules/provider/provider.module'; // ESP Migration - TODO: Add EmailProvider model to schema
+import { IpPoolModule } from './modules/ip-pool/ip-pool.module'; // ESP Migration
+import { RateLimitModule } from './modules/rate-limit/rate-limit.module'; // ESP Migration
 
 @Module({
   imports: [
@@ -65,6 +68,9 @@ import { SuppressionModule } from './modules/suppression/suppression.module'; //
     OnboardingModule, // ESP Migration: Domain onboarding
     ReputationModule, // ESP Migration: Reputation monitoring
     SuppressionModule, // ESP Migration: Email suppression
+    // ProviderModule, // ESP Migration: Provider management - TODO: Add EmailProvider model to schema
+    IpPoolModule, // ESP Migration: IP pool management
+    RateLimitModule, // ESP Migration: Rate limiting management
   ],
 })
 export class AppModule implements NestModule {

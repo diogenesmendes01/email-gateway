@@ -1,19 +1,12 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
-
-export enum SuppressionReason {
-  HARD_BOUNCE = 'hard_bounce',
-  SOFT_BOUNCE = 'soft_bounce',
-  COMPLAINT = 'complaint',
-  MANUAL = 'manual',
-  ROLE_ACCOUNT = 'role_account'
-}
+import { SuppressionReason } from '@email-gateway/database';
 
 export interface SuppressionEntry {
   id: string;
   companyId: string | null;
   email: string;
-  domain: string;
+  domain: string | null;
   reason: SuppressionReason;
   source: string;
   suppressedAt: Date;
@@ -78,7 +71,7 @@ export class SuppressionService {
       await this.prisma.suppression.upsert({
         where: {
           companyId_email: {
-            companyId: data.companyId || null,
+            companyId: data.companyId ?? '',
             email: data.email,
           },
         },
@@ -307,7 +300,7 @@ export class SuppressionService {
 
           imported++;
         } catch (error) {
-          errors.push(`Failed to import ${email}: ${error.message}`);
+          errors.push(`Failed to import ${email}: ${(error as Error).message}`);
         }
       }
     }
@@ -389,8 +382,8 @@ export class SuppressionService {
       ]);
 
       const reasonStats: Record<SuppressionReason, number> = {} as any;
-      byReason.forEach(item => {
-        reasonStats[item.reason] = item._count;
+      byReason.forEach((item: any) => {
+        reasonStats[item.reason as SuppressionReason] = item._count;
       });
 
       return {

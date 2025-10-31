@@ -22,6 +22,7 @@ import { loadWorkerConfig } from './config/worker.config';
 import { loadSESConfig, validateSESConfig } from './config/ses.config';
 import { EmailDriverService } from './services/email-driver.service';
 import { loadPostalConfig, validatePostalConfig } from './drivers/postal/postal-config';
+import { MXRateLimiterService } from './services/mx-rate-limiter.service';
 
 /**
  * Classe principal do Worker
@@ -103,7 +104,10 @@ class EmailWorker {
       });
     }
 
-    const emailDriverService = new EmailDriverService(driverDescriptors);
+    const mxRateLimiter = new MXRateLimiterService(this.redis);
+    const emailDriverService = new EmailDriverService(driverDescriptors, {
+      mxRateLimiter,
+    });
 
     console.log('[EmailWorker] Email providers configured:', driverDescriptors.map((descriptor) => descriptor.config.provider));
 

@@ -61,20 +61,20 @@ export class DNSRecordsController {
       }
 
       // Get DNS records
-      const records = await this.prisma.dnsRecord.findMany({
+      const records = await this.prisma.dNSRecord.findMany({
         where: { domainId },
         orderBy: { createdAt: 'desc' },
       });
 
       // Calculate summary
-      const verified = records.filter(r => r.isVerified).length;
-      const failed = records.filter(r => r.lastChecked && !r.isVerified).length;
+      const verified = records.filter((r: any) => r.isVerified).length;
+      const failed = records.filter((r: any) => r.lastChecked && !r.isVerified).length;
       const pending = records.length - verified - failed;
 
       const response: DNSRecordsListResponse = {
         domainId,
         domain: domain.domain,
-        records: records.map(r => ({
+        records: records.map((r: any) => ({
           id: r.id,
           recordType: r.recordType,
           name: r.name,
@@ -103,7 +103,7 @@ export class DNSRecordsController {
         {
           statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
           message: 'Failed to retrieve DNS records',
-          error: error.message,
+          error: (error as Error).message,
         },
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
@@ -138,7 +138,7 @@ export class DNSRecordsController {
       }
 
       // Create DNS record
-      const record = await this.prisma.dnsRecord.create({
+      const record = await this.prisma.dNSRecord.create({
         data: {
           domainId,
           recordType: body.recordType,
@@ -171,7 +171,7 @@ export class DNSRecordsController {
         {
           statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
           message: 'Failed to add DNS record',
-          error: error.message,
+          error: (error as Error).message,
         },
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
@@ -191,7 +191,7 @@ export class DNSRecordsController {
       this.logger.log(`Verifying DNS record: ${recordId}`);
 
       // Get the record
-      const record = await this.prisma.dnsRecord.findFirst({
+      const record = await this.prisma.dNSRecord.findFirst({
         where: {
           id: recordId,
           domainId,
@@ -204,7 +204,7 @@ export class DNSRecordsController {
 
       // For now, mark as verified (in production, would do actual DNS lookup)
       // TODO: Implement actual DNS verification logic
-      await this.prisma.dnsRecord.update({
+      await this.prisma.dNSRecord.update({
         where: { id: recordId },
         data: {
           isVerified: true,
@@ -225,7 +225,7 @@ export class DNSRecordsController {
         {
           statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
           message: 'Failed to verify DNS record',
-          error: error.message,
+          error: (error as Error).message,
         },
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
@@ -245,7 +245,7 @@ export class DNSRecordsController {
       this.logger.log(`Deleting DNS record: ${recordId}`);
 
       // Delete the record
-      const result = await this.prisma.dnsRecord.deleteMany({
+      const result = await this.prisma.dNSRecord.deleteMany({
         where: {
           id: recordId,
           domainId,
@@ -271,7 +271,7 @@ export class DNSRecordsController {
         {
           statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
           message: 'Failed to delete DNS record',
-          error: error.message,
+          error: (error as Error).message,
         },
         HttpStatus.INTERNAL_SERVER_ERROR,
       );

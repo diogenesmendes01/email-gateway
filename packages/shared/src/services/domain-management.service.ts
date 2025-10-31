@@ -16,6 +16,7 @@ import { SESClient, VerifyDomainIdentityCommand, GetIdentityVerificationAttribut
 import { SESv2Client, CreateEmailIdentityCommand, GetEmailIdentityCommand } from '@aws-sdk/client-sesv2';
 import * as dns from 'dns/promises';
 
+// Domain verification result for SES operations
 export interface DomainVerificationResult {
   domain: string;
   status: 'PENDING' | 'VERIFIED' | 'FAILED' | 'TEMPORARY_FAILURE';

@@ -38,6 +38,11 @@ export interface DriverSendOptions {
   clickTrackingDomain?: string;
   ipPoolId?: string;
   returnPath?: string;
+  selectedIpPool?: {
+    id: string;
+    name: string;
+    ipAddresses: string[];
+  } | null;
 }
 
 export interface DriverQuotaInfo {

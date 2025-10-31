@@ -203,6 +203,19 @@ export class ErrorMappingService {
     };
   }
 
+  static mapRateLimitExceeded(domain: string, retryAfterMs: number): MappedError {
+    return {
+      code: ErrorCode.SES_THROTTLING,
+      category: ErrorCategory.QUOTA_ERROR,
+      retryable: true,
+      message: `Limite de envio para ${domain} excedido. Aguarde antes de reenviar`,
+      metadata: {
+        domain,
+        retryAfterMs,
+      },
+    };
+  }
+
   /**
    * Determina se um erro deve ser retentado baseado na categoria
    */

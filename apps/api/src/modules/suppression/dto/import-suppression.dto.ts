@@ -1,13 +1,13 @@
 import { IsArray, IsEnum, IsOptional, IsString, MaxLength, ArrayMinSize } from 'class-validator';
-import { SuppressionReason } from '@certshift/database';
+import { SuppressionReason } from '@email-gateway/database';
 
 export class ImportSuppressionDto {
   @IsArray()
   @ArrayMinSize(1)
-  emails: string[];
-
+  emails!: string[];
+  
   @IsEnum(SuppressionReason)
-  reason: SuppressionReason;
+  reason!: SuppressionReason;
 
   @IsOptional()
   @IsString()

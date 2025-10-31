@@ -55,7 +55,7 @@ export class SuppressionController {
         {
           statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
           message: 'Failed to add email to suppression list',
-          error: error.message,
+          error: (error as Error).message,
         },
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
@@ -103,7 +103,7 @@ export class SuppressionController {
         {
           statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
           message: 'Failed to retrieve suppression list',
-          error: error.message,
+          error: (error as Error).message,
         },
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
@@ -133,7 +133,7 @@ export class SuppressionController {
         {
           statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
           message: 'Failed to remove email from suppression list',
-          error: error.message,
+          error: (error as Error).message,
         },
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
@@ -164,7 +164,7 @@ export class SuppressionController {
         {
           statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
           message: 'Failed to check email suppression status',
-          error: error.message,
+          error: (error as Error).message,
         },
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
@@ -177,7 +177,7 @@ export class SuppressionController {
    */
   @Post('import')
   async importSuppressions(@Body() body: {
-    csvData: string;
+    emails: string[];
     reason: string;
     source?: string;
   }) {
@@ -188,7 +188,7 @@ export class SuppressionController {
       const companyId = 'placeholder-company-id';
 
       const result = await this.suppressionService.importSuppressions(companyId, {
-        csvData: body.csvData,
+        emails: body.emails,
         reason: body.reason as any,
         source: body.source || 'import',
       });
@@ -207,7 +207,7 @@ export class SuppressionController {
         {
           statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
           message: 'Failed to import suppression list',
-          error: error.message,
+          error: (error as Error).message,
         },
         HttpStatus.INTERNAL_SERVER_ERROR,
       );

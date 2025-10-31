@@ -1,12 +1,12 @@
 import { IsEmail, IsEnum, IsOptional, IsString, MaxLength } from 'class-validator';
-import { SuppressionReason } from '@certshift/database';
+import { SuppressionReason } from '@email-gateway/database';
 
 export class AddSuppressionDto {
   @IsEmail()
-  email: string;
-
+  email!: string;
+  
   @IsEnum(SuppressionReason)
-  reason: SuppressionReason;
+  reason!: SuppressionReason;
 
   @IsOptional()
   @IsString()

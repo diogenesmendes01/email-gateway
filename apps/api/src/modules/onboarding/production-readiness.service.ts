@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
-import { DomainOnboardingStatus } from '@certshift/database';
+import { DomainOnboardingStatus } from '@email-gateway/database';
 
 export interface ProductionReadinessResult {
   ready: boolean;
@@ -42,7 +42,7 @@ export class ProductionReadinessService {
       where: { id: domainId },
       select: {
         domain: true,
-        isActive: true,
+        isProductionReady: true,
         createdAt: true,
       },
     });
@@ -72,10 +72,10 @@ export class ProductionReadinessService {
       id: 'domain-active',
       name: 'Domain Active',
       description: 'Domain must be active in the system',
-      passed: domain.isActive,
+      passed: domain.isProductionReady,
       severity: 'critical',
-      details: domain.isActive ? 'Domain is active' : 'Domain is inactive',
-      fix: domain.isActive ? undefined : 'Activate the domain in domain management',
+      details: domain.isProductionReady ? 'Domain is active' : 'Domain is inactive',
+      fix: domain.isProductionReady ? undefined : 'Activate the domain in domain management',
     });
 
     // Check 2: DKIM keys generated
@@ -90,12 +90,12 @@ export class ProductionReadinessService {
     });
 
     // Check 3: DNS records verified
-    const dnsRecords = await this.prisma.dnsRecord.findMany({
+    const dnsRecords = await this.prisma.dNSRecord.findMany({
       where: { domainId },
       select: { isVerified: true, recordType: true, name: true },
     });
 
-    const verifiedRecords = dnsRecords.filter(r => r.isVerified).length;
+    const verifiedRecords = dnsRecords.filter((r: any) => r.isVerified).length;
     const totalRecords = dnsRecords.length;
     const dnsVerified = totalRecords > 0 && verifiedRecords === totalRecords;
 
@@ -223,7 +223,7 @@ export class ProductionReadinessService {
     await this.prisma.domain.update({
       where: { id: domainId },
       data: {
-        onboardingStatus: DomainOnboardingStatus.PRODUCTION_READY,
+        isProductionReady: true,
         updatedAt: now,
       },
     });
@@ -265,7 +265,7 @@ export class ProductionReadinessService {
     await this.prisma.domain.update({
       where: { id: domainId },
       data: {
-        onboardingStatus: DomainOnboardingStatus.DNS_CONFIGURED,
+        isProductionReady: false,
         updatedAt: now,
       },
     });
@@ -295,8 +295,7 @@ export class ProductionReadinessService {
     // Find domains that have completed onboarding but not yet approved
     const domains = await this.prisma.domain.findMany({
       where: {
-        onboardingStatus: DomainOnboardingStatus.DNS_CONFIGURED,
-        isActive: true,
+        isProductionReady: false,
       },
       select: {
         id: true,

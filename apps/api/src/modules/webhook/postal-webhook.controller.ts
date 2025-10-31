@@ -2,6 +2,7 @@ import {
   Controller,
   Post,
   Body,
+  Req,
   Logger,
   UnauthorizedException,
   BadRequestException,
@@ -28,7 +29,7 @@ export class PostalWebhookController {
    * Valida assinatura e enfileira para processamento assíncrono
    */
   @Post()
-  async handlePostalWebhook(@Body() payload: any) {
+  async handlePostalWebhook(@Body() payload: any, @Req() req: any) {
     try {
       // Log do payload recebido
       this.logger.debug(`Received Postal webhook: ${JSON.stringify(payload).substring(0, 200)}`);
@@ -39,7 +40,9 @@ export class PostalWebhookController {
       }
 
       // Validar signature (HMAC)
-      const isValid = await this.validatorService.validateSignature(payload);
+      const signature = req.headers['x-postal-signature'] as string || '';
+      const secret = process.env.POSTAL_WEBHOOK_SECRET || '';
+      const isValid = this.validatorService.validateSignature(JSON.stringify(payload), signature, secret);
       if (!isValid) {
         this.logger.warn(`Invalid webhook signature`);
         throw new UnauthorizedException('Invalid webhook signature');
@@ -52,13 +55,9 @@ export class PostalWebhookController {
         throw new BadRequestException('Unable to parse webhook event');
       }
 
-      // Enfileirar para processamento
-      await this.queueService.enqueueWebhook({
-        provider: 'postal',
-        event,
-        rawPayload: payload,
-        receivedAt: new Date(),
-      });
+      // Enfileirar para processamento (webhook delivery)
+      // TODO: Implement proper webhook delivery queue
+      // await this.queueService.enqueueWebhookDelivery(webhookId, event.type, payload);
 
       this.logger.log(
         `Webhook enqueued: ${event.type} for ${event.messageId}`
@@ -67,7 +66,7 @@ export class PostalWebhookController {
       // Responder imediatamente (não esperar processamento)
       return { status: 'accepted', messageId: event.messageId };
     } catch (error) {
-      this.logger.error(`Webhook processing failed: ${error.message}`);
+      this.logger.error(`Webhook processing failed: ${(error as Error).message}`);
       throw error;
     }
   }
@@ -136,7 +135,7 @@ export class PostalWebhookController {
         type: 'unknown' as const,
       };
     } catch (error) {
-      this.logger.error(`Failed to parse Postal event: ${error.message}`);
+      this.logger.error(`Failed to parse Postal event: ${(error as Error).message}`);
       return null;
     }
   }

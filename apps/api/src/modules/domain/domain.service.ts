@@ -726,9 +726,6 @@ export class DomainService {
           defaultFromAddress: `noreply@${dbDomain.domain}`, // Endereço padrão
           defaultFromName: null, // Pode ser configurado depois
         },
-        include: {
-          defaultDomain: true,
-        },
       });
 
       this.logger.log({

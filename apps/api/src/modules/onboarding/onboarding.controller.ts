@@ -20,7 +20,7 @@ export class StartOnboardingDto {
   @IsString()
   @IsNotEmpty()
   @IsUUID()
-  domainId: string;
+  domainId!: string;
 }
 
 /**
@@ -29,7 +29,7 @@ export class StartOnboardingDto {
 export class ApproveProductionDto {
   @IsString()
   @IsNotEmpty()
-  approvedBy: string;
+  approvedBy!: string;
 
   @IsOptional()
   @IsString()

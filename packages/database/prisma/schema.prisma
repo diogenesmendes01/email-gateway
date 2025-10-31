@@ -376,6 +376,7 @@ model Domain {
 
   // Relations
   company Company @relation("CompanyDomains", fields: [companyId], references: [id], onDelete: Cascade)
+  onboarding DomainOnboarding?
 
   @@unique([companyId, domain])
   @@index([companyId, status])
@@ -596,6 +597,8 @@ model DomainOnboarding {
   updatedAt     DateTime                  @updatedAt @map("updated_at")
   
   // Relations
+  domain        Domain                    @relation(fields: [domainId], references: [id], onDelete: Cascade)
+  
   @@map("domain_onboarding")
 }
 

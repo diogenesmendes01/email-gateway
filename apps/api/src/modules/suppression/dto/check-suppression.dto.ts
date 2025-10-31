@@ -7,12 +7,12 @@ export class CheckSuppressionDto {
     example: 'user@example.com',
   })
   @IsEmail()
-  email: string;
+  email!: string;
 }
 
 export class CheckSuppressionResponseDto {
   @ApiProperty({ description: 'Is email suppressed', example: false })
-  suppressed: boolean;
+  suppressed!: boolean;
 
   @ApiProperty({
     description: 'Reason if suppressed',

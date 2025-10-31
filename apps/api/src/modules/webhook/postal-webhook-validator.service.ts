@@ -48,7 +48,7 @@ export class PostalWebhookValidatorService {
         Buffer.from(expectedSignature),
       );
     } catch (error) {
-      this.logger.warn(`Signature validation failed: ${error.message}`);
+      this.logger.warn(`Signature validation failed: ${(error as Error).message}`);
       return false;
     }
   }

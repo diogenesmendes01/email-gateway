@@ -2,7 +2,7 @@ import { Injectable, Logger, NotFoundException, InternalServerErrorException } f
 import { DNSCheckerService } from './dns-checker.service';
 import { DKIMGeneratorService } from './dkim-generator.service';
 import { PrismaService } from '../../database/prisma.service';
-import { DomainOnboardingStatus } from '@certshift/database';
+import { DomainOnboardingStatus } from '@email-gateway/database';
 
 export interface VerificationResult {
   domain: string;
@@ -296,29 +296,35 @@ export class DNSVerifierService {
 
         // Update individual DNS records
         for (const check of checks) {
-          await tx.dnsRecord.upsert({
+          const existing = await tx.dNSRecord.findFirst({
             where: {
-              idx_dns_record_domain_type_name: {
-                domainId,
-                recordType: 'TXT',
-                name: check.record,
-              },
-            },
-            create: {
               domainId,
               recordType: 'TXT',
               name: check.record,
-              value: check.found || '',
-              isVerified: check.valid,
-              lastChecked: now,
-              createdAt: now,
-            },
-            update: {
-              value: check.found || '',
-              isVerified: check.valid,
-              lastChecked: now,
             },
           });
+
+          if (existing) {
+            await tx.dNSRecord.update({
+              where: { id: existing.id },
+              data: {
+                value: check.found || '',
+                isVerified: check.valid,
+                lastChecked: now,
+              },
+            });
+          } else {
+            await tx.dNSRecord.create({
+              data: {
+                domainId,
+                recordType: 'TXT',
+                name: check.record,
+                value: check.found || '',
+                isVerified: check.valid,
+                lastChecked: now,
+              },
+            });
+          }
         }
       });
     } catch (error) {

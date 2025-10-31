@@ -1,10 +1,13 @@
 import { EmailSendJobData } from '@email-gateway/shared';
+import { IPPoolType } from '@prisma/client';
 
 import { DriverFactory } from '../drivers/driver-factory';
 import type { DriverConfig, DriverSendOptions } from '../drivers/base/driver-config.types';
 import type { IEmailDriver } from '../drivers/base/email-driver.interface';
 import type { SendResult } from '../drivers/base/email-driver-result';
 import { ErrorMappingService, type MappedError } from './error-mapping.service';
+import { IPPoolSelectorService } from './ip-pool-selector.service';
+import { MXRateLimiterService } from './mx-rate-limiter.service';
 
 export interface EmailDriverDescriptor {
   id: string;
@@ -18,8 +21,9 @@ export class EmailDriverService {
     descriptor: EmailDriverDescriptor;
     driver: IEmailDriver;
   }>;
+  private readonly mxRateLimiter?: MXRateLimiterService;
 
-  constructor(descriptors: EmailDriverDescriptor[]) {
+  constructor(descriptors: EmailDriverDescriptor[], dependencies?: { mxRateLimiter?: MXRateLimiterService }) {
     if (!descriptors.length) {
       throw new Error('[EmailDriverService] At least one driver configuration is required');
     }
@@ -34,10 +38,27 @@ export class EmailDriverService {
         driver: DriverFactory.create(descriptor.config),
       }))
       .sort((a, b) => (a.descriptor.priority ?? 0) - (b.descriptor.priority ?? 0));
+
+    this.mxRateLimiter = dependencies?.mxRateLimiter;
   }
 
   async sendEmail(job: EmailSendJobData, htmlContent: string): Promise<SendResult> {
-    const options: DriverSendOptions = { htmlContent };
+    if (this.mxRateLimiter) {
+      const rateLimitResult = await this.mxRateLimiter.checkLimit(job.to);
+
+      if (!rateLimitResult.allowed) {
+        const error = ErrorMappingService.mapRateLimitExceeded(
+          rateLimitResult.domain ?? 'unknown-domain',
+          rateLimitResult.retryAfterMs ?? 1000,
+        );
+
+        return {
+          success: false,
+          provider: this.drivers[0].descriptor.config.provider,
+          error,
+        };
+      }
+    }
 
     let lastError: MappedError | undefined;
 
@@ -47,6 +68,20 @@ export class EmailDriverService {
       }
 
       try {
+        const fallbackType = this.resolveIpPoolType(descriptor.config.extras);
+        const selectedIpPool = await IPPoolSelectorService.selectPool({
+          companyId: job.companyId,
+          requestedPoolId: descriptor.config.ipPoolId as string | undefined,
+          fallbackType,
+        }).catch(() => null);
+
+        const options: DriverSendOptions = {
+          htmlContent,
+          headers: job.headers ?? undefined,
+          selectedIpPool,
+          ipPoolId: (selectedIpPool?.id ?? descriptor.config.ipPoolId) as string | undefined,
+        };
+
         const result = await driver.sendEmail(job, descriptor.config, options);
 
         if (result.success) {
@@ -115,6 +150,20 @@ export class EmailDriverService {
     const enrichedError = new Error(`${error.code}: ${error.message}`);
     (enrichedError as any).mappedError = error;
     return enrichedError;
+  }
+
+  private resolveIpPoolType(extras?: Record<string, unknown>): IPPoolType | undefined {
+    const value = extras?.['ipPoolType'];
+
+    if (typeof value !== 'string') {
+      return undefined;
+    }
+
+    const normalized = value.toUpperCase();
+
+    return (Object.values(IPPoolType) as string[]).includes(normalized)
+      ? (normalized as IPPoolType)
+      : undefined;
   }
 }
 

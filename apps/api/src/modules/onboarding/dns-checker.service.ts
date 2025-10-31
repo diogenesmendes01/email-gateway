@@ -29,7 +29,7 @@ export class DNSCheckerService {
       this.logger.debug(`Found ${txtRecords.length} TXT records for ${domain}`);
       return txtRecords;
     } catch (error) {
-      this.logger.warn(`TXT lookup failed for ${domain}:`, error.message);
+      this.logger.warn(`TXT lookup failed for ${domain}:`, (error as Error).message);
       return [];
     }
   }
@@ -47,7 +47,7 @@ export class DNSCheckerService {
       this.logger.debug(`Found ${addresses.length} A records for ${domain}`);
       return addresses;
     } catch (error) {
-      this.logger.warn(`A lookup failed for ${domain}:`, error.message);
+      this.logger.warn(`A lookup failed for ${domain}:`, (error as Error).message);
       throw error; // Re-throw for domains that should exist
     }
   }
@@ -65,7 +65,7 @@ export class DNSCheckerService {
       this.logger.debug(`Found ${addresses.length} AAAA records for ${domain}`);
       return addresses;
     } catch (error) {
-      this.logger.warn(`AAAA lookup failed for ${domain}:`, error.message);
+      this.logger.warn(`AAAA lookup failed for ${domain}:`, (error as Error).message);
       return [];
     }
   }
@@ -83,7 +83,7 @@ export class DNSCheckerService {
       this.logger.debug(`Found ${cnames.length} CNAME records for ${domain}`);
       return cnames;
     } catch (error) {
-      this.logger.warn(`CNAME lookup failed for ${domain}:`, error.message);
+      this.logger.warn(`CNAME lookup failed for ${domain}:`, (error as Error).message);
       return [];
     }
   }
@@ -101,7 +101,7 @@ export class DNSCheckerService {
       this.logger.debug(`Found ${mxRecords.length} MX records for ${domain}`);
       return mxRecords;
     } catch (error) {
-      this.logger.warn(`MX lookup failed for ${domain}:`, error.message);
+      this.logger.warn(`MX lookup failed for ${domain}:`, (error as Error).message);
       return [];
     }
   }
@@ -181,7 +181,7 @@ export class DNSCheckerService {
       const nsRecords = await resolveNs(domain);
       return nsRecords.length > 0;
     } catch (error) {
-      this.logger.warn(`NS lookup failed for ${domain}:`, error.message);
+      this.logger.warn(`NS lookup failed for ${domain}:`, (error as Error).message);
       return false;
     }
   }

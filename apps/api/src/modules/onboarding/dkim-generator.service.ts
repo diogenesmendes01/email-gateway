@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { DKIMCrypto, DKIMKeyPair, DKIMDNSRecord } from '@certshift/shared/src/crypto/dkim-crypto';
+import { DKIMCrypto, DKIMKeyPair, DKIMDNSRecord } from '@email-gateway/shared/src/crypto/dkim-crypto';
 import { PrismaService } from '../../database/prisma.service';
 
 export interface DKIMGenerationResult {
@@ -52,7 +52,7 @@ export class DKIMGeneratorService {
       };
     } catch (error) {
       this.logger.error(`Failed to generate DKIM key pair for domain ${domain}:`, error);
-      throw new Error(`DKIM key pair generation failed: ${error.message}`);
+      throw new Error(`DKIM key pair generation failed: ${(error as Error).message}`);
     }
   }
 
@@ -75,7 +75,7 @@ export class DKIMGeneratorService {
       });
 
       // Also create DNS record entry
-      await this.prisma.dnsRecord.create({
+      await this.prisma.dNSRecord.create({
         data: {
           domainId,
           recordType: 'TXT',
@@ -88,7 +88,7 @@ export class DKIMGeneratorService {
       this.logger.log(`DKIM keys stored successfully for domain onboarding: ${domainId}`);
     } catch (error) {
       this.logger.error(`Failed to store DKIM keys for domain ${domainId}:`, error);
-      throw new Error(`Failed to store DKIM keys: ${error.message}`);
+      throw new Error(`Failed to store DKIM keys: ${(error as Error).message}`);
     }
   }
 

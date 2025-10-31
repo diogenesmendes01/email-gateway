@@ -32,7 +32,7 @@ export interface ProviderQuotaInfo {
   sentLast24Hours?: number;
 }
 
-export interface DomainVerificationResult {
+export interface EmailProviderDomainVerification {
   domain: string;
   verified: boolean;
   records?: Array<{

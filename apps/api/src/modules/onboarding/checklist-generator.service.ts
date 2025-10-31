@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
-import { DomainOnboardingStatus } from '@certshift/database';
+import { DomainOnboardingStatus } from '@email-gateway/database';
 
 export interface OnboardingChecklist {
   domainId: string;
@@ -304,7 +304,7 @@ export class ChecklistGeneratorService {
     onboarding: any
   ): Promise<void> {
     // Check DNS records status
-    const dnsRecords = await this.prisma.dnsRecord.findMany({
+    const dnsRecords = await this.prisma.dNSRecord.findMany({
       where: { domainId },
       select: {
         recordType: true,
@@ -318,7 +318,7 @@ export class ChecklistGeneratorService {
     for (const item of items) {
       switch (item.id) {
         case 'dns-dkim':
-          const dkimRecord = dnsRecords.find(r => r.name.includes('._domainkey.'));
+          const dkimRecord = dnsRecords.find((r: any) => r.name.includes('._domainkey.'));
           if (dkimRecord) {
             item.status = dkimRecord.isVerified ? 'completed' : 'failed';
             item.lastChecked = dkimRecord.lastChecked || undefined;
@@ -326,7 +326,7 @@ export class ChecklistGeneratorService {
           break;
 
         case 'dns-spf':
-          const spfRecord = dnsRecords.find(r => r.recordType === 'TXT' && !r.name.includes('._domainkey.'));
+          const spfRecord = dnsRecords.find((r: any) => r.recordType === 'TXT' && !r.name.includes('._domainkey.'));
           if (spfRecord) {
             item.status = spfRecord.isVerified ? 'completed' : 'failed';
             item.lastChecked = spfRecord.lastChecked || undefined;
@@ -334,7 +334,7 @@ export class ChecklistGeneratorService {
           break;
 
         case 'verify-dns':
-          const allVerified = dnsRecords.every(r => r.isVerified);
+          const allVerified = dnsRecords.every((r: any) => r.isVerified);
           item.status = allVerified ? 'completed' : 'pending';
           break;
       }
