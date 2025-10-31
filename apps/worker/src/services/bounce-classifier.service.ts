@@ -33,20 +33,20 @@ export class BounceClassifierService {
     try {
       const dsn = this.dsnParser.parseDSN(rawDSN);
       const classification = this.dsnParser.classifyBounce(dsn);
-      const bounces = this.dsnParser.extractBouncedEmails(dsn);
+      const bounces = dsn.perRecipientFields || [];
 
-      const classifiedBounces: ClassifiedBounce[] = bounces.map(email => ({
-        email: email.email,
-        type: classification.type,
-        reason: classification.reason,
-        shouldSuppress: classification.shouldSuppress,
-        diagnosticCode: email.diagnosticCode,
-        statusCode: email.status,
-        expiresAt: this.calculateExpiryDate(classification.type),
-      }));
+      const classifiedBounces: ClassifiedBounce[] = bounces.map((recipient: any) => {
+        const bounceType = classification.type === 'undetermined' ? 'soft' : classification.type;
+        return {
+          email: recipient.finalRecipient || recipient.originalRecipient || 'unknown@example.com',
+          bounceType: bounceType as 'hard' | 'soft' | 'transient',
+          action: recipient.action || 'failed',
+          priority: this.getPriorityFromType(bounceType) as 'high' | 'medium' | 'low',
+        };
+      });
 
-      const severity = this.calculateSeverity(classification.type);
-      const recommendation = this.getRecommendation('bounce', classification.type);
+      const severity = this.calculateSeverity(classification.type === 'undetermined' ? 'soft' : classification.type);
+      const recommendation = this.getRecommendation('bounce', classification.type === 'undetermined' ? 'soft' : classification.type);
 
       return {
         type: 'bounce',
@@ -57,7 +57,7 @@ export class BounceClassifierService {
         recommendation,
       };
     } catch (error) {
-      this.logger.error(`Failed to analyze DSN: ${error.message}`);
+      this.logger.error(`Failed to analyze DSN: ${(error as Error).message}`);
       return {
         type: 'bounce',
         severity: 'low',
@@ -92,7 +92,7 @@ export class BounceClassifierService {
         recommendation,
       };
     } catch (error) {
-      this.logger.error(`Failed to analyze ARF: ${error.message}`);
+      this.logger.error(`Failed to analyze ARF: ${(error as Error).message}`);
       return {
         type: 'complaint',
         severity: 'low',
@@ -248,17 +248,17 @@ export class BounceClassifierService {
 
     // Actions for bounces
     for (const bounce of analysis.bounces) {
-      if (bounce.shouldSuppress) {
+      if (bounce.bounceType === 'hard') {
         actions.push({
           email: bounce.email,
-          action: `Add to suppression list (${bounce.reason})`,
-          priority: 'high',
+          action: `Add to suppression list (${bounce.bounceType})`,
+          priority: 'high' as const,
         });
-      } else if (bounce.type === 'soft') {
+      } else if (bounce.bounceType === 'soft') {
         actions.push({
           email: bounce.email,
           action: 'Retry with backoff',
-          priority: 'medium',
+          priority: 'medium' as const,
         });
       }
     }
@@ -269,23 +269,39 @@ export class BounceClassifierService {
         actions.push({
           email: complaint.email,
           action: `Mark as complaint (${complaint.feedbackType})`,
-          priority: 'high',
+          priority: 'high' as const,
         });
       } else if (complaint.feedbackType === 'opt-out') {
         actions.push({
           email: complaint.email,
           action: 'Unsubscribe from list',
-          priority: 'high',
+          priority: 'high' as const,
         });
       } else if (complaint.feedbackType === 'not-spam') {
         actions.push({
           email: complaint.email,
           action: 'Whitelist/trusted sender',
-          priority: 'low',
+          priority: 'low' as const,
         });
       }
     }
 
     return actions;
+  }
+
+  /**
+   * Get priority level from bounce type
+   */
+  private getPriorityFromType(bounceType: string): string {
+    switch (bounceType) {
+      case 'hard':
+        return 'high';
+      case 'soft':
+        return 'medium';
+      case 'transient':
+        return 'low';
+      default:
+        return 'medium';
+    }
   }
 }

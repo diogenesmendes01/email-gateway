@@ -22,7 +22,7 @@ import { CompanyModule } from './modules/company/company.module'; // TASK-036
 import { OnboardingModule } from './modules/onboarding/onboarding.module'; // ESP Migration
 import { ReputationModule } from './modules/reputation/reputation.module'; // ESP Migration
 import { SuppressionModule } from './modules/suppression/suppression.module'; // ESP Migration
-// import { ProviderModule } from './modules/provider/provider.module'; // ESP Migration - TODO: Add EmailProvider model to schema
+import { ProviderModule } from './modules/provider/provider.module'; // ESP Migration
 import { IpPoolModule } from './modules/ip-pool/ip-pool.module'; // ESP Migration
 import { RateLimitModule } from './modules/rate-limit/rate-limit.module'; // ESP Migration
 
@@ -68,7 +68,7 @@ import { RateLimitModule } from './modules/rate-limit/rate-limit.module'; // ESP
     OnboardingModule, // ESP Migration: Domain onboarding
     ReputationModule, // ESP Migration: Reputation monitoring
     SuppressionModule, // ESP Migration: Email suppression
-    // ProviderModule, // ESP Migration: Provider management - TODO: Add EmailProvider model to schema
+    ProviderModule, // ESP Migration: Provider management
     IpPoolModule, // ESP Migration: IP pool management
     RateLimitModule, // ESP Migration: Rate limiting management
   ],

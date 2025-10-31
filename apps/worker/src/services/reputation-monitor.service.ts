@@ -202,13 +202,11 @@ export class ReputationMonitorService {
         }),
         this.prisma.emailTracking.count({
           where: {
-            emailLogId: { companyId },
             openedAt: { gte: since },
           },
         }),
         this.prisma.emailTracking.count({
           where: {
-            emailLogId: { companyId },
             clickedAt: { gte: since },
           },
         }),

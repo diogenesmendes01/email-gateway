@@ -492,6 +492,43 @@ model Suppression {
   @@index([domain, reason])
 }
 
+// Email Provider Configuration - Configuração de provedores de email
+model EmailProviderConfig {
+  id            String          @id @default(cuid())
+  companyId     String?         @map("company_id") // null = global/default
+  provider      EmailProvider   @default(AWS_SES)
+  isActive      Boolean         @default(true) @map("is_active")
+  priority      Int             @default(0) // 0 = highest priority
+  
+  // Configuration (JSON)
+  config        Json            // Provider-specific config (credentials, etc)
+  
+  // IP Pool association
+  ipPoolId      String?         @map("ip_pool_id")
+  
+  // Rate limiting
+  maxPerSecond  Int?            @map("max_per_second")
+  maxPerMinute  Int?            @map("max_per_minute")
+  maxPerHour    Int?            @map("max_per_hour")
+  maxPerDay     Int?            @map("max_per_day")
+  
+  // Tracking
+  sentToday     Int             @default(0) @map("sent_today")
+  lastUsedAt    DateTime?       @map("last_used_at")
+  
+  // Metadata
+  name          String?         @db.VarChar(100)
+  description   String?         @db.Text
+  
+  createdAt     DateTime        @default(now()) @map("created_at")
+  updatedAt     DateTime        @updatedAt @map("updated_at")
+  
+  // Relations
+  @@index([companyId, isActive, priority])
+  @@index([provider, isActive])
+  @@map("email_provider_configs")
+}
+
 // IP Pools - Gerenciamento de IPs para envio
 model IPPool {
   id            String      @id @default(cuid())

@@ -68,10 +68,15 @@ export const ARF_FEEDBACK_TYPE_MAP: Record<string, ARFFeedbackType> = {
   'other': 'other',
 };
 
-export interface ARFParseError {
-  code: string;
-  message: string;
-  originalText?: string;
+export class ARFParseError extends Error {
+  constructor(
+    public code: string,
+    message: string,
+    public originalText?: string,
+  ) {
+    super(message);
+    this.name = 'ARFParseError';
+  }
 }
 
 /**

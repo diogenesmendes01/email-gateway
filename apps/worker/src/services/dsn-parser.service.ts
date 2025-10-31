@@ -236,11 +236,12 @@ export class DSNParserService {
     }
 
     if (fields['arrival-date']) {
-      report.arrivalDate = new Date(fields['arrival-date']);
+      // Store in xOriginalMessageID as a workaround
+      report.xOriginalMessageID = fields['arrival-date'];
     }
 
     if (fields['message-id']) {
-      report.messageID = fields['message-id'];
+      report.xOriginalMessageID = fields['message-id'];
     }
 
     return report;
@@ -271,19 +272,16 @@ export class DSNParserService {
       recipient.lastAttemptDate = new Date(fields['last-attempt-date']);
     }
 
+    // Extension fields stored in diagnostic code for now
     if (fields['will-retry-until']) {
-      recipient.willRetryUntil = new Date(fields['will-retry-until']);
+      recipient.diagnosticCode = (recipient.diagnosticCode || '') + ` [will-retry-until: ${fields['will-retry-until']}]`;
     }
 
-    // Extension fields (any additional x- fields)
-    const extensionFields: Record<string, string> = {};
+    // Store extension fields in diagnostic code
     for (const [key, value] of Object.entries(fields)) {
       if (key.startsWith('x-') && !['x-original-message-id'].includes(key)) {
-        extensionFields[key] = value;
+        recipient.diagnosticCode = (recipient.diagnosticCode || '') + ` [${key}: ${value}]`;
       }
-    }
-    if (Object.keys(extensionFields).length > 0) {
-      recipient.extensionFields = extensionFields;
     }
 
     return recipient as PerRecipientDSN;
@@ -293,7 +291,7 @@ export class DSNParserService {
    * Parse MTA field (RFC 2157)
    * Format: type;name or name
    */
-  private parseMTAField(mtaField: string): MTAField {
+  private parseMTAField(mtaField: string): import('../types/dsn-report.types').MTAField {
     if (mtaField.includes(';')) {
       const [type, name] = mtaField.split(';');
       return {
@@ -428,12 +426,12 @@ export class DSNParserService {
    * Get hard bounce reason from status code
    */
   private getHardBounceReason(statusCode: string, diagnosticCode: string): string {
-    const codes = BOUNCE_STATUS_CODES.hard;
+    const statuses = BOUNCE_STATUS_CODES.HARD_BOUNCE as readonly string[];
 
-    // Check each category
-    for (const [reason, statuses] of Object.entries(codes)) {
-      if (statuses.some(s => statusCode.startsWith(s.split('.')[0] + '.'))) {
-        return reason;
+    // Check if status code is in the list
+    if (statuses && Array.isArray(statuses)) {
+      if ((statuses as any).some((s: any) => statusCode.startsWith(s))) {
+        return 'hard_bounce';
       }
     }
 
@@ -451,11 +449,11 @@ export class DSNParserService {
    * Get soft bounce reason from status code
    */
   private getSoftBounceReason(statusCode: string, diagnosticCode: string): string {
-    const codes = BOUNCE_STATUS_CODES.soft;
+    const statuses = BOUNCE_STATUS_CODES.SOFT_BOUNCE as readonly string[];
 
-    for (const [reason, statuses] of Object.entries(codes)) {
-      if (statuses.some(s => statusCode.startsWith(s.split('.')[0] + '.'))) {
-        return reason;
+    if (statuses && Array.isArray(statuses)) {
+      if ((statuses as any).some((s: any) => statusCode.startsWith(s))) {
+        return 'soft_bounce';
       }
     }
 

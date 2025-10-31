@@ -1,11 +1,4 @@
-import { EmailProvider } from '@email-gateway/shared';
+import { PartialType } from '@nestjs/mapped-types';
+import { CreateProviderDto } from './create-provider.dto';
 
-export class UpdateProviderDto {
-  provider?: EmailProvider;
-  isActive?: boolean;
-  priority?: number;
-  config?: Record<string, unknown>;
-  dailyLimit?: number | null;
-  hourlyLimit?: number | null;
-}
-
+export class UpdateProviderDto extends PartialType(CreateProviderDto) {}

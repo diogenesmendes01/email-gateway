@@ -124,14 +124,14 @@ export class ARFParserService {
           case 'original-rcpt-to':
             if (!report.originalHeaders!.to) {
               report.originalHeaders!.to = headerValue;
-            } else if (Array.isArray(report.originalHeaders!.to)) {
-              (report.originalHeaders!.to as string[]).push(headerValue);
+            } else if (typeof report.originalHeaders!.to === 'string') {
+              report.originalHeaders!.to = report.originalHeaders!.to + ', ' + headerValue;
             } else {
-              report.originalHeaders!.to = [report.originalHeaders!.to as string, headerValue];
+              report.originalHeaders!.to = headerValue;
             }
             break;
           case 'received-date':
-            report.originalHeaders!.date = headerValue;
+            report.originalHeaders!.date = new Date(headerValue);
             report.timestamp = new Date(headerValue);
             break;
           case 'message-id':
@@ -319,7 +319,7 @@ export class ARFParserService {
   /**
    * Extract authentication failure information from ARF report
    */
-  extractAuthFailure(arf: ARFReport): AuthFailureReport | null {
+  extractAuthFailure(arf: ARFReport): import('../types/arf-report.types').AuthFailureReport | null {
     if (arf.feedbackType !== 'auth-failure' || !arf.authFailure) {
       return null;
     }

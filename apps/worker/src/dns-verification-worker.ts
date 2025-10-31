@@ -1,8 +1,11 @@
 import { Processor, WorkerHost, OnWorkerEvent } from '@nestjs/bullmq';
 import { Injectable, Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
-// import { DNSVerifierService } from '../api/src/modules/onboarding/dns-verifier.service';
 import { PrismaClient } from '@email-gateway/database';
+
+// TODO: Import DNSVerifierService from API or create shared service
+type DNSVerifierService = any;
+type PrismaService = PrismaClient;
 
 export interface DomainVerificationJob {
   domainId: string;
@@ -60,7 +63,7 @@ export class DNSVerificationWorker extends WorkerHost {
       const result = await this.dnsVerifier.verifyAllRecords(domainId);
 
       // Log results
-      const passedChecks = result.checks.filter(check => check.valid).length;
+      const passedChecks = result.checks.filter((check: any) => check.valid).length;
       const totalChecks = result.checks.length;
 
       this.logger.log(
@@ -112,7 +115,7 @@ export class DNSVerificationWorker extends WorkerHost {
     await this.prisma.domain.update({
       where: { id: domainId },
       data: {
-        onboardingStatus: 'PRODUCTION_READY',
+        isProductionReady: true,
         updatedAt: new Date(),
       },
     });

@@ -3,7 +3,9 @@ import { Job } from 'bull';
 import { DSNParserService } from './services/dsn-parser.service';
 import { ARFParserService } from './services/arf-parser.service';
 import { BounceClassifierService } from './services/bounce-classifier.service';
-import { PrismaService } from '../../database/database.module';
+import { PrismaClient } from '@email-gateway/database';
+
+type PrismaService = PrismaClient;
 
 export interface WebhookIngestJobData {
   provider: 'postal' | 'mailu' | 'haraka' | 'ses';
@@ -161,7 +163,7 @@ export class WebhookIngestWorker {
         data: {
           emailLogId: emailLog.id,
           type: 'BOUNCED',
-          metadata: { ...metadata, classification },
+          metadata: { ...metadata, classification: JSON.parse(JSON.stringify(classification)) },
         },
       });
 
@@ -169,7 +171,7 @@ export class WebhookIngestWorker {
       if (classification.shouldSuppress) {
         await this.prisma.suppression.upsert({
           where: {
-            idx_suppression_company_email: {
+            companyId_email: {
               companyId: emailLog.companyId,
               email: emailLog.to,
             },
@@ -246,14 +248,14 @@ export class WebhookIngestWorker {
         data: {
           emailLogId: emailLog.id,
           type: 'COMPLAINED',
-          metadata: { ...metadata, complaint },
+          metadata: { ...metadata, complaint: JSON.parse(JSON.stringify(complaint)) },
         },
       });
 
       // 5. Adicionar à supressão
       await this.prisma.suppression.upsert({
         where: {
-          idx_suppression_company_email: {
+          companyId_email: {
             companyId: emailLog.companyId,
             email: emailLog.to,
           },
@@ -341,7 +343,12 @@ export class WebhookIngestWorker {
       const trackingId = metadata.tracking_id || `click-${emailLog.id}`;
       const clickUrl = metadata.url;
 
-      // Encontrar ou criar tracking
+      // Encontrar tracking existente
+      const existingTracking = await this.prisma.emailTracking.findUnique({
+        where: { trackingId },
+      });
+
+      // Criar ou atualizar tracking
       const tracking = await this.prisma.emailTracking.upsert({
         where: { trackingId },
         create: {
@@ -357,7 +364,7 @@ export class WebhookIngestWorker {
           clickedAt: new Date(),
           clickCount: { increment: 1 },
           clickedUrls: this.appendClickUrl(
-            tracking?.clickedUrls || [],
+            (existingTracking?.clickedUrls as any) || [],
             clickUrl
           ),
           userAgent: metadata.user_agent,

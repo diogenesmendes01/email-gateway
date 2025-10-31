@@ -14,8 +14,5 @@ export {
   IPPoolType,
   RateLimitScope,
   SuppressionReason,
+  EmailProvider,
 } from '@prisma/client';
-
-// EmailProvider enum (from schema)
-// TODO: Verify if this enum exists in generated Prisma client
-// export { EmailProvider } from '@prisma/client';

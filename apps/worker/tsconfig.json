@@ -17,15 +17,6 @@
     "src/**/__tests__/**/*",
     "test/**/*",
     "node_modules/**/*",
-    "dist/**/*",
-    "src/dns-verification-worker.ts",
-    "src/webhook-ingest-worker.ts",
-    "src/services/arf-parser.service.ts",
-    "src/services/bounce-classifier.service.ts",
-    "src/services/dsn-parser.service.ts",
-    "src/drivers/postal/postal-smtp-driver.ts",
-    "src/reputation-calculator-worker.ts",
-    "src/services/reputation-monitor.service.ts",
-    "src/services/logging.service.ts"
+    "dist/**/*"
   ]
 }

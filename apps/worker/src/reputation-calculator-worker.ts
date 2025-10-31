@@ -3,6 +3,8 @@ import { Job } from 'bull';
 import { ReputationMonitorService } from './services/reputation-monitor.service';
 import { PrismaClient } from '@email-gateway/database';
 
+type PrismaService = PrismaClient;
+
 /**
  * Reputation Calculator Worker - TRACK 2
  * Semana 7-8: Reputação & Guardrails

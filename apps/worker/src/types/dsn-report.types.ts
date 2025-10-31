@@ -98,6 +98,20 @@ export interface RecipientBounceClassification {
 }
 
 /**
+ * Classified bounce with email and action
+ */
+export interface ClassifiedBounce {
+  /** Email address that bounced */
+  email: string;
+  /** Bounce type */
+  bounceType: 'hard' | 'soft' | 'transient';
+  /** Action to take */
+  action: string;
+  /** Priority level */
+  priority: 'high' | 'medium' | 'low';
+}
+
+/**
  * DSN parsing error class
  */
 export class DSNParseError extends Error {
