@@ -8,7 +8,7 @@
 
 ## 🎯 Objetivo
 
-Deixar o código **100% funcional e pronto para produção** com integração **AWS SES apenas** (não usaremos SNS nem SQS - usamos BullMQ/Redis no lugar).
+Deixar o código **100% funcional e pronto para produção** com **SMTP próprio (self-hosted)** como provider principal. AWS SES pode ser usado como backup opcional. Usamos BullMQ/Redis para gerenciamento de filas (não SNS nem SQS).
 
 ---
 
@@ -267,27 +267,29 @@ Implementar lógica de warm-up gradual de domínios
 
 ---
 
-### FASE 2: Integração AWS SES (1-2 dias)
-**Tempo:** Depende de aprovações AWS
+### FASE 2: Configuração SMTP Self-Hosted (1-2 dias)
+**Tempo:** Depende da configuração do servidor
 
 ```bash
-1. Setup AWS account e SES
-2. Verificar domínio no SES
-3. Configurar variáveis de ambiente
-4. Testes de envio em sandbox
-5. Request production access
-6. Validação end-to-end
+1. Setup servidor SMTP (Postal, MailU, ou outro)
+2. Configurar DNS (SPF, DKIM, DMARC)
+3. Verificar domínio
+4. Configurar variáveis de ambiente (.env)
+5. Testes de envio
+6. Configurar SES como backup (opcional)
+7. Validação end-to-end
 ```
 
 **Checklist:**
-- [ ] AWS account configurada
-- [ ] SES verificado e fora do sandbox
-- [ ] Variáveis de ambiente configuradas
+- [ ] Servidor SMTP configurado e funcionando
+- [ ] DNS configurado (SPF, DKIM, DMARC)
+- [ ] Domínio verificado
+- [ ] Variáveis SMTP_* configuradas no .env
 - [ ] ENCRYPTION_KEY gerada (openssl rand -base64 32)
 - [ ] Database PostgreSQL configurado
 - [ ] Redis configurado
-- [ ] DNS configurado (SPF, DKIM, DMARC)
 - [ ] Envio de teste bem-sucedido
+- [ ] SES configurado como backup (opcional)
 
 ---
 
@@ -408,7 +410,8 @@ Implementar conforme necessidade:
 
 ### O que está COMPLETO ✅
 
-- ✅ Core email sending (SES integration)
+- ✅ Core email sending (SMTP self-hosted + SES backup)
+- ✅ Multi-provider architecture (Postal SMTP, AWS SES)
 - ✅ Worker com BullMQ + Redis
 - ✅ Database schema (8 models, 6 migrations)
 - ✅ Criptografia AES-256-CBC + PBKDF2

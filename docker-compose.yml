@@ -26,7 +26,7 @@ services:
     container_name: email-gateway-redis
     restart: unless-stopped
     ports:
-      - '6379:6379'
+      - '6382:6379'  # Porta 6382 para evitar conflito
     command: redis-server --appendonly yes --appendfsync everysec
     volumes:
       - redis_data:/data
@@ -36,27 +36,37 @@ services:
       timeout: 5s
       retries: 5
 
-  postal:
-    image: ghcr.io/postalserver/postal:latest
-    container_name: email-gateway-postal
+  # MailHog - Servidor SMTP de testes (mais simples que Postal)
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: email-gateway-mailhog
     restart: unless-stopped
     ports:
-      - '25:25'
-      - '587:587'
-      - '5000:5000'
-    environment:
-      POSTAL_DB_HOST: postgres
-      POSTAL_DB_NAME: postal
-      POSTAL_DB_USER: postal
-      POSTAL_DB_PASS: postal_password
-      POSTAL_REDIS_HOST: redis
-    volumes:
-      - postal_data:/opt/postal
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+      - '1025:1025'  # SMTP
+      - '8025:8025'  # Interface web
+
+  # Postal (comentado - muito complexo para setup rápido)
+  # postal:
+  #   image: ghcr.io/postalserver/postal:latest
+  #   container_name: email-gateway-postal
+  #   restart: unless-stopped
+  #   ports:
+  #     - '25:25'
+  #     - '587:587'
+  #     - '5000:5000'
+  #   environment:
+  #     POSTAL_DB_HOST: postgres
+  #     POSTAL_DB_NAME: postal
+  #     POSTAL_DB_USER: postal
+  #     POSTAL_DB_PASS: postal_password
+  #     POSTAL_REDIS_HOST: redis
+  #   volumes:
+  #     - postal_data:/opt/postal
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #     redis:
+  #       condition: service_healthy
 
   # API (desenvolvimento)
   # api:

@@ -1,0 +1,11 @@
+{
+  "to": "diogenes.mendes01@gmail.com",
+  "subject": "Teste de Email Gateway - Funcionalidade Básica",
+  "html": "<html><body><h1>Olá!</h1><p>Este é um email de teste do <strong>Email Gateway</strong>.</p><p>Se você está lendo isto, significa que a funcionalidade básica está funcionando corretamente! 🎉</p><hr><p style=\"color: gray; font-size: 12px;\">Enviado automaticamente via API de teste</p></body></html>",
+  "recipient": {
+    "externalId": "user-test-001",
+    "nome": "Diogenes Mendes",
+    "email": "diogenes.mendes01@gmail.com"
+  },
+  "externalId": "test-email-001"
+}

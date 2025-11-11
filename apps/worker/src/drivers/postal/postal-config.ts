@@ -25,8 +25,9 @@ export function loadPostalConfig(): PostalSMTPConfig {
     throw new Error('POSTAL_SMTP_HOST environment variable is required when using Postal SMTP');
   }
 
-  if (!user || !pass) {
-    throw new Error('POSTAL_SMTP_USER and POSTAL_SMTP_PASS environment variables are required when using Postal SMTP');
+  // For MailHog and other non-secure SMTP servers, auth is optional
+  if (secure && (!user || !pass)) {
+    throw new Error('POSTAL_SMTP_USER and POSTAL_SMTP_PASS environment variables are required when using secure Postal SMTP');
   }
 
   if (!fromAddress) {
@@ -38,10 +39,10 @@ export function loadPostalConfig(): PostalSMTPConfig {
     host,
     port,
     secure,
-    auth: {
+    auth: user && pass ? {
       user,
       pass,
-    },
+    } : undefined,
     fromAddress,
     returnPathDomain,
   };

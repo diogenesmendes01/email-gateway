@@ -141,8 +141,10 @@ export class PostalSMTPDriver implements IEmailDriver {
       throw new Error('PostalSMTPDriver requires SMTP port');
     }
 
-    if (!config.auth || !config.auth.user || !config.auth.pass) {
-      throw new Error('PostalSMTPDriver requires SMTP credentials');
+    // For MailHog and other non-secure SMTP servers, auth is optional
+    const requiresAuth = config.secure ?? false;
+    if (requiresAuth && (!config.auth || !config.auth.user || !config.auth.pass)) {
+      throw new Error('PostalSMTPDriver requires SMTP credentials when secure=true');
     }
 
     if (!config.fromAddress) {

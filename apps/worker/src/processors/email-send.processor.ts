@@ -3,7 +3,7 @@
  *
  * Processador principal do job email:send com pipeline completo de estados
  *
- * TASK 4.1 — Pipeline de estados, validações e envio SES
+ * TASK 4.1 — Pipeline de estados, validações e envio via provider configurado
  *
  * Pipeline de estados:
  * RECEIVED → VALIDATED → SENT_ATTEMPT → SENT (sucesso)
@@ -17,7 +17,7 @@
  * 4. TEMPLATE - Validação do HTML/template
  *
  * Após validações bem-sucedidas:
- * - Envia email via AWS SES
+ * - Envia email via provider configurado (SMTP self-hosted principal, SES backup)
  * - Grava logs e eventos com requestId/jobId/messageId
  * - Implementa ack/retry conforme Trilha 3.2
  */
@@ -137,7 +137,7 @@ export class EmailSendProcessor {
       // Busca o HTML do outbox
       const htmlContent = await this.getHtmlContent(jobData.outboxId);
 
-      // Tenta enviar via SES
+      // Tenta enviar via provider configurado (SMTP self-hosted ou SES backup)
       const sendResult = await this.emailDriverService.sendEmail(jobData, htmlContent);
 
       const durationMs = Date.now() - startTime;

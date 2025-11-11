@@ -1,0 +1,11 @@
+{
+  "to": "diogenes.mendes01@gmail.com",
+  "subject": "Teste Final - Email Gateway com CertShift",
+  "html": "<html><head><style>body{font-family:Arial,sans-serif;line-height:1.6;color:#333;max-width:600px;margin:0 auto;padding:20px}h1{color:#2c3e50;border-bottom:3px solid #3498db;padding-bottom:10px}p{margin:15px 0}.highlight{background-color:#f39c12;color:white;padding:2px 8px;border-radius:3px}.footer{margin-top:30px;padding-top:20px;border-top:1px solid #ddd;font-size:12px;color:#7f8c8d}</style></head><body><h1>🎉 Email Gateway - Teste Completo</h1><p>Olá!</p><p>Este é um email de teste do <strong>Email Gateway</strong> usando o domínio <span class='highlight'>certshiftsoftware.com.br</span>.</p><p>Se você está lendo esta mensagem, significa que:</p><ul><li>✅ A API está funcionando corretamente</li><li>✅ O Worker está processando a fila</li><li>✅ A integração com AWS SES está operacional</li><li>✅ O sistema está pronto para produção!</li></ul><div class='footer'><p>Enviado automaticamente via API de teste</p><p>Email Gateway v1.0 - CertShift Software</p></div></body></html>",
+  "recipient": {
+    "externalId": "user-final-test-001",
+    "nome": "Diogenes Mendes",
+    "email": "diogenes.mendes01@gmail.com"
+  },
+  "externalId": "test-email-final-001"
+}

@@ -55,8 +55,8 @@ export class AuthService {
    */
   async validateApiKey(apiKey: string): Promise<ApiKeyPayload | null> {
     try {
-      // Extrai prefixo da API Key
-      const prefix = apiKey.split('_')[0] + '_' + apiKey.split('_')[1];
+      // Extrai prefixo da API Key (primeiros 12 caracteres)
+      const prefix = apiKey.substring(0, 12);
       
       // Busca todas as empresas para verificar o hash da API Key
       const companies = await prisma.company.findMany({

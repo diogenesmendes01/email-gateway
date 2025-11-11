@@ -19,10 +19,14 @@ import { DomainService } from './domain.service';
 // Auth Module (para guards)
 import { AuthModule } from '../auth/auth.module';
 
+// Database Module (para PrismaService)
+import { DatabaseModule } from '../../database/database.module';
+
 @Module({
   imports: [
     ConfigModule,
     AuthModule, // Para usar guards de autenticação
+    DatabaseModule, // Para usar PrismaService
   ],
   controllers: [DomainController, DNSRecordsController],
   providers: [DomainService],

@@ -15,9 +15,9 @@ import { EMAIL_JOB_CONFIG, EMAIL_JOB_VALIDATION } from './email-job.types';
 export const emailJobRecipientSchema = z.object({
   recipientId: z
     .string()
-    .uuid('recipientId deve ser um UUID válido')
+    .cuid('recipientId deve ser um CUID válido')
     .optional()
-    .describe('UUID do destinatário no banco'),
+    .describe('CUID do destinatário no banco'),
 
   externalId: z
     .string()
@@ -76,13 +76,13 @@ export const emailSendJobDataSchema = z
   .object({
     outboxId: z
       .string()
-      .uuid('outboxId deve ser um UUID válido')
-      .describe('UUID do registro em email_outbox (igual ao jobId)'),
+      .cuid('outboxId deve ser um CUID válido')
+      .describe('CUID do registro em email_outbox (igual ao jobId)'),
 
     companyId: z
       .string()
-      .uuid('companyId deve ser um UUID válido')
-      .describe('UUID da empresa (tenant)'),
+      .min(1, 'companyId não pode ser vazio')
+      .describe('ID da empresa (tenant)'),
 
     requestId: z
       .string()
@@ -206,7 +206,7 @@ export const emailSendJobOptionsSchema = z
   .object({
     jobId: z
       .string()
-      .uuid('jobId deve ser um UUID válido (igual ao outboxId)')
+      .cuid('jobId deve ser um CUID válido (igual ao outboxId)')
       .describe('Job ID = Outbox ID (idempotência)'),
 
     ttl: z

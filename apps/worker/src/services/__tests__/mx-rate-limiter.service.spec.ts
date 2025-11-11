@@ -9,12 +9,15 @@ describe('MXRateLimiterService', () => {
   let mockRedis: jest.Mocked<Redis>;
 
   beforeEach(() => {
+    const mockPipeline = {
+      incr: jest.fn().mockReturnThis(),
+      expire: jest.fn().mockReturnThis(),
+      exec: jest.fn(),
+    };
+
     mockRedis = {
-      pipeline: jest.fn().mockReturnValue({
-        incr: jest.fn().mockReturnThis(),
-        expire: jest.fn().mockReturnThis(),
-        exec: jest.fn(),
-      }),
+      multi: jest.fn().mockReturnValue(mockPipeline),
+      pipeline: jest.fn().mockReturnValue(mockPipeline),
     } as any;
 
     service = new MXRateLimiterService(mockRedis);
@@ -26,7 +29,7 @@ describe('MXRateLimiterService', () => {
 
   describe('checkLimit', () => {
     it('deve permitir envio se dentro dos limites', async () => {
-      const pipeline = mockRedis.pipeline();
+      const pipeline = mockRedis.multi();
       (pipeline.exec as jest.Mock).mockResolvedValueOnce([
         [null, 5],  // secondCount
         [null, 'OK'],
@@ -41,9 +44,9 @@ describe('MXRateLimiterService', () => {
     });
 
     it('deve bloquear se exceder limite por segundo', async () => {
-      const pipeline = mockRedis.pipeline();
+      const pipeline = mockRedis.multi();
       (pipeline.exec as jest.Mock).mockResolvedValueOnce([
-        [null, 15],  // secondCount > 10 (limite padrão para Gmail)
+        [null, 25],  // secondCount > 20 (limite para Gmail é 20/s)
         [null, 'OK'],
         [null, 50],
         [null, 'OK'],
@@ -57,11 +60,11 @@ describe('MXRateLimiterService', () => {
     });
 
     it('deve bloquear se exceder limite por minuto', async () => {
-      const pipeline = mockRedis.pipeline();
+      const pipeline = mockRedis.multi();
       (pipeline.exec as jest.Mock).mockResolvedValueOnce([
         [null, 5],
         [null, 'OK'],
-        [null, 601], // minuteCount > 600 (limite padrão para Gmail)
+        [null, 1001], // minuteCount > 1000 (limite para Gmail é 1000/min)
         [null, 'OK'],
       ]);
 
@@ -74,7 +77,7 @@ describe('MXRateLimiterService', () => {
     });
 
     it('deve extrair domínio corretamente', async () => {
-      const pipeline = mockRedis.pipeline();
+      const pipeline = mockRedis.multi();
       (pipeline.exec as jest.Mock).mockResolvedValue([
         [null, 1],
         [null, 'OK'],
@@ -88,7 +91,7 @@ describe('MXRateLimiterService', () => {
     });
 
     it('deve permitir se Redis falhar', async () => {
-      const pipeline = mockRedis.pipeline();
+      const pipeline = mockRedis.multi();
       (pipeline.exec as jest.Mock).mockResolvedValueOnce(null);
 
       const result = await service.checkLimit('user@gmail.com');
@@ -97,17 +100,26 @@ describe('MXRateLimiterService', () => {
     });
 
     it('deve usar limites diferentes para domínios diferentes', async () => {
-      const pipeline = mockRedis.pipeline();
-      (pipeline.exec as jest.Mock).mockResolvedValue([
-        [null, 3],
+      // Mock para Gmail (limites altos: 20/s, 1000/min)
+      let pipeline = mockRedis.multi();
+      (pipeline.exec as jest.Mock).mockResolvedValueOnce([
+        [null, 10],  // Dentro do limite de 20/s
         [null, 'OK'],
-        [null, 100],
+        [null, 500], // Dentro do limite de 1000/min
         [null, 'OK'],
       ]);
 
-      // Gmail tem limites mais baixos que domínios desconhecidos
       const gmailResult = await service.checkLimit('user@gmail.com');
       expect(gmailResult.allowed).toBe(true);
+
+      // Mock para domínio desconhecido (limites baixos: 1/s, 120/min)
+      pipeline = mockRedis.multi();
+      (pipeline.exec as jest.Mock).mockResolvedValueOnce([
+        [null, 0.5], // Dentro do limite de 1/s
+        [null, 'OK'],
+        [null, 50],  // Dentro do limite de 120/min
+        [null, 'OK'],
+      ]);
 
       const unknownResult = await service.checkLimit('user@unknown-domain.com');
       expect(unknownResult.allowed).toBe(true);
@@ -120,9 +132,9 @@ describe('MXRateLimiterService', () => {
       expect(domain).toBe('example.com');
     });
 
-    it('deve retornar "unknown" para email inválido', () => {
+    it('deve retornar "default" para email inválido', () => {
       const domain = (service as any).extractDomain('invalid-email');
-      expect(domain).toBe('unknown');
+      expect(domain).toBe('default');
     });
 
     it('deve lidar com emails com subdomínios', () => {

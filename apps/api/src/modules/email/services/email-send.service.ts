@@ -27,9 +27,11 @@ import {
   encryptCpfCnpj,
   decryptCpfCnpj,
   hashCpfCnpjSha256,
+  sanitizeEmailHtml,
 } from '@email-gateway/shared';
 import { Prisma, EmailStatus } from '@prisma/client';
 import * as crypto from 'crypto';
+import cuid from 'cuid';
 
 interface SendEmailParams {
   companyId: string;
@@ -107,18 +109,32 @@ export class EmailSendService {
       });
     }
 
+    // TASK-001: Sanitize HTML to prevent XSS attacks
+    const sanitizedHtml = sanitizeEmailHtml(body.html);
+
+    // Log if sanitization modified the HTML
+    if (sanitizedHtml !== body.html) {
+      this.logger.warn({
+        message: 'HTML sanitization modified content',
+        companyId,
+        originalLength: body.html.length,
+        sanitizedLength: sanitizedHtml.length,
+        requestId,
+      });
+    }
+
     // Generate IDs
-    const outboxId = crypto.randomUUID();
+    const outboxId = cuid();
     const jobId = outboxId; // Same ID for outbox and job
     const receivedAt = new Date();
 
     // Process recipient if provided
     let recipientId: string | undefined;
     if (body.recipient) {
-      recipientId = await this.processRecipient(companyId, body.recipient);
+      recipientId = await this.processRecipient(companyId, body.recipient, body.to);
     }
 
-    // Create outbox record
+    // Create outbox record with sanitized HTML
     const outbox = await this.createOutbox({
       id: outboxId,
       companyId,
@@ -128,7 +144,7 @@ export class EmailSendService {
       cc: body.cc || [],
       bcc: body.bcc || [],
       subject: body.subject,
-      html: body.html,
+      html: sanitizedHtml, // Use sanitized HTML instead of raw
       replyTo: body.replyTo,
       headers: body.headers,
       tags: body.tags || [],
@@ -197,7 +213,7 @@ export class EmailSendService {
 
       // TASK-020: Record successful enqueue
       const duration = (performance.now() - startTime) / 1000;
-      this.metricsService.recordEmailSent(companyId, 'ses');
+      this.metricsService.recordEmailSent(companyId, 'smtp');
       this.metricsService.recordEmailSendDuration(duration, companyId);
     } catch (error) {
       // TASK-020: Record failure
@@ -205,7 +221,7 @@ export class EmailSendService {
       this.metricsService.recordEmailFailed(
         companyId,
         error instanceof Error ? error.constructor.name : 'UNKNOWN_ERROR',
-        'ses'
+        'smtp'
       );
       this.metricsService.recordEmailSendDuration(duration, companyId);
 
@@ -306,6 +322,7 @@ export class EmailSendService {
   private async processRecipient(
     companyId: string,
     recipient: EmailSendBody['recipient'],
+    to: string,
   ): Promise<string | undefined> {
     if (!recipient) {
       return undefined;
@@ -313,7 +330,7 @@ export class EmailSendService {
 
     const recipientData: Prisma.RecipientCreateInput = {
       company: { connect: { id: companyId } },
-      email: recipient.email || '',
+      email: recipient.email || to,
     };
 
     // Add optional fields

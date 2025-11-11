@@ -30,6 +30,18 @@ export class ARFParserService {
     try {
       this.logger.debug(`Parsing ARF message (${rawARF.length} chars)`);
 
+      // Handle empty ARF
+      if (!rawARF || rawARF.trim().length === 0) {
+        return {
+          version: '1.0',
+          feedbackType: 'other' as any,
+          timestamp: new Date(),
+          mimeVersion: '1.0',
+          contentType: 'message/feedback-report',
+          originalHeaders: {},
+        } as ARFReport;
+      }
+
       // ARF messages are multipart/report
       // Extract the feedback-report part (machine-readable)
       const feedbackReportPart = this.extractFeedbackReportPart(rawARF);
@@ -119,9 +131,13 @@ export class ARFParserService {
             report.feedbackType = this.parseFeedbackType(headerValue);
             break;
           case 'original-mail-from':
-            report.originalHeaders!.from = headerValue;
+          case 'from':
+            if (!report.originalHeaders!.from) {
+              report.originalHeaders!.from = headerValue;
+            }
             break;
           case 'original-rcpt-to':
+          case 'to':
             if (!report.originalHeaders!.to) {
               report.originalHeaders!.to = headerValue;
             } else if (typeof report.originalHeaders!.to === 'string') {
@@ -131,6 +147,7 @@ export class ARFParserService {
             }
             break;
           case 'received-date':
+          case 'arrival-date':
             report.originalHeaders!.date = new Date(headerValue);
             report.timestamp = new Date(headerValue);
             break;
@@ -143,11 +160,17 @@ export class ARFParserService {
           case 'source-ip':
             report.sourceIP = headerValue;
             break;
+          case 'reporting-mua':
+            report.reportingMUA = headerValue;
+            break;
           case 'reported-domain':
             // Can be used for additional validation
             break;
           case 'authentication-results':
             report.authFailure = headerValue;
+            break;
+          case 'auth-failure':
+            report.authFailureType = headerValue;
             break;
           case 'removal-recipient':
             // Additional recipient information
@@ -165,7 +188,7 @@ export class ARFParserService {
 
     // Set defaults if not provided
     if (!report.version) report.version = '1.0';
-    if (!report.feedbackType) report.feedbackType = 'other';
+    // Do NOT set default feedbackType - let validateARF catch this
     if (!report.timestamp) report.timestamp = new Date();
 
     // MIME version and content type are standard for ARF
@@ -179,8 +202,21 @@ export class ARFParserService {
    * Extract original message from ARF (if present)
    */
   private extractOriginalMessage(rawARF: string): string | undefined {
+    const MAX_MESSAGE_LENGTH = 1000;
+
     const boundaryMatch = rawARF.match(/boundary="([^"]+)"/) || rawARF.match(/boundary=([^\s;]+)/);
-    if (!boundaryMatch) return undefined;
+    if (!boundaryMatch) {
+      // No boundary, check if there's content after empty lines
+      const parts = rawARF.split('\n\n');
+      if (parts.length > 1) {
+        let message = parts.slice(1).join('\n\n').trim();
+        if (message.length > MAX_MESSAGE_LENGTH) {
+          message = message.substring(0, MAX_MESSAGE_LENGTH) + '...';
+        }
+        return message || undefined;
+      }
+      return undefined;
+    }
 
     const boundary = boundaryMatch[1];
     const parts = rawARF.split(`--${boundary}`);
@@ -194,10 +230,19 @@ export class ARFParserService {
         if (i + 1 < parts.length) {
           const nextPart = parts[i + 1];
           const contentStart = nextPart.indexOf('\n\n');
+          let message: string;
           if (contentStart !== -1) {
-            return nextPart.substring(contentStart + 2).trim();
+            message = nextPart.substring(contentStart + 2).trim();
+          } else {
+            message = nextPart.trim();
           }
-          return nextPart.trim();
+
+          // Truncate if too long
+          if (message.length > MAX_MESSAGE_LENGTH) {
+            message = message.substring(0, MAX_MESSAGE_LENGTH) + '...';
+          }
+
+          return message;
         }
         break;
       }
@@ -320,18 +365,31 @@ export class ARFParserService {
    * Extract authentication failure information from ARF report
    */
   extractAuthFailure(arf: ARFReport): import('../types/arf-report.types').AuthFailureReport | null {
-    if (arf.feedbackType !== 'auth-failure' || !arf.authFailure) {
+    if (arf.feedbackType !== 'auth-failure') {
       return null;
     }
 
-    // Parse authentication failure details
-    const authFailure = arf.authFailure.toLowerCase();
-
+    // Check if we have auth failure type directly
     let authMethod: 'dkim' | 'spf' | 'dmarc' = 'dkim';
-    if (authFailure.includes('spf')) {
-      authMethod = 'spf';
-    } else if (authFailure.includes('dmarc')) {
-      authMethod = 'dmarc';
+
+    if (arf.authFailureType) {
+      const authType = arf.authFailureType.toLowerCase();
+      if (authType.includes('spf')) {
+        authMethod = 'spf';
+      } else if (authType.includes('dmarc')) {
+        authMethod = 'dmarc';
+      } else if (authType.includes('dkim')) {
+        authMethod = 'dkim';
+      }
+    } else if (arf.authFailure) {
+      // Parse authentication failure details from results
+      const authFailure = arf.authFailure.toLowerCase();
+
+      if (authFailure.includes('spf')) {
+        authMethod = 'spf';
+      } else if (authFailure.includes('dmarc')) {
+        authMethod = 'dmarc';
+      }
     }
 
     // Extract domain from headers if possible
@@ -386,8 +444,8 @@ export class ARFParserService {
     const errors: string[] = [];
 
     // RFC 5965 required fields
-    if (!arf.feedbackType) {
-      errors.push('Missing required Feedback-Type header');
+    if (!arf.feedbackType || arf.feedbackType === 'other' as any) {
+      errors.push('Missing feedback-type');
     }
 
     // Version is optional in practice, though recommended

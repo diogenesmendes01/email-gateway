@@ -12,6 +12,8 @@ async function main() {
     update: {},
     create: {
       name: 'Test Company (Approved)',
+      email: 'contato@certshiftsoftware.com.br',
+      passwordHash: await bcrypt.hash('password123', 10),
       apiKey: 'sk_test_approved_12345',
       apiKeyHash: await bcrypt.hash('sk_test_approved_12345', 10),
       apiKeyPrefix: 'sk_test',
@@ -37,6 +39,8 @@ async function main() {
     update: {},
     create: {
       name: 'Test Company (Sandbox)',
+      email: 'sandbox@certshiftsoftware.com.br',
+      passwordHash: await bcrypt.hash('password123', 10),
       apiKey: 'sk_sandbox_test_12345',
       apiKeyHash: await bcrypt.hash('sk_sandbox_test_12345', 10),
       apiKeyPrefix: 'sk_sand',
@@ -60,6 +64,8 @@ async function main() {
     update: {},
     create: {
       name: 'Test Company (Suspended)',
+      email: 'suspended@certshiftsoftware.com.br',
+      passwordHash: await bcrypt.hash('password123', 10),
       apiKey: 'sk_suspended_test_12345',
       apiKeyHash: await bcrypt.hash('sk_suspended_test_12345', 10),
       apiKeyPrefix: 'sk_susp',
@@ -85,13 +91,13 @@ async function main() {
     where: {
       companyId_domain: {
         companyId: approvedCompany.id,
-        domain: 'testcompany.com',
+        domain: 'certshiftsoftware.com.br',
       },
     },
     update: {},
     create: {
       companyId: approvedCompany.id,
-      domain: 'testcompany.com',
+      domain: 'certshiftsoftware.com.br',
       status: 'VERIFIED',
       dkimStatus: 'VERIFIED',
       dkimTokens: ['token1', 'token2', 'token3'],
@@ -100,18 +106,6 @@ async function main() {
   });
 
   console.log('✅ Created verified domain:', domain.id);
-
-  // 5. Definir como domínio padrão
-  await prisma.company.update({
-    where: { id: approvedCompany.id },
-    data: {
-      domainId: domain.id,
-      defaultFromAddress: 'vendas@testcompany.com',
-      defaultFromName: 'Equipe Vendas',
-    },
-  });
-
-  console.log('✅ Set default domain for approved company');
 
   console.log('\n🎉 Seed completed successfully!');
 }

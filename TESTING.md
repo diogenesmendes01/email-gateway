@@ -167,31 +167,10 @@ curl -X POST http://localhost:3000/rate-limits \
 ```typescript
 // Em apps/worker/src/index.ts ou em um script de teste
 
-import { SESDriver } from './drivers/aws-ses/ses-driver';
 import { PostalSMTPDriver } from './drivers/postal/postal-smtp-driver';
+import { SESDriver } from './drivers/aws-ses/ses-driver';
 
-// Testar SES Driver
-const sesDriver = new SESDriver();
-const sesResult = await sesDriver.sendEmail(
-  {
-    to: 'test@example.com',
-    from: 'sender@yourdomain.com',
-    subject: 'Test Email',
-    // ... outros campos
-  },
-  {
-    provider: 'AWS_SES',
-    region: 'us-east-1',
-    credentials: { /* ... */ }
-  },
-  {
-    htmlContent: '<p>Test</p>',
-  }
-);
-
-console.log('SES Result:', sesResult);
-
-// Testar Postal Driver
+// Testar Postal SMTP Driver (PRINCIPAL)
 const postalDriver = new PostalSMTPDriver();
 const postalResult = await postalDriver.sendEmail(
   {
@@ -212,6 +191,27 @@ const postalResult = await postalDriver.sendEmail(
 );
 
 console.log('Postal Result:', postalResult);
+
+// Testar SES Driver (BACKUP - Opcional)
+const sesDriver = new SESDriver();
+const sesResult = await sesDriver.sendEmail(
+  {
+    to: 'test@example.com',
+    from: 'sender@yourdomain.com',
+    subject: 'Test Email',
+    // ... outros campos
+  },
+  {
+    provider: 'AWS_SES',
+    region: 'us-east-1',
+    credentials: { /* ... */ }
+  },
+  {
+    htmlContent: '<p>Test</p>',
+  }
+);
+
+console.log('SES Result:', sesResult);
 ```
 
 ---

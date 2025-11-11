@@ -71,6 +71,8 @@
   "dependencies": {
     "@types/bcrypt": "^6.0.0",
     "bcrypt": "^6.0.0",
-    "ioredis": "^5.8.1"
+    "cuid": "^3.0.0",
+    "ioredis": "^5.8.1",
+    "isomorphic-dompurify": "^2.31.0"
   }
 }

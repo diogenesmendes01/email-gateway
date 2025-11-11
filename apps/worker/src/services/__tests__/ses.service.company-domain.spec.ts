@@ -38,13 +38,13 @@ describe('SESDriver - Company Domain (TASK-027)', () => {
     (prisma.company.findUnique as jest.Mock).mockResolvedValue({
       id: 'company-1',
       name: 'Test Company',
-      defaultFromAddress: 'vendas@testcompany.com',
-      defaultFromName: 'Equipe Vendas',
+      defaultFromAddress: 'contato@certshiftsoftware.com.br',
+      defaultFromName: 'Test Team',
       domainId: 'domain-1',
       isSuspended: false,
       defaultDomain: {
         id: 'domain-1',
-        domain: 'testcompany.com',
+        domain: 'certshiftsoftware.com.br',
         status: 'VERIFIED',
       },
     });
@@ -68,14 +68,14 @@ describe('SESDriver - Company Domain (TASK-027)', () => {
 
     // Verificar que usou domínio da empresa
     const sentCommand = mockSend.mock.calls[0][0];
-    expect(sentCommand.input.Source).toBe('Equipe Vendas <vendas@testcompany.com>');
+    expect(sentCommand.input.Source).toBe('Test Team <contato@certshiftsoftware.com.br>');
   });
 
   it('should use global fallback when domain not verified', async () => {
     (prisma.company.findUnique as jest.Mock).mockResolvedValue({
       id: 'company-2',
       name: 'Test Company 2',
-      defaultFromAddress: 'vendas@unverified.com',
+      defaultFromAddress: 'contact@unverified.com',
       domainId: 'domain-2',
       isSuspended: false,
       defaultDomain: {

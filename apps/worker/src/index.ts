@@ -68,11 +68,24 @@ class EmailWorker {
     this.tracingService = new TracingService('email-worker');
 
     // Carrega e valida configurações dos providers
-    const sesConfig = loadSESConfig();
-    validateSESConfig(sesConfig);
-
     const providerToggle = (process.env.EMAIL_PROVIDER as EmailProvider | undefined) ?? EmailProvider.AWS_SES;
-    const fallbackEnabled = (process.env.EMAIL_PROVIDER_FALLBACK ?? 'true').toLowerCase() !== 'false';
+    const fallbackEnabled = (process.env.EMAIL_PROVIDER_FALLBACK ?? 'false').toLowerCase() === 'true';
+
+    // Carrega SES config somente se for usado como primary ou fallback
+    let sesConfig = null;
+    const useSES = providerToggle === EmailProvider.AWS_SES || (fallbackEnabled && process.env.AWS_REGION);
+
+    if (useSES) {
+      try {
+        sesConfig = loadSESConfig();
+        validateSESConfig(sesConfig);
+      } catch (error) {
+        if (providerToggle === EmailProvider.AWS_SES) {
+          throw error; // Se SES é primary, erro é crítico
+        }
+        console.warn('[EmailWorker] SES config not available for fallback:', error.message);
+      }
+    }
 
     const driverDescriptors = [];
 
@@ -87,7 +100,7 @@ class EmailWorker {
         isActive: true,
       });
 
-      if (fallbackEnabled) {
+      if (fallbackEnabled && sesConfig) {
         driverDescriptors.push({
           id: 'fallback-aws-ses',
           config: sesConfig,
@@ -95,7 +108,7 @@ class EmailWorker {
           isActive: true,
         });
       }
-    } else {
+    } else if (providerToggle === EmailProvider.AWS_SES && sesConfig) {
       driverDescriptors.push({
         id: 'primary-aws-ses',
         config: sesConfig,
