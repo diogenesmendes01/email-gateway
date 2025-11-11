@@ -7,6 +7,12 @@ node_modules/
 .env.local
 .env.*.local
 
+# Specific environment files with credentials
+/.env
+/apps/api/.env
+/apps/worker/.env
+/packages/database/.env
+
 # Block production and sensitive environment files
 .env.production
 .env.production.local

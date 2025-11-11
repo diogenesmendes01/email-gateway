@@ -75,7 +75,8 @@
       "Bash(nul)",
       "Bash(timeout 3 ping:*)",
       "Bash(set EMAIL_PROVIDER=POSTAL_SMTP)",
-      "Bash(docker logs:*)"
+      "Bash(docker logs:*)",
+      "Bash(git rm:*)"
     ],
     "deny": [],
     "ask": []
