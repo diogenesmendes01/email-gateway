@@ -19,6 +19,7 @@ import {
 import { QueueService } from '../../queue/queue.service';
 import { MetricsService } from '../../metrics/metrics.service';
 import { ContentValidationService } from './content-validation.service'; // TASK-031
+import { DailyQuotaService, QuotaResult } from './daily-quota.service'; // TASK-038
 import { prisma } from '@email-gateway/database';
 import {
   EmailSendBody,
@@ -52,6 +53,7 @@ export class EmailSendService {
     private readonly queueService: QueueService,
     private readonly metricsService: MetricsService,
     private readonly contentValidationService: ContentValidationService, // TASK-031
+    private readonly dailyQuotaService: DailyQuotaService, // TASK-038
   ) {}
   /**
    * Send email asynchronously
@@ -73,6 +75,31 @@ export class EmailSendService {
 
     // TASK-024: Check if recipient is blocked (hard bounce or spam complaint)
     await this.checkBlocklist(companyId, body.to);
+
+    // TASK-038: Check daily quota before sending
+    const quotaCheck = await this.dailyQuotaService.checkQuota(companyId);
+    if (!quotaCheck.allowed) {
+      this.logger.warn({
+        message: 'Daily quota exceeded, email send rejected',
+        companyId,
+        current: quotaCheck.current,
+        limit: quotaCheck.limit,
+        resetsAt: quotaCheck.resetsAt,
+        reason: quotaCheck.reason,
+        requestId,
+      });
+
+      // TASK-038: Record quota exceeded metric
+      this.metricsService.recordQuotaExceeded(companyId, quotaCheck.current, quotaCheck.limit);
+
+      throw new BadRequestException({
+        code: 'DAILY_QUOTA_EXCEEDED',
+        message: 'Daily email quota exceeded',
+        current: quotaCheck.current,
+        limit: quotaCheck.limit,
+        resetsAt: quotaCheck.resetsAt,
+      });
+    }
 
     // TASK-031: Validate email content
     const validation = await this.contentValidationService.validateEmail({
@@ -210,6 +237,28 @@ export class EmailSendService {
         requestId,
         status: EmailStatus.ENQUEUED,
       });
+
+      // TASK-038: Increment quota after successful enqueue
+      try {
+        await this.dailyQuotaService.incrementQuota(companyId);
+        this.logger.debug({
+          message: 'Quota incremented after successful enqueue',
+          companyId,
+          outboxId,
+          jobId: enqueuedJobId,
+          requestId,
+        });
+      } catch (quotaError) {
+        // Log error but don't fail the send - quota might be inconsistent but email was enqueued
+        this.logger.error({
+          message: 'Failed to increment quota after successful enqueue',
+          companyId,
+          outboxId,
+          jobId: enqueuedJobId,
+          requestId,
+          error: quotaError instanceof Error ? quotaError.message : 'Unknown error',
+        });
+      }
 
       // TASK-020: Record successful enqueue
       const duration = (performance.now() - startTime) / 1000;

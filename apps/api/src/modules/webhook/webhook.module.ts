@@ -3,6 +3,7 @@ import { BullModule } from '@nestjs/bull';
 import { PostalWebhookController } from './postal-webhook.controller';
 import { PostalWebhookValidatorService } from './postal-webhook-validator.service';
 import { WebhookQueueService } from './webhook-queue.service';
+import { WebhookIngestQueueService } from './webhook-ingest-queue.service';
 
 /**
  * Webhook Module
@@ -15,7 +16,7 @@ import { WebhookQueueService } from './webhook-queue.service';
     }),
   ],
   controllers: [PostalWebhookController],
-  providers: [PostalWebhookValidatorService, WebhookQueueService],
-  exports: [PostalWebhookValidatorService, WebhookQueueService],
+  providers: [PostalWebhookValidatorService, WebhookQueueService, WebhookIngestQueueService],
+  exports: [PostalWebhookValidatorService, WebhookQueueService, WebhookIngestQueueService],
 })
 export class WebhookModule {}

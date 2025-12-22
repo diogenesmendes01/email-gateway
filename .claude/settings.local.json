@@ -76,7 +76,8 @@
       "Bash(timeout 3 ping:*)",
       "Bash(set EMAIL_PROVIDER=POSTAL_SMTP)",
       "Bash(docker logs:*)",
-      "Bash(git rm:*)"
+      "Bash(git rm:*)",
+      "mcp__ide__getDiagnostics"
     ],
     "deny": [],
     "ask": []

@@ -15,7 +15,6 @@ import {
   Query,
   HttpCode,
   HttpStatus,
-  Request,
 } from '@nestjs/common';
 import { EmailService } from '../services/email.service';
 import {
@@ -26,7 +25,7 @@ import {
   EmailListQuery,
   EmailByIdParams,
 } from '@email-gateway/shared';
-import { ApiKeyOnly } from '../../auth/decorators';
+import { ApiKeyOnly, Company } from '../../auth/decorators';
 
 @Controller('emails')
 export class EmailController {
@@ -46,14 +45,10 @@ export class EmailController {
   @HttpCode(HttpStatus.OK)
   async listEmails(
     @Query() query: EmailListQuery,
-    @Request() req: any,
+    @Company() companyId: string,
   ): Promise<EmailListResponse> {
     // Validate query parameters using Zod
     const validatedQuery = emailListQuerySchema.parse(query);
-
-    // Get company ID from authenticated request
-    // TODO: Extract from API Key guard
-    const companyId = req.user?.companyId || req.companyId;
 
     // Call service to fetch emails
     return this.emailService.listEmails(companyId, validatedQuery);
@@ -73,13 +68,10 @@ export class EmailController {
   @HttpCode(HttpStatus.OK)
   async getEmailById(
     @Param() params: EmailByIdParams,
-    @Request() req: any,
+    @Company() companyId: string,
   ): Promise<EmailDetailResponse> {
     // Validate path parameters using Zod
     const validatedParams = emailByIdParamsSchema.parse(params);
-
-    // Get company ID from authenticated request
-    const companyId = req.user?.companyId || req.companyId;
 
     // Call service to fetch email details
     return this.emailService.getEmailById(companyId, validatedParams.id);
@@ -100,13 +92,10 @@ export class EmailController {
   @HttpCode(HttpStatus.OK)
   async getEmailEvents(
     @Param() params: EmailByIdParams,
-    @Request() req: any,
+    @Company() companyId: string,
   ) {
     // Validate path parameters
     const validatedParams = emailByIdParamsSchema.parse(params);
-
-    // Get company ID from authenticated request
-    const companyId = req.user?.companyId || req.companyId;
 
     // Call service to fetch email events
     return this.emailService.getEmailEvents(companyId, validatedParams.id);

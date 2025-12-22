@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { MetricsModule } from '../metrics/metrics.module';
 
 // Services
 import { AuthService } from './auth.service';
@@ -14,7 +15,7 @@ import { BasicAuthGuard } from './basic-auth.guard';
 import { AuditInterceptor } from './audit.interceptor';
 
 @Module({
-  imports: [ConfigModule],
+  imports: [ConfigModule, MetricsModule],
   controllers: [],
   providers: [
     AuthService,

@@ -8,8 +8,11 @@ import {
   HttpException,
   HttpStatus,
   Logger,
+  NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
+import { ApiProtected, Company } from '../auth/decorators';
+import { MetricsService } from '../metrics/metrics.service';
 
 interface DNSRecordResponse {
   id: string;
@@ -36,28 +39,40 @@ interface DNSRecordsListResponse {
 }
 
 @Controller('domains/:domainId/dns-records')
+@ApiProtected()
 export class DNSRecordsController {
   private readonly logger = new Logger(DNSRecordsController.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly metricsService: MetricsService,
+  ) {}
 
   /**
    * GET /domains/:domainId/dns-records
    * Get all DNS records for a domain
    */
   @Get()
-  async getDNSRecords(@Param('domainId') domainId: string): Promise<DNSRecordsListResponse> {
+  async getDNSRecords(
+    @Param('domainId') domainId: string,
+    @Company() companyId: string,
+  ): Promise<DNSRecordsListResponse> {
     try {
       this.logger.log(`Getting DNS records for domain: ${domainId}`);
 
-      // Get domain info
-      const domain = await this.prisma.domain.findUnique({
-        where: { id: domainId },
+      // TASK-038: Validate domain ownership
+      const domain = await this.prisma.domain.findFirst({
+        where: {
+          id: domainId,
+          companyId,
+        },
         select: { domain: true },
       });
 
       if (!domain) {
-        throw new HttpException('Domain not found', HttpStatus.NOT_FOUND);
+        // TASK-038: Record domain access denied metric
+        this.metricsService.recordDomainAccessDenied(companyId, domainId, 'get');
+        throw new NotFoundException('Domain not found or does not belong to your company');
       }
 
       // Get DNS records
@@ -117,6 +132,7 @@ export class DNSRecordsController {
   @Post()
   async addDNSRecord(
     @Param('domainId') domainId: string,
+    @Company() companyId: string,
     @Body() body: {
       recordType: string;
       name: string;
@@ -127,14 +143,19 @@ export class DNSRecordsController {
     try {
       this.logger.log(`Adding DNS record for domain: ${domainId}`);
 
-      // Validate domain exists
-      const domain = await this.prisma.domain.findUnique({
-        where: { id: domainId },
+      // TASK-038: Validate domain ownership
+      const domain = await this.prisma.domain.findFirst({
+        where: {
+          id: domainId,
+          companyId,
+        },
         select: { id: true },
       });
 
       if (!domain) {
-        throw new HttpException('Domain not found', HttpStatus.NOT_FOUND);
+        // TASK-038: Record domain access denied metric
+        this.metricsService.recordDomainAccessDenied(companyId, domainId, 'post');
+        throw new NotFoundException('Domain not found or does not belong to your company');
       }
 
       // Create DNS record
@@ -185,21 +206,30 @@ export class DNSRecordsController {
   @Post(':recordId/verify')
   async verifyDNSRecord(
     @Param('domainId') domainId: string,
-    @Param('recordId') recordId: string
+    @Param('recordId') recordId: string,
+    @Company() companyId: string,
   ): Promise<{ success: boolean; message: string }> {
     try {
       this.logger.log(`Verifying DNS record: ${recordId}`);
 
-      // Get the record
+      // TASK-038: Get the record and validate domain ownership
       const record = await this.prisma.dNSRecord.findFirst({
         where: {
           id: recordId,
           domainId,
         },
+        include: {
+          domain: {
+            where: { companyId },
+            select: { id: true },
+          },
+        },
       });
 
-      if (!record) {
-        throw new HttpException('DNS record not found', HttpStatus.NOT_FOUND);
+      if (!record || !record.domain) {
+        // TASK-038: Record domain access denied metric
+        this.metricsService.recordDomainAccessDenied(companyId, domainId, 'verify');
+        throw new NotFoundException('DNS record not found or domain does not belong to your company');
       }
 
       // For now, mark as verified (in production, would do actual DNS lookup)
@@ -239,21 +269,27 @@ export class DNSRecordsController {
   @Delete(':recordId')
   async deleteDNSRecord(
     @Param('domainId') domainId: string,
-    @Param('recordId') recordId: string
+    @Param('recordId') recordId: string,
+    @Company() companyId: string,
   ): Promise<{ success: boolean; message: string }> {
     try {
       this.logger.log(`Deleting DNS record: ${recordId}`);
 
-      // Delete the record
+      // TASK-038: Delete the record with domain ownership validation
       const result = await this.prisma.dNSRecord.deleteMany({
         where: {
           id: recordId,
-          domainId,
+          domain: {
+            id: domainId,
+            companyId,
+          },
         },
       });
 
       if (result.count === 0) {
-        throw new HttpException('DNS record not found', HttpStatus.NOT_FOUND);
+        // TASK-038: Record domain access denied metric
+        this.metricsService.recordDomainAccessDenied(companyId, domainId, 'delete');
+        throw new NotFoundException('DNS record not found or domain does not belong to your company');
       }
 
       this.logger.log(`DNS record deleted: ${recordId}`);

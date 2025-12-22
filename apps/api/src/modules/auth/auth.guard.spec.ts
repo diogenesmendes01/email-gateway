@@ -104,12 +104,70 @@ describe('ApiKeyGuard', () => {
         expiresAt: new Date(Date.now() + 86400000),
         allowedIps: [],
         isActive: false,
+        isApproved: true,
+        isSuspended: false,
       };
 
       (authService.validateApiKey as jest.Mock).mockResolvedValue(mockPayload);
 
       await expect(guard.canActivate(context)).rejects.toThrow(
         new ForbiddenException('Company is inactive')
+      );
+
+      expect(authService.validateApiKey).toHaveBeenCalledWith(apiKey);
+    });
+
+    it('should throw ForbiddenException when company is suspended (TASK-038)', async () => {
+      const apiKey = 'sk_live_suspended_key';
+      const context = createMockContext(apiKey);
+      const mockPayload: ApiKeyPayload = {
+        companyId: 'company-123',
+        prefix: 'sk_live',
+        expiresAt: new Date(Date.now() + 86400000),
+        allowedIps: [],
+        isActive: true,
+        isApproved: true,
+        isSuspended: true,
+        suspensionReason: 'Violation of terms',
+      };
+
+      (authService.validateApiKey as jest.Mock).mockResolvedValue(mockPayload);
+      (authService.isApiKeyExpired as jest.Mock).mockReturnValue(false);
+      (authService.validateIpAllowlist as jest.Mock).mockResolvedValue(true);
+
+      await expect(guard.canActivate(context)).rejects.toThrow(
+        new ForbiddenException({
+          code: 'COMPANY_SUSPENDED',
+          message: 'Company is suspended',
+          suspensionReason: 'Violation of terms',
+        })
+      );
+
+      expect(authService.validateApiKey).toHaveBeenCalledWith(apiKey);
+    });
+
+    it('should throw ForbiddenException when company is not approved (TASK-038)', async () => {
+      const apiKey = 'sk_live_unapproved_key';
+      const context = createMockContext(apiKey);
+      const mockPayload: ApiKeyPayload = {
+        companyId: 'company-123',
+        prefix: 'sk_live',
+        expiresAt: new Date(Date.now() + 86400000),
+        allowedIps: [],
+        isActive: true,
+        isApproved: false,
+        isSuspended: false,
+      };
+
+      (authService.validateApiKey as jest.Mock).mockResolvedValue(mockPayload);
+      (authService.isApiKeyExpired as jest.Mock).mockReturnValue(false);
+      (authService.validateIpAllowlist as jest.Mock).mockResolvedValue(true);
+
+      await expect(guard.canActivate(context)).rejects.toThrow(
+        new ForbiddenException({
+          code: 'COMPANY_PENDING_APPROVAL',
+          message: 'Company pending approval',
+        })
       );
 
       expect(authService.validateApiKey).toHaveBeenCalledWith(apiKey);

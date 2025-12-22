@@ -21,6 +21,8 @@ import { CompanyService, CompanyProfile, RegenerateApiKeyResponse } from '../ser
 import { UpdateProfileDto } from '../dto/update-profile.dto';
 import { RegenerateApiKeyDto } from '../dto/regenerate-api-key.dto';
 import { ApiKeyOnly, Company } from '../../auth/decorators';
+import { DomainService } from '../../domain/domain.service';
+import { prisma } from '@email-gateway/database';
 
 @ApiTags('Company Profile')
 @Controller('company')
@@ -29,7 +31,10 @@ import { ApiKeyOnly, Company } from '../../auth/decorators';
 export class ProfileController {
   private readonly logger = new Logger(ProfileController.name);
 
-  constructor(private readonly companyService: CompanyService) {}
+  constructor(
+    private readonly companyService: CompanyService,
+    private readonly domainService: DomainService,
+  ) {}
 
   /**
    * GET /v1/company/profile
@@ -165,5 +170,100 @@ export class ProfileController {
     });
 
     return result;
+  }
+
+  /**
+   * GET /v1/company/profile/default-sender
+   * Retorna informações sobre o remetente padrão atual e opções disponíveis
+   */
+  @Get('profile/default-sender')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Obter informações do remetente padrão',
+    description: 'Retorna o remetente padrão atual e lista domínios verificados disponíveis para configuração',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Informações do remetente padrão retornadas',
+  })
+  async getDefaultSenderInfo(@Company() companyId: string) {
+    const profile = await this.companyService.getProfile(companyId);
+
+    // Buscar domínios verificados diretamente do banco
+    const verifiedDomains = await prisma.domain.findMany({
+      where: {
+        companyId,
+        status: 'VERIFIED',
+      },
+      select: {
+        id: true,
+        domain: true,
+        status: true,
+        createdAt: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return {
+      current: {
+        fromAddress: profile.config.defaultFromAddress,
+        fromName: profile.config.defaultFromName,
+        domainId: profile.config.domainId,
+      },
+      availableDomains: verifiedDomains.map(d => ({
+        id: d.id,
+        domain: d.domain,
+        status: d.status,
+        createdAt: d.createdAt,
+      })),
+      message: verifiedDomains.length === 0
+        ? 'Nenhum domínio verificado disponível. Configure e verifique um domínio primeiro.'
+        : 'Use PUT /v1/company/profile/default-sender para alterar o remetente padrão.',
+    };
+  }
+
+  /**
+   * PUT /v1/company/profile/default-sender
+   * Define um novo domínio como remetente padrão
+   */
+  @Put('profile/default-sender')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Definir remetente padrão',
+    description: 'Define um domínio verificado como remetente padrão da empresa',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Remetente padrão atualizado com sucesso',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Domínio não encontrado ou não verificado',
+  })
+  async setDefaultSender(
+    @Company() companyId: string,
+    @Body() body: { domainId: string },
+  ) {
+    this.logger.log({
+      message: 'Set default sender request',
+      companyId,
+      domainId: body.domainId,
+    });
+
+    const result = await this.domainService.setDefaultDomain(companyId, body.domainId);
+
+    this.logger.log({
+      message: 'Default sender updated successfully',
+      companyId,
+      domain: result.domain,
+      fromAddress: result.defaultFromAddress,
+    });
+
+    return {
+      success: true,
+      message: 'Remetente padrão atualizado com sucesso',
+      domain: result.domain,
+      fromAddress: result.defaultFromAddress,
+    };
   }
 }

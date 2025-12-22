@@ -19,8 +19,8 @@ import { MetricsService } from './services/metrics.service';
 import { TracingService } from './services/tracing.service';
 import { SLOService } from './services/slo.service';
 import { loadWorkerConfig } from './config/worker.config';
-import { loadSESConfig, validateSESConfig } from './config/ses.config';
 import { EmailDriverService } from './services/email-driver.service';
+import { loadSESConfig, validateSESConfig } from './config/ses.config';
 import { loadPostalConfig, validatePostalConfig } from './drivers/postal/postal-config';
 import { MXRateLimiterService } from './services/mx-rate-limiter.service';
 
@@ -68,12 +68,11 @@ class EmailWorker {
     this.tracingService = new TracingService('email-worker');
 
     // Carrega e valida configurações dos providers
-    const providerToggle = (process.env.EMAIL_PROVIDER as EmailProvider | undefined) ?? EmailProvider.AWS_SES;
-    const fallbackEnabled = (process.env.EMAIL_PROVIDER_FALLBACK ?? 'false').toLowerCase() === 'true';
+    const providerToggle = (process.env.EMAIL_PROVIDER as EmailProvider | undefined) ?? EmailProvider.POSTAL_SMTP;
 
-    // Carrega SES config somente se for usado como primary ou fallback
+    // Carrega SES (desabilitado)
     let sesConfig = null;
-    const useSES = providerToggle === EmailProvider.AWS_SES || (fallbackEnabled && process.env.AWS_REGION);
+    const useSES = false;
 
     if (useSES) {
       try {
@@ -100,21 +99,9 @@ class EmailWorker {
         isActive: true,
       });
 
-      if (fallbackEnabled && sesConfig) {
-        driverDescriptors.push({
-          id: 'fallback-aws-ses',
-          config: sesConfig,
-          priority: 1,
-          isActive: true,
-        });
-      }
-    } else if (providerToggle === EmailProvider.AWS_SES && sesConfig) {
-      driverDescriptors.push({
-        id: 'primary-aws-ses',
-        config: sesConfig,
-        priority: 0,
-        isActive: true,
-      });
+      // SES fallback removido
+    } else {
+      throw new Error(`[EmailWorker] Unsupported EMAIL_PROVIDER: ${providerToggle}. Use POSTAL_SMTP.`);
     }
 
     const mxRateLimiter = new MXRateLimiterService(this.redis);

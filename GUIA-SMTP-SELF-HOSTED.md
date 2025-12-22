@@ -309,19 +309,18 @@ nano .env
 Adicionar/modificar:
 
 ```env
-# SMTP Configuration (Postal)
-SMTP_HOST=mail.seudominio.com
-SMTP_PORT=2525                    # Postal usa 2525 para envio
-SMTP_SECURE=false                 # false = usa STARTTLS
-SMTP_USER=USERNAME_DO_POSTAL      # Do passo 7
-SMTP_PASSWORD=PASSWORD_DO_POSTAL  # Do passo 7
-SMTP_FROM_ADDRESS=noreply@seudominio.com
-SMTP_FROM_NAME=Sua Empresa
+# Provider principal: SMTP self-hosted (Postal)
+EMAIL_PROVIDER=POSTAL_SMTP
 
-# Opcional: AWS SES como backup
-# AWS_REGION=us-east-1
-# AWS_ACCESS_KEY_ID=...
-# AWS_SECRET_ACCESS_KEY=...
+# Configuração Postal SMTP
+POSTAL_SMTP_HOST=mail.seudominio.com
+POSTAL_SMTP_PORT=2525                    # Postal usa 2525 para envio
+POSTAL_SMTP_SECURE=false                 # false = usa STARTTLS
+POSTAL_SMTP_USER=USERNAME_DO_POSTAL      # Do passo 7
+POSTAL_SMTP_PASS=PASSWORD_DO_POSTAL      # Do passo 7
+POSTAL_FROM_ADDRESS=noreply@seudominio.com
+# Opcional: Return-Path dedicado para bounces
+POSTAL_RETURN_PATH_DOMAIN=rp.seudominio.com
 ```
 
 ### Passo 2: Verificar Configuração

@@ -22,11 +22,15 @@ import { AuthModule } from '../auth/auth.module';
 // Database Module (para PrismaService)
 import { DatabaseModule } from '../../database/database.module';
 
+// Metrics Module (para métricas de bloqueio)
+import { MetricsModule } from '../metrics/metrics.module';
+
 @Module({
   imports: [
     ConfigModule,
     AuthModule, // Para usar guards de autenticação
     DatabaseModule, // Para usar PrismaService
+    MetricsModule, // Para métricas de bloqueio TASK-038
   ],
   controllers: [DomainController, DNSRecordsController],
   providers: [DomainService],

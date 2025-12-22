@@ -2,9 +2,10 @@
  * @email-gateway/api - Update Profile DTO
  *
  * TASK-037: DTO para atualização de perfil
+ * TASK-038: Removidos campos defaultFromAddress/defaultFromName - agora gerenciados via domínios
  */
 
-import { IsEmail, IsOptional, IsString, MinLength, MaxLength } from 'class-validator';
+import { IsOptional, IsString, MinLength, MaxLength } from 'class-validator';
 
 export class UpdateProfileDto {
   @IsOptional()
@@ -13,13 +14,7 @@ export class UpdateProfileDto {
   @MaxLength(100, { message: 'Nome deve ter no máximo 100 caracteres' })
   name?: string;
 
-  @IsOptional()
-  @IsEmail({}, { message: 'From Address inválido' })
-  defaultFromAddress?: string;
-
-  @IsOptional()
-  @IsString()
-  @MinLength(3, { message: 'From Name deve ter no mínimo 3 caracteres' })
-  @MaxLength(100, { message: 'From Name deve ter no máximo 100 caracteres' })
-  defaultFromName?: string;
+  // TASK-038: Removidos campos defaultFromAddress e defaultFromName
+  // Estes campos agora são gerenciados exclusivamente via setDefaultDomain
+  // com domínios verificados. Não podem ser editados diretamente no perfil.
 }

@@ -28,6 +28,7 @@ import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery } from '@nestjs/
 import { ApiKeyGuard } from '../auth/auth.guard';
 import { BasicAuthGuard } from '../auth/basic-auth.guard';
 import { RateLimitGuard } from '../auth/rate-limit.guard';
+import { Company, SandboxAllowed } from '../auth/decorators';
 
 // Services
 import { DomainService } from './domain.service';
@@ -45,7 +46,6 @@ import {
 
 @ApiTags('Domain Management')
 @Controller('v1/domains')
-@UseGuards(ApiKeyGuard, RateLimitGuard)
 export class DomainController {
   constructor(private readonly domainService: DomainService) {}
 
@@ -54,14 +54,14 @@ export class DomainController {
    * Lista domínios configurados
    */
   @Get()
+  @SandboxAllowed() // TASK-038: Permite acesso a empresas em sandbox
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Lista domínios configurados' })
   @ApiResponse({
     status: 200,
     description: 'Lista de domínios retornada com sucesso',
   })
-  async listDomains(@Request() req: any) {
-    const companyId = req.companyId;
+  async listDomains(@Company() companyId: string) {
     return this.domainService.listDomains(companyId);
   }
 
@@ -70,6 +70,7 @@ export class DomainController {
    * Adiciona novo domínio para verificação
    */
   @Post()
+  @SandboxAllowed() // TASK-038: Permite acesso a empresas em sandbox
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Adiciona novo domínio para verificação' })
   @ApiResponse({
@@ -78,9 +79,8 @@ export class DomainController {
   })
   async addDomain(
     @Body() body: DomainVerificationRequest,
-    @Request() req: any,
+    @Company() companyId: string,
   ): Promise<DomainVerificationResponse> {
-    const companyId = req.companyId;
     return this.domainService.addDomain(companyId, body);
   }
 
@@ -89,6 +89,7 @@ export class DomainController {
    * Verifica status de verificação de um domínio
    */
   @Get(':domain/status')
+  @SandboxAllowed() // TASK-038: Permite acesso a empresas em sandbox
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Verifica status de verificação de um domínio' })
   @ApiParam({ name: 'domain', description: 'Nome do domínio' })
@@ -98,9 +99,8 @@ export class DomainController {
   })
   async getDomainStatus(
     @Param('domain') domain: string,
-    @Request() req: any,
+    @Company() companyId: string,
   ): Promise<DomainVerificationResponse> {
-    const companyId = req.companyId;
     return this.domainService.getDomainStatus(companyId, domain);
   }
 
@@ -109,6 +109,7 @@ export class DomainController {
    * Inicia verificação de um domínio
    */
   @Post(':domain/verify')
+  @SandboxAllowed() // TASK-038: Permite acesso a empresas em sandbox
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Inicia verificação de um domínio' })
   @ApiParam({ name: 'domain', description: 'Nome do domínio' })
@@ -129,6 +130,7 @@ export class DomainController {
    * Obtém registros DNS necessários para um domínio
    */
   @Get(':domain/dns-records')
+  @SandboxAllowed() // TASK-038: Permite acesso a empresas em sandbox
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Obtém registros DNS necessários para um domínio' })
   @ApiParam({ name: 'domain', description: 'Nome do domínio' })
@@ -149,6 +151,7 @@ export class DomainController {
    * Habilita DKIM para um domínio
    */
   @Post(':domain/dkim')
+  @SandboxAllowed() // TASK-038: Permite acesso a empresas em sandbox
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Habilita DKIM para um domínio' })
   @ApiParam({ name: 'domain', description: 'Nome do domínio' })
@@ -169,6 +172,7 @@ export class DomainController {
    * Valida registros DNS de um domínio
    */
   @Post(':domain/validate-dns')
+  @SandboxAllowed() // TASK-038: Permite acesso a empresas em sandbox
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Valida registros DNS de um domínio' })
   @ApiParam({ name: 'domain', description: 'Nome do domínio' })
@@ -284,6 +288,7 @@ export class DomainController {
    * TASK-028: Endpoint para definir domínio padrão
    */
   @Put(':id/default')
+  @SandboxAllowed() // TASK-038: Permite acesso a empresas em sandbox
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Define um domínio como padrão para a empresa' })
   @ApiParam({ name: 'id', description: 'ID do domínio' })
@@ -293,9 +298,8 @@ export class DomainController {
   })
   async setDefaultDomain(
     @Param('id') id: string,
-    @Request() req: any,
+    @Company() companyId: string,
   ) {
-    const companyId = req.companyId;
     return this.domainService.setDefaultDomain(companyId, id);
   }
 

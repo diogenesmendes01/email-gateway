@@ -272,12 +272,13 @@ export class CompanyService {
       throw new NotFoundException('Empresa não encontrada');
     }
 
+    // TASK-038: Bloquear atualização direta de remetente padrão
+    // Remetente padrão deve ser definido apenas via setDefaultDomain
     await prisma.company.update({
       where: { id: companyId },
       data: {
         name: dto.name,
-        defaultFromAddress: dto.defaultFromAddress,
-        defaultFromName: dto.defaultFromName,
+        // defaultFromAddress e defaultFromName são gerenciados apenas pelo setDefaultDomain
       },
     });
 

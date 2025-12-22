@@ -12,6 +12,10 @@ export interface ApiKeyPayload {
   allowedIps?: string[];
   rateLimitConfig?: RateLimitConfig;
   isActive: boolean;
+  // TASK-038: Multi-tenant hardening fields
+  isApproved: boolean;
+  isSuspended: boolean;
+  suspensionReason?: string | null;
 }
 
 export interface RateLimitConfig {
@@ -86,6 +90,10 @@ export class AuthService {
             allowedIps: company.allowedIps,
             rateLimitConfig: company.rateLimitConfig as any as RateLimitConfig,
             isActive: company.isActive,
+            // TASK-038: Multi-tenant hardening fields
+            isApproved: company.isApproved,
+            isSuspended: company.isSuspended,
+            suspensionReason: company.suspensionReason,
           };
         }
       }

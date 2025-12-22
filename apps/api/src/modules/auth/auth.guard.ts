@@ -7,10 +7,14 @@ import {
 } from '@nestjs/common';
 import { Request } from 'express';
 import { AuthService, ApiKeyPayload } from './auth.service';
+import { MetricsService } from '../metrics/metrics.service';
 
 @Injectable()
 export class ApiKeyGuard implements CanActivate {
-  constructor(private authService: AuthService) {}
+  constructor(
+    private authService: AuthService,
+    private metricsService: MetricsService,
+  ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<Request>();
@@ -30,6 +34,29 @@ export class ApiKeyGuard implements CanActivate {
     // Verifica se a empresa está ativa
     if (!payload.isActive) {
       throw new ForbiddenException('Company is inactive');
+    }
+
+    // TASK-038: Verifica se a empresa está suspensa
+    if (payload.isSuspended) {
+      // Record metric for suspended tenant access
+      this.metricsService.recordTenantSuspended(payload.companyId, payload.suspensionReason);
+
+      throw new ForbiddenException({
+        code: 'COMPANY_SUSPENDED',
+        message: 'Company is suspended',
+        suspensionReason: payload.suspensionReason,
+      });
+    }
+
+    // TASK-038: Verifica se a empresa está aprovada
+    if (!payload.isApproved) {
+      // Record metric for unapproved tenant access
+      this.metricsService.recordTenantUnapproved(payload.companyId);
+
+      throw new ForbiddenException({
+        code: 'COMPANY_PENDING_APPROVAL',
+        message: 'Company pending approval',
+      });
     }
 
     // Verifica se a API Key expirou

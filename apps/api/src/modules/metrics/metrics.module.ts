@@ -66,6 +66,27 @@ import { MetricsService } from './metrics.service';
       labelNames: ['company_id', 'status'],
       buckets: [1, 5, 10, 30, 60, 120, 300], // 1s, 5s, 10s, 30s, 1min, 2min, 5min
     }),
+    // TASK-038: Multi-tenant blocking metrics
+    makeCounterProvider({
+      name: 'tenant_quota_exceeded_total',
+      help: 'Total number of quota exceeded blocks',
+      labelNames: ['company_id', 'current_count', 'limit'],
+    }),
+    makeCounterProvider({
+      name: 'tenant_suspended_access_total',
+      help: 'Total number of suspended tenant access blocks',
+      labelNames: ['company_id', 'suspension_reason'],
+    }),
+    makeCounterProvider({
+      name: 'tenant_unapproved_access_total',
+      help: 'Total number of unapproved tenant access blocks',
+      labelNames: ['company_id'],
+    }),
+    makeCounterProvider({
+      name: 'tenant_domain_access_denied_total',
+      help: 'Total number of domain access denied blocks',
+      labelNames: ['company_id', 'domain_id', 'action'],
+    }),
   ],
   exports: [MetricsService],
 })

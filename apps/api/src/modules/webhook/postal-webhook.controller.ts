@@ -8,7 +8,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { PostalWebhookValidatorService } from './postal-webhook-validator.service';
-import { WebhookQueueService } from './webhook-queue.service';
+import { WebhookIngestQueueService } from './webhook-ingest-queue.service';
 
 /**
  * Postal Webhook Controller - TRACK 2
@@ -21,7 +21,7 @@ export class PostalWebhookController {
 
   constructor(
     private readonly validatorService: PostalWebhookValidatorService,
-    private readonly queueService: WebhookQueueService,
+    private readonly ingestQueue: WebhookIngestQueueService,
   ) {}
 
   /**
@@ -55,16 +55,23 @@ export class PostalWebhookController {
         throw new BadRequestException('Unable to parse webhook event');
       }
 
-      // Enfileirar para processamento (webhook delivery)
-      // TODO: Implement proper webhook delivery queue
-      // await this.queueService.enqueueWebhookDelivery(webhookId, event.type, payload);
+      // Enfileirar para processamento (webhook ingest)
+      const jobId = await this.ingestQueue.enqueue({
+        provider: 'postal',
+        event: {
+          type: event.type,
+          messageId: event.messageId,
+          timestamp: event.timestamp,
+          metadata: event.metadata,
+        },
+        rawPayload: payload,
+        receivedAt: new Date(),
+      });
 
-      this.logger.log(
-        `Webhook enqueued: ${event.type} for ${event.messageId}`
-      );
+      this.logger.log(`Webhook enqueued: ${event.type} for ${event.messageId} (jobId=${jobId})`);
 
       // Responder imediatamente (não esperar processamento)
-      return { status: 'accepted', messageId: event.messageId };
+      return { status: 'accepted', messageId: event.messageId, jobId };
     } catch (error) {
       this.logger.error(`Webhook processing failed: ${(error as Error).message}`);
       throw error;

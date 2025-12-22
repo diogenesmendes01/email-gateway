@@ -41,6 +41,19 @@ export class MetricsService {
 
     @InjectMetric('email_batch_processing_duration_seconds')
     public batchProcessingDuration: Histogram<string>,
+
+    // TASK-038: Multi-tenant blocking metrics
+    @InjectMetric('tenant_quota_exceeded_total')
+    public quotaExceededCounter: Counter<string>,
+
+    @InjectMetric('tenant_suspended_access_total')
+    public tenantSuspendedCounter: Counter<string>,
+
+    @InjectMetric('tenant_unapproved_access_total')
+    public tenantUnapprovedCounter: Counter<string>,
+
+    @InjectMetric('tenant_domain_access_denied_total')
+    public domainAccessDeniedCounter: Counter<string>,
   ) {}
 
   /**
@@ -138,5 +151,46 @@ export class MetricsService {
       },
       durationSeconds
     );
+  }
+
+  /**
+   * TASK-038: Track quota exceeded blocks
+   */
+  recordQuotaExceeded(companyId: string, currentCount: number, limit: number) {
+    this.quotaExceededCounter.inc({
+      company_id: companyId,
+      current_count: currentCount.toString(),
+      limit: limit.toString(),
+    });
+  }
+
+  /**
+   * TASK-038: Track suspended tenant access blocks
+   */
+  recordTenantSuspended(companyId: string, suspensionReason?: string) {
+    this.tenantSuspendedCounter.inc({
+      company_id: companyId,
+      suspension_reason: suspensionReason || 'unknown',
+    });
+  }
+
+  /**
+   * TASK-038: Track unapproved tenant access blocks
+   */
+  recordTenantUnapproved(companyId: string) {
+    this.tenantUnapprovedCounter.inc({
+      company_id: companyId,
+    });
+  }
+
+  /**
+   * TASK-038: Track domain access denied
+   */
+  recordDomainAccessDenied(companyId: string, domainId: string, action: string) {
+    this.domainAccessDeniedCounter.inc({
+      company_id: companyId,
+      domain_id: domainId,
+      action, // get, post, verify, delete
+    });
   }
 }

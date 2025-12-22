@@ -10,9 +10,10 @@ import { CompanyController } from './controllers/company.controller';
 import { ProfileController } from './controllers/profile.controller'; // TASK-037
 import { CompanyService } from './services/company.service';
 import { AuthModule } from '../auth/auth.module'; // TASK-037: Required for ApiKeyGuard
+import { DomainModule } from '../domain/domain.module'; // TASK-038: Required for DomainService
 
 @Module({
-  imports: [AuthModule], // TASK-037: Import AuthModule for authentication guards
+  imports: [AuthModule, DomainModule], // TASK-037: Import AuthModule for authentication guards, TASK-038: Import DomainModule for DomainService
   controllers: [CompanyController, ProfileController], // TASK-037: Added ProfileController
   providers: [CompanyService],
   exports: [CompanyService],

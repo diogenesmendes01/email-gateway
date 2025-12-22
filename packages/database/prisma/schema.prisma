@@ -496,7 +496,7 @@ model Suppression {
 model EmailProviderConfig {
   id            String          @id @default(cuid())
   companyId     String?         @map("company_id") // null = global/default
-  provider      EmailProvider   @default(AWS_SES)
+  provider      EmailProvider   @default(POSTAL_SMTP)
   isActive      Boolean         @default(true) @map("is_active")
   priority      Int             @default(0) // 0 = highest priority
   

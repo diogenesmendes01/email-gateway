@@ -519,31 +519,46 @@ export const ProfilePage: React.FC = () => {
         <div className="bg-white shadow rounded-lg p-6">
           <h3 className="text-lg font-medium text-gray-900 mb-4">Configurações de Envio</h3>
           <div className="space-y-4">
+            {/* TASK-038: Bloqueio de edição direta de remetente */}
+            <div className="bg-blue-50 border border-blue-200 rounded-md p-4 mb-4">
+              <div className="flex">
+                <div className="flex-shrink-0">
+                  <span className="text-blue-400">ℹ️</span>
+                </div>
+                <div className="ml-3">
+                  <h4 className="text-sm font-medium text-blue-800">
+                    Remetente Padrão
+                  </h4>
+                  <p className="text-sm text-blue-700 mt-1">
+                    O remetente padrão é configurado através de domínios verificados na seção "Domínios".
+                    Apenas domínios verificados podem ser usados como remetente padrão.
+                  </p>
+                  <p className="text-sm text-blue-700 mt-2">
+                    <a href="/domains" className="font-medium underline">
+                      Gerenciar Domínios e Remetente Padrão →
+                    </a>
+                  </p>
+                </div>
+              </div>
+            </div>
+
             <div>
               <label className="block text-sm font-medium text-gray-700">From Address</label>
-              {isEditing ? (
-                <input
-                  type="email"
-                  value={formData.defaultFromAddress}
-                  onChange={(e) => setFormData({ ...formData, defaultFromAddress: e.target.value })}
-                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                />
-              ) : (
-                <p className="mt-1 text-sm text-gray-900">{profile.config.defaultFromAddress || 'Não configurado'}</p>
-              )}
+              <p className="mt-1 text-sm text-gray-900 font-mono bg-gray-50 px-3 py-2 rounded border">
+                {profile.config.defaultFromAddress || 'Não configurado'}
+              </p>
+              <p className="text-xs text-gray-500 mt-1">
+                Configurado automaticamente ao definir um domínio padrão
+              </p>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700">From Name</label>
-              {isEditing ? (
-                <input
-                  type="text"
-                  value={formData.defaultFromName}
-                  onChange={(e) => setFormData({ ...formData, defaultFromName: e.target.value })}
-                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                />
-              ) : (
-                <p className="mt-1 text-sm text-gray-900">{profile.config.defaultFromName || 'Não configurado'}</p>
-              )}
+              <p className="mt-1 text-sm text-gray-900 font-mono bg-gray-50 px-3 py-2 rounded border">
+                {profile.config.defaultFromName || 'Não configurado'}
+              </p>
+              <p className="text-xs text-gray-500 mt-1">
+                Configurado automaticamente ao definir um domínio padrão
+              </p>
             </div>
           </div>
         </div>

@@ -22,7 +22,7 @@
     "build:dashboard": "npm run build --workspace=@email-gateway/dashboard",
     "test": "npm run test --workspaces",
     "test:ci": "npm run ci:test",
-    "test:api": "npm run test --workspace=@email-gateway/api",
+    "test:api": "cd apps/api && npm test",
     "test:worker": "npm run test --workspace=@email-gateway/worker",
     "lint": "npm run lint --workspaces",
     "lint:ci": "npm run ci:lint",
