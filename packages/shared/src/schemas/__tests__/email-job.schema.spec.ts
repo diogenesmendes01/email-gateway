@@ -19,7 +19,7 @@ describe('Email Job Schemas', () => {
   describe('emailJobRecipientSchema', () => {
     it('deve validar recipient válido com recipientId', () => {
       const valid = {
-        recipientId: '123e4567-e89b-12d3-a456-426614174000',
+        recipientId: 'clrk8z0000000abcdef12345',
         email: 'test@example.com',
       };
 
@@ -94,12 +94,12 @@ describe('Email Job Schemas', () => {
 
   describe('emailSendJobDataSchema', () => {
     const validJobData = {
-      outboxId: '123e4567-e89b-12d3-a456-426614174000',
-      companyId: '789e4567-e89b-12d3-a456-426614174999',
+      outboxId: 'clrk8z0000000abcdef12345',
+      companyId: 'clrk8z0001111abcdef67890',
       requestId: 'req-abc123',
       to: 'cliente@example.com',
       subject: 'Seu boleto está disponível',
-      htmlRef: '123e4567-e89b-12d3-a456-426614174000',
+      htmlRef: 'clrk8z0000000abcdef12345',
       recipient: {
         externalId: 'CUST-12345',
         cpfCnpjHash: 'a'.repeat(64),
@@ -129,14 +129,14 @@ describe('Email Job Schemas', () => {
       expect(result).toEqual(withOptional);
     });
 
-    it('deve rejeitar outboxId inválido (não UUID)', () => {
+    it('deve rejeitar outboxId inválido (não CUID)', () => {
       const invalid = {
         ...validJobData,
-        outboxId: 'not-a-uuid',
+        outboxId: 'not-a-cuid',
       };
 
       expect(() => emailSendJobDataSchema.parse(invalid)).toThrow(
-        'UUID válido',
+        'CUID válido',
       );
     });
 
@@ -228,12 +228,12 @@ describe('Email Job Schemas', () => {
 
   describe('validateEmailJobData', () => {
     const validJobData = {
-      outboxId: '123e4567-e89b-12d3-a456-426614174000',
-      companyId: '789e4567-e89b-12d3-a456-426614174999',
+      outboxId: 'clrk8z0000000abcdef12345',
+      companyId: 'clrk8z0001111abcdef67890',
       requestId: 'req-abc123',
       to: 'cliente@example.com',
       subject: 'Teste',
-      htmlRef: '123e4567-e89b-12d3-a456-426614174000',
+      htmlRef: 'clrk8z0000000abcdef12345',
       recipient: {
         externalId: 'CUST-12345',
         nome: 'João',
@@ -261,7 +261,7 @@ describe('Email Job Schemas', () => {
       const withRecipientId = {
         ...validJobData,
         recipient: {
-          recipientId: '123e4567-e89b-12d3-a456-426614174000',
+          recipientId: 'clrk8z0000000abcdef12345',
           email: 'cliente@example.com',
         },
       };
@@ -306,7 +306,7 @@ describe('Email Job Schemas', () => {
   describe('emailSendJobOptionsSchema', () => {
     it('deve validar options com valores padrão', () => {
       const valid = {
-        jobId: '123e4567-e89b-12d3-a456-426614174000',
+        jobId: 'clrk8z0000000abcdef12345',
       };
 
       const result = emailSendJobOptionsSchema.parse(valid);
@@ -319,7 +319,7 @@ describe('Email Job Schemas', () => {
 
     it('deve validar options completas', () => {
       const valid = {
-        jobId: '123e4567-e89b-12d3-a456-426614174000',
+        jobId: 'clrk8z0000000abcdef12345',
         ttl: 3600000, // 1 hora
         priority: 1,
         delay: 5000,
@@ -333,7 +333,7 @@ describe('Email Job Schemas', () => {
 
     it('deve rejeitar TTL acima de 24h', () => {
       const invalid = {
-        jobId: '123e4567-e89b-12d3-a456-426614174000',
+        jobId: 'clrk8z0000000abcdef12345',
         ttl: EMAIL_JOB_CONFIG.DEFAULT_TTL + 1,
       };
 
@@ -344,7 +344,7 @@ describe('Email Job Schemas', () => {
 
     it('deve rejeitar priority fora do range', () => {
       const invalid = {
-        jobId: '123e4567-e89b-12d3-a456-426614174000',
+        jobId: 'clrk8z0000000abcdef12345',
         priority: 11,
       };
 
@@ -355,7 +355,7 @@ describe('Email Job Schemas', () => {
 
     it('deve rejeitar delay negativo', () => {
       const invalid = {
-        jobId: '123e4567-e89b-12d3-a456-426614174000',
+        jobId: 'clrk8z0000000abcdef12345',
         delay: -1000,
       };
 

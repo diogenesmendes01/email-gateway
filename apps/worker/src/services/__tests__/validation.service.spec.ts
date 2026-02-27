@@ -37,11 +37,11 @@ describe('ValidationService', () => {
   describe('validateIntegrity', () => {
     it('should pass validation for valid job data', async () => {
       const validJobData: EmailSendJobData = {
-        outboxId: '123e4567-e89b-12d3-a456-426614174000',
-        companyId: '123e4567-e89b-12d3-a456-426614174001',
+        outboxId: 'clrk8z0000000abcdef12345',
+        companyId: 'clrk8z0001111abcdef67890',
         recipient: {
           email: 'test@example.com',
-          recipientId: '123e4567-e89b-12d3-a456-426614174002',
+          recipientId: 'clrk8z0002222abcdef11111',
         },
         subject: 'Test Email',
         htmlRef: 'test-ref',
@@ -59,7 +59,7 @@ describe('ValidationService', () => {
 
     it('should fail validation for invalid payload (missing fields)', async () => {
       const invalidJobData = {
-        outboxId: '123e4567-e89b-12d3-a456-426614174000',
+        outboxId: 'clrk8z0000000abcdef12345',
         // Missing required fields
       };
 
@@ -72,10 +72,10 @@ describe('ValidationService', () => {
       expect(result.error).toBeDefined();
     });
 
-    it('should fail validation for invalid UUID format', async () => {
+    it('should fail validation for invalid CUID format', async () => {
       const invalidJobData = {
-        outboxId: 'invalid-uuid',
-        companyId: '123e4567-e89b-12d3-a456-426614174001',
+        outboxId: 'invalid-cuid',
+        companyId: 'clrk8z0001111abcdef67890',
         recipient: {
           email: 'test@example.com',
         },
@@ -94,8 +94,8 @@ describe('ValidationService', () => {
 
   describe('validateOutbox', () => {
     const validJobData: EmailSendJobData = {
-      outboxId: '123e4567-e89b-12d3-a456-426614174000',
-      companyId: '123e4567-e89b-12d3-a456-426614174001',
+      outboxId: 'clrk8z0000000abcdef12345',
+      companyId: 'clrk8z0001111abcdef67890',
       recipient: {
         email: 'test@example.com',
       },
@@ -162,11 +162,11 @@ describe('ValidationService', () => {
 
   describe('validateRecipient', () => {
     const validJobData: EmailSendJobData = {
-      outboxId: '123e4567-e89b-12d3-a456-426614174000',
-      companyId: '123e4567-e89b-12d3-a456-426614174001',
+      outboxId: 'clrk8z0000000abcdef12345',
+      companyId: 'clrk8z0001111abcdef67890',
       recipient: {
         email: 'test@example.com',
-        recipientId: '123e4567-e89b-12d3-a456-426614174002',
+        recipientId: 'clrk8z0002222abcdef11111',
       },
       subject: 'Test Email',
       htmlRef: 'test-ref',
@@ -282,8 +282,8 @@ describe('ValidationService', () => {
 
   describe('validateTemplate', () => {
     const validJobData: EmailSendJobData = {
-      outboxId: '123e4567-e89b-12d3-a456-426614174000',
-      companyId: '123e4567-e89b-12d3-a456-426614174001',
+      outboxId: 'clrk8z0000000abcdef12345',
+      companyId: 'clrk8z0001111abcdef67890',
       recipient: {
         email: 'test@example.com',
       },
@@ -402,11 +402,11 @@ describe('ValidationService', () => {
 
   describe('validateAll', () => {
     const validJobData: EmailSendJobData = {
-      outboxId: '123e4567-e89b-12d3-a456-426614174000',
-      companyId: '123e4567-e89b-12d3-a456-426614174001',
+      outboxId: 'clrk8z0000000abcdef12345',
+      companyId: 'clrk8z0001111abcdef67890',
       recipient: {
         email: 'test@example.com',
-        recipientId: '123e4567-e89b-12d3-a456-426614174002',
+        recipientId: 'clrk8z0002222abcdef11111',
       },
       subject: 'Test Email',
       htmlRef: 'test-ref',

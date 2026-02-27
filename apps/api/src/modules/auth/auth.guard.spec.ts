@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ExecutionContext, UnauthorizedException, ForbiddenException } from '@nestjs/common';
 import { ApiKeyGuard } from './auth.guard';
 import { AuthService, ApiKeyPayload } from './auth.service';
+import { MetricsService } from '../metrics/metrics.service';
 
 describe('ApiKeyGuard', () => {
   let guard: ApiKeyGuard;
@@ -18,6 +19,13 @@ describe('ApiKeyGuard', () => {
             isApiKeyExpired: jest.fn(),
             validateIpAllowlist: jest.fn(),
             updateLastUsedAt: jest.fn(),
+          },
+        },
+        {
+          provide: MetricsService,
+          useValue: {
+            recordTenantSuspended: jest.fn(),
+            recordTenantUnapproved: jest.fn(),
           },
         },
       ],
@@ -59,6 +67,8 @@ describe('ApiKeyGuard', () => {
         expiresAt: new Date(Date.now() + 86400000),
         allowedIps: [],
         isActive: true,
+        isApproved: true,
+        isSuspended: false,
       };
 
       (authService.validateApiKey as jest.Mock).mockResolvedValue(mockPayload);
@@ -182,6 +192,8 @@ describe('ApiKeyGuard', () => {
         expiresAt: new Date(Date.now() - 86400000), // Expired
         allowedIps: [],
         isActive: true,
+        isApproved: true,
+        isSuspended: false,
       };
 
       (authService.validateApiKey as jest.Mock).mockResolvedValue(mockPayload);
@@ -229,6 +241,8 @@ describe('ApiKeyGuard', () => {
         expiresAt: new Date(Date.now() + 86400000),
         allowedIps: [],
         isActive: true,
+        isApproved: true,
+        isSuspended: false,
       };
 
       (authService.validateApiKey as jest.Mock).mockResolvedValue(mockPayload);

@@ -34,7 +34,8 @@ describe('validateEncryptionKey', () => {
     it('should reject all-zeros keys', () => {
       const result = validateEncryptionKey('0'.repeat(32));
       expect(result.valid).toBe(false);
-      expect(result.error).toContain('All zeros');
+      // All-zeros also matches the all-same-character pattern (checked first)
+      expect(result.error).toContain('All characters are the same');
     });
 
     it('should reject sequential hex pattern', () => {
@@ -44,7 +45,7 @@ describe('validateEncryptionKey', () => {
     });
 
     it('should reject keys with placeholder words - changeme', () => {
-      const result = validateEncryptionKey('changeme1234567890123456789012');
+      const result = validateEncryptionKey('changeme123456789012345678901234');
       expect(result.valid).toBe(false);
       expect(result.error).toContain('Contains placeholder word');
     });
@@ -90,33 +91,36 @@ describe('validateEncryptionKey', () => {
     });
 
     it('should accept keys with exactly 16 unique characters', () => {
-      // Exactly 16 unique chars: a-p
-      const result = validateEncryptionKey('abcdefghijklmnopabcdefghijklmnop');
+      // Exactly 16 unique chars without sequential patterns (abc/123/xyz/789/012)
+      const result = validateEncryptionKey('gHjKmNpRtVwZaDeFgHjKmNpRtVwZaDeF');
       expect(result.valid).toBe(true);
     });
 
     it('should accept keys with more than 16 unique characters', () => {
-      // More than 16 unique chars
-      const result = validateEncryptionKey('abcdefghijklmnopqrstuvwxyz123456');
+      // More than 16 unique chars without sequential patterns
+      const result = validateEncryptionKey('gHjKmNpRtVwZaDeFqSuBhJkLnPrTvWxY');
       expect(result.valid).toBe(true);
     });
   });
 
   describe('Sequential pattern detection', () => {
     it('should reject short keys with abc pattern', () => {
-      const result = validateEncryptionKey('abc' + 'x'.repeat(29));
+      // 17 unique chars so entropy passes, but contains 'abc' and length < 48
+      const result = validateEncryptionKey('abcGHJKMNPQRSTUVWabcGHJKMNPQRSTU');
       expect(result.valid).toBe(false);
       expect(result.error).toContain('sequential patterns');
     });
 
     it('should reject short keys with 123 pattern', () => {
-      const result = validateEncryptionKey('123' + 'x'.repeat(29));
+      // 17 unique chars so entropy passes, but contains '123' and length < 48
+      const result = validateEncryptionKey('123GHJKMNPQRSTUVW123GHJKMNPQRSTU');
       expect(result.valid).toBe(false);
       expect(result.error).toContain('sequential patterns');
     });
 
     it('should accept longer keys with sequential patterns (48+ chars)', () => {
-      const result = validateEncryptionKey('123' + 'x'.repeat(45));
+      // Contains '123' but key is >= 48 chars so sequential check is skipped
+      const result = validateEncryptionKey('123gHjKmNpRtVwZaDeFgHjKmNpRtVwZaDeFgHjKmNpRtVwZaDeF');
       expect(result.valid).toBe(true);
     });
   });
@@ -144,12 +148,14 @@ describe('validateEncryptionKey', () => {
 
   describe('Edge cases', () => {
     it('should handle exactly 16 unique chars with repetition', () => {
-      const result = validateEncryptionKey('abcdefghijklmnopabcdefghijklmnop');
+      // 16 unique chars (g,H,j,K,m,N,p,R,t,V,w,Z,a,D,e,F) without sequential patterns
+      const result = validateEncryptionKey('gHjKmNpRtVwZaDeFgHjKmNpRtVwZaDeF');
       expect(result.valid).toBe(true);
     });
 
     it('should handle 15 unique chars (should fail)', () => {
-      const result = validateEncryptionKey('abcdefghijklmnoabcdefghijklmno12');
+      // 15 unique chars (g,H,j,K,m,N,p,R,t,V,w,Z,a,D,e) without sequential patterns
+      const result = validateEncryptionKey('gHjKmNpRtVwZaDeHjKmNpRtVwZaDeggg');
       expect(result.valid).toBe(false);
       expect(result.error).toContain('15/16');
     });

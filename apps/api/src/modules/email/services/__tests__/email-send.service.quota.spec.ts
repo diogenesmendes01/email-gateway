@@ -65,6 +65,8 @@ describe('EmailSendService - Quota Integration (TASK-038)', () => {
             recordEmailSent: jest.fn(),
             recordEmailFailed: jest.fn(),
             recordEmailSendDuration: jest.fn(),
+            recordQuotaExceeded: jest.fn(),
+            recordEncryptionLatency: jest.fn(),
           },
         },
         {

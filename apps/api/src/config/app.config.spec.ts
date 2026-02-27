@@ -12,7 +12,7 @@ describe('AppConfigService', () => {
     process.env.REDIS_URL = 'redis://localhost:6379';
     process.env.DASHBOARD_USERNAME = 'admin';
     process.env.DASHBOARD_PASSWORD_HASH = 'hashed-password';
-    process.env.ENCRYPTION_KEY = 'a'.repeat(32); // 32 caracteres
+    process.env.ENCRYPTION_KEY = 'x7K9mP2vN8qR4tY6wE3sA5dF1gH0jL9z'; // 32 caracteres
     process.env.PORT = '3000';
     process.env.API_PREFIX = 'v1';
     process.env.NODE_ENV = 'test';
@@ -32,7 +32,7 @@ describe('AppConfigService', () => {
           SES_FROM_ADDRESS: 'test@example.com',
           DASHBOARD_USERNAME: 'admin',
           DASHBOARD_PASSWORD_HASH: 'hashed-password',
-          ENCRYPTION_KEY: 'a'.repeat(32), // 32 caracteres
+          ENCRYPTION_KEY: 'x7K9mP2vN8qR4tY6wE3sA5dF1gH0jL9z', // 32 caracteres
           PORT: '3000',
           API_PREFIX: 'v1',
           NODE_ENV: 'test',
@@ -110,7 +110,7 @@ describe('AppConfigService', () => {
             REDIS_URL: 'redis://localhost:6379',
             DASHBOARD_USERNAME: 'admin',
             DASHBOARD_PASSWORD_HASH: 'hashed-password',
-            ENCRYPTION_KEY: 'a'.repeat(32),
+            ENCRYPTION_KEY: 'x7K9mP2vN8qR4tY6wE3sA5dF1gH0jL9z',
           };
           return config[key] || defaultValue;
         }),
@@ -144,7 +144,7 @@ describe('AppConfigService', () => {
       const config = service.encryption;
       
       expect(config).toEqual({
-        key: 'a'.repeat(32),
+        key: 'x7K9mP2vN8qR4tY6wE3sA5dF1gH0jL9z',
         saltSecret: undefined,
       });
     });
@@ -166,7 +166,7 @@ describe('AppConfigService', () => {
             REDIS_URL: 'redis://localhost:6379',
             DASHBOARD_USERNAME: 'admin',
             DASHBOARD_PASSWORD_HASH: 'hashed-password',
-            ENCRYPTION_KEY: 'a'.repeat(32),
+            ENCRYPTION_KEY: 'x7K9mP2vN8qR4tY6wE3sA5dF1gH0jL9z',
             NODE_ENV: 'production',
           };
           return config[key] || defaultValue;
@@ -197,7 +197,7 @@ describe('AppConfigService', () => {
             REDIS_URL: 'redis://localhost:6379',
             DASHBOARD_USERNAME: 'admin',
             DASHBOARD_PASSWORD_HASH: 'hashed-password',
-            ENCRYPTION_KEY: 'a'.repeat(32),
+            ENCRYPTION_KEY: 'x7K9mP2vN8qR4tY6wE3sA5dF1gH0jL9z',
             NODE_ENV: 'development',
           };
           return config[key] || defaultValue;
@@ -231,7 +231,7 @@ describe('AppConfigService', () => {
 
       // Verificar se valores sensíveis estão mascarados
       expect(allConfig.dashboard.passwordHash).toBe('hash***word');
-      expect(allConfig.encryption.key).toBe('aaaa***aaaa');
+      expect(allConfig.encryption.key).toBe('x7K9***jL9z');
     });
   });
 
@@ -270,7 +270,7 @@ describe('AppConfigService', () => {
             // REDIS_URL ausente
             DASHBOARD_USERNAME: 'admin',
             DASHBOARD_PASSWORD_HASH: 'hashed-password',
-            ENCRYPTION_KEY: 'a'.repeat(32),
+            ENCRYPTION_KEY: 'x7K9mP2vN8qR4tY6wE3sA5dF1gH0jL9z',
           };
           return config[key] || defaultValue;
         }),
@@ -335,7 +335,7 @@ describe('AppConfigService', () => {
             REDIS_URL: 'redis://localhost:6379',
             DASHBOARD_USERNAME: 'admin',
             DASHBOARD_PASSWORD_HASH: 'hashed-password',
-            ENCRYPTION_KEY: 'a'.repeat(32),
+            ENCRYPTION_KEY: 'x7K9mP2vN8qR4tY6wE3sA5dF1gH0jL9z',
           };
           return config[key] || defaultValue;
         }),
@@ -362,7 +362,7 @@ describe('AppConfigService', () => {
             REDIS_URL: 'redis://localhost:6379',
             DASHBOARD_USERNAME: 'admin',
             DASHBOARD_PASSWORD_HASH: 'hashed-password',
-            ENCRYPTION_KEY: 'a'.repeat(32),
+            ENCRYPTION_KEY: 'x7K9mP2vN8qR4tY6wE3sA5dF1gH0jL9z',
             PORT: '70000', // Porta fora do range válido (1-65535)
           };
           return config[key] || defaultValue;
@@ -395,7 +395,7 @@ describe('AppConfigService', () => {
             REDIS_URL: 'not-a-redis-url',
             DASHBOARD_USERNAME: 'admin',
             DASHBOARD_PASSWORD_HASH: 'hashed-password',
-            ENCRYPTION_KEY: 'a'.repeat(32),
+            ENCRYPTION_KEY: 'x7K9mP2vN8qR4tY6wE3sA5dF1gH0jL9z',
           };
           return config[key] || defaultValue;
         }),

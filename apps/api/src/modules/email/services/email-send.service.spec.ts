@@ -13,9 +13,13 @@ jest.mock('@email-gateway/database', () => ({
       create: jest.fn(),
       update: jest.fn(),
       findUnique: jest.fn(),
+      delete: jest.fn(),
     },
     recipient: {
       upsert: jest.fn(),
+    },
+    recipientBlocklist: {
+      findUnique: jest.fn(),
     },
   },
 }));
@@ -24,14 +28,57 @@ class MockQueueService {
   enqueueEmailJob = jest.fn(async (data: any) => data.outboxId);
 }
 
+class MockMetricsService {
+  recordEmailSent = jest.fn();
+  recordEmailFailed = jest.fn();
+  recordEmailSendDuration = jest.fn();
+  recordQuotaExceeded = jest.fn();
+  recordEncryptionLatency = jest.fn();
+}
+
+class MockContentValidationService {
+  validateEmail = jest.fn().mockResolvedValue({
+    valid: true,
+    score: 0.8,
+    errors: [],
+    warnings: [],
+  });
+}
+
+class MockDailyQuotaService {
+  checkQuota = jest.fn().mockResolvedValue({
+    allowed: true,
+    current: 50,
+    limit: 1000,
+    resetsAt: '2025-01-01T00:00:00.000Z',
+  });
+  incrementQuota = jest.fn().mockResolvedValue(undefined);
+}
+
 describe('EmailSendService', () => {
   let service: EmailSendService;
   let queue: MockQueueService;
+  let metrics: MockMetricsService;
+  let contentValidation: MockContentValidationService;
+  let dailyQuota: MockDailyQuotaService;
 
   beforeEach(() => {
     jest.resetAllMocks();
     queue = new MockQueueService();
-    service = new EmailSendService(queue as any);
+    metrics = new MockMetricsService();
+    contentValidation = new MockContentValidationService();
+    dailyQuota = new MockDailyQuotaService();
+    service = new EmailSendService(
+      queue as any,
+      metrics as any,
+      contentValidation as any,
+      dailyQuota as any,
+    );
+
+    // Default: no blocklist match
+    (prisma.recipientBlocklist.findUnique as jest.Mock).mockResolvedValue(null);
+    // Default: no idempotency conflict
+    (prisma.idempotencyKey.findUnique as jest.Mock).mockResolvedValue(null);
   });
 
   it('deve criar outbox, enfileirar job e atualizar status para ENQUEUED', async () => {
@@ -43,7 +90,6 @@ describe('EmailSendService', () => {
     // emailOutbox.create devolve id gerado
     (prisma.emailOutbox.create as jest.Mock).mockResolvedValue({ id: outboxId });
     (prisma.recipient.upsert as jest.Mock).mockResolvedValue({ id: recipientId });
-    (prisma.idempotencyKey.findUnique as jest.Mock).mockResolvedValue(null);
 
     // Act
     const result = await service.sendEmail({
@@ -71,7 +117,6 @@ describe('EmailSendService', () => {
   it('deve realizar rollback do outbox se enqueue falhar', async () => {
     // Arrange
     (prisma.emailOutbox.create as jest.Mock).mockResolvedValue({ id: 'o1' });
-    (prisma.idempotencyKey.findUnique as jest.Mock).mockResolvedValue(null);
     (prisma.emailOutbox.delete as unknown as jest.Mock) = jest.fn();
     const errorQueue = new Error('redis down');
     queue.enqueueEmailJob = jest.fn().mockRejectedValue(errorQueue);
@@ -85,5 +130,3 @@ describe('EmailSendService', () => {
     ).rejects.toBeTruthy();
   });
 });
-
-

@@ -5,12 +5,11 @@ describe('ErrorMappingService', () => {
     it('deve criar erro de rate limit com informações corretas', () => {
       const error = ErrorMappingService.mapRateLimitExceeded('gmail.com', 5000);
 
-      expect(error.code).toBe('RATE_LIMIT_EXCEEDED');
-      expect(error.category).toBe('RATE_LIMIT');
+      expect(error.code).toBe('SES_THROTTLING');
+      expect(error.category).toBe('QUOTA_ERROR');
       expect(error.message).toContain('gmail.com');
-      expect(error.message).toContain('5000');
-      expect(error.isRetryable).toBe(true);
-      expect(error.retryAfterMs).toBe(5000);
+      expect(error.retryable).toBe(true);
+      expect(error.metadata?.retryAfterMs).toBe(5000);
     });
 
     it('deve incluir domínio no metadata', () => {
@@ -23,7 +22,7 @@ describe('ErrorMappingService', () => {
     it('deve marcar como retryable', () => {
       const error = ErrorMappingService.mapRateLimitExceeded('test.com', 2000);
 
-      expect(error.isRetryable).toBe(true);
+      expect(error.retryable).toBe(true);
     });
   });
 
@@ -37,26 +36,26 @@ describe('ErrorMappingService', () => {
 
       const error = ErrorMappingService.mapSESError(sesError);
 
-      expect(error.code).toBe('RATE_LIMIT_EXCEEDED');
-      expect(error.category).toBe('RATE_LIMIT');
-      expect(error.isRetryable).toBe(true);
+      expect(error.code).toBe('SES_THROTTLING');
+      expect(error.category).toBe('QUOTA_ERROR');
+      expect(error.retryable).toBe(true);
     });
 
-    it('deve mapear erro de email inválido', () => {
+    it('deve mapear erro de mensagem rejeitada', () => {
       const sesError = {
-        name: 'InvalidParameterValue',
-        message: 'Invalid email address',
+        name: 'MessageRejected',
+        message: 'Message rejected',
         $metadata: {},
       };
 
       const error = ErrorMappingService.mapSESError(sesError);
 
-      expect(error.code).toBe('INVALID_EMAIL');
-      expect(error.category).toBe('VALIDATION');
-      expect(error.isRetryable).toBe(false);
+      expect(error.code).toBe('SES_MESSAGE_REJECTED');
+      expect(error.category).toBe('PERMANENT_ERROR');
+      expect(error.retryable).toBe(false);
     });
 
-    it('deve mapear erro de reputação', () => {
+    it('deve mapear erro de conta pausada', () => {
       const sesError = {
         name: 'AccountSendingPausedException',
         message: 'Account sending paused',
@@ -65,71 +64,85 @@ describe('ErrorMappingService', () => {
 
       const error = ErrorMappingService.mapSESError(sesError);
 
-      expect(error.code).toBe('REPUTATION_ISSUE');
-      expect(error.category).toBe('REPUTATION');
-      expect(error.isRetryable).toBe(false);
+      expect(error.code).toBe('SES_ACCOUNT_SENDING_PAUSED');
+      expect(error.category).toBe('PERMANENT_ERROR');
+      expect(error.retryable).toBe(false);
+    });
+
+    it('deve mapear erro desconhecido para fallback', () => {
+      const sesError = {
+        name: 'SomeUnknownError',
+        message: 'Something went wrong',
+        $metadata: {},
+      };
+
+      const error = ErrorMappingService.mapSESError(sesError);
+
+      expect(error.code).toBe('UNKNOWN_ERROR');
+      expect(error.category).toBe('PERMANENT_ERROR');
+      expect(error.retryable).toBe(false);
+      expect(error.originalCode).toBe('SomeUnknownError');
     });
   });
 
-  describe('mapPostalError', () => {
-    it('deve mapear erro de SMTP', () => {
-      const postalError = {
-        responseCode: 550,
-        response: '550 Mailbox not found',
-      };
+  describe('mapGenericError', () => {
+    it('deve mapear erro genérico', () => {
+      const error = ErrorMappingService.mapGenericError(new Error('SMTP error'));
 
-      const error = ErrorMappingService.mapPostalError(postalError);
-
-      expect(error.code).toBe('INVALID_RECIPIENT');
-      expect(error.category).toBe('PERMANENT');
-      expect(error.isRetryable).toBe(false);
+      expect(error.code).toBe('UNKNOWN_ERROR');
+      expect(error.category).toBe('PERMANENT_ERROR');
+      expect(error.retryable).toBe(false);
+      expect(error.message).toContain('SMTP error');
     });
 
-    it('deve mapear erro temporário', () => {
-      const postalError = {
-        responseCode: 421,
-        response: '421 Service not available',
-      };
+    it('deve mapear string como erro', () => {
+      const error = ErrorMappingService.mapGenericError('string error');
 
-      const error = ErrorMappingService.mapPostalError(postalError);
-
-      expect(error.category).toBe('TEMPORARY');
-      expect(error.isRetryable).toBe(true);
-    });
-
-    it('deve incluir código de resposta original', () => {
-      const postalError = {
-        responseCode: 554,
-        response: '554 Transaction failed',
-      };
-
-      const error = ErrorMappingService.mapPostalError(postalError);
-
-      expect(error.originalCode).toBe('554');
+      expect(error.code).toBe('UNKNOWN_ERROR');
+      expect(error.message).toContain('string error');
     });
   });
 
-  describe('isRetryable', () => {
-    it('deve identificar erros retryable', () => {
-      const error = {
-        code: 'RATE_LIMIT_EXCEEDED',
-        category: 'RATE_LIMIT',
-        message: 'Rate limit exceeded',
-        isRetryable: true,
-      };
+  describe('mapValidationError', () => {
+    it('deve mapear erro de validação', () => {
+      const error = ErrorMappingService.mapValidationError('Campo obrigatório');
 
-      expect(error.isRetryable).toBe(true);
+      expect(error.code).toBe('INVALID_PAYLOAD');
+      expect(error.category).toBe('VALIDATION_ERROR');
+      expect(error.retryable).toBe(false);
+      expect(error.message).toBe('Campo obrigatório');
+    });
+  });
+
+  describe('shouldRetry', () => {
+    it('deve retornar true para erros retryable', () => {
+      const error = ErrorMappingService.mapRateLimitExceeded('test.com', 1000);
+      expect(ErrorMappingService.shouldRetry(error)).toBe(true);
     });
 
-    it('deve identificar erros não-retryable', () => {
-      const error = {
-        code: 'INVALID_EMAIL',
-        category: 'VALIDATION',
-        message: 'Invalid email',
-        isRetryable: false,
-      };
+    it('deve retornar false para erros não-retryable', () => {
+      const error = ErrorMappingService.mapValidationError('invalid');
+      expect(ErrorMappingService.shouldRetry(error)).toBe(false);
+    });
+  });
 
-      expect(error.isRetryable).toBe(false);
+  describe('formatForLogging', () => {
+    it('deve formatar erro com código original', () => {
+      const sesError = { name: 'Throttling', message: 'Rate exceeded', $metadata: {} };
+      const error = ErrorMappingService.mapSESError(sesError);
+      const formatted = ErrorMappingService.formatForLogging(error);
+
+      expect(formatted).toContain('QUOTA_ERROR');
+      expect(formatted).toContain('SES_THROTTLING');
+      expect(formatted).toContain('Throttling');
+    });
+
+    it('deve formatar erro sem código original', () => {
+      const error = ErrorMappingService.mapValidationError('Campo inválido');
+      const formatted = ErrorMappingService.formatForLogging(error);
+
+      expect(formatted).toContain('VALIDATION_ERROR');
+      expect(formatted).toContain('INVALID_PAYLOAD');
     });
   });
 });

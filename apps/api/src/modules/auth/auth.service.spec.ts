@@ -9,7 +9,11 @@ jest.mock('@email-gateway/database', () => ({
   prisma: {
     company: {
       findMany: jest.fn(),
+      findUnique: jest.fn(),
       update: jest.fn(),
+      create: jest.fn(),
+    },
+    auditLog: {
       create: jest.fn(),
     },
   },
@@ -90,18 +94,23 @@ describe('AuthService', () => {
   });
 
   describe('validateApiKey', () => {
+    // Note: validateApiKey extracts first 12 chars as prefix via apiKey.substring(0, 12)
     it('should return payload for valid API key', async () => {
       const apiKey = 'sk_live_valid_key';
+      const extractedPrefix = apiKey.substring(0, 12); // 'sk_live_vali'
       const mockHash = 'hashed_key';
       const mockCompany = {
         id: 'company-123',
         name: 'Test Company',
         apiKeyHash: mockHash,
-        apiKeyPrefix: 'sk_live',
+        apiKeyPrefix: extractedPrefix,
         apiKeyCreatedAt: new Date(),
         apiKeyExpiresAt: new Date(Date.now() + 86400000), // 1 day from now
         lastUsedAt: null,
         isActive: true,
+        isApproved: true,
+        isSuspended: false,
+        suspensionReason: null,
         allowedIps: ['192.168.1.1'],
         rateLimitConfig: { rps: 60, burst: 120, windowMs: 1000 },
       };
@@ -114,18 +123,21 @@ describe('AuthService', () => {
 
       expect(result).toEqual({
         companyId: 'company-123',
-        prefix: 'sk_live',
+        prefix: extractedPrefix,
         expiresAt: mockCompany.apiKeyExpiresAt,
         lastUsedAt: undefined,
         allowedIps: ['192.168.1.1'],
         rateLimitConfig: { rps: 60, burst: 120, windowMs: 1000 },
         isActive: true,
+        isApproved: true,
+        isSuspended: false,
+        suspensionReason: null,
       });
 
       expect(bcrypt.compare).toHaveBeenCalledWith(apiKey, mockHash);
       expect(prisma.company.findMany).toHaveBeenCalledWith({
         where: {
-          apiKeyPrefix: 'sk_live',
+          apiKeyPrefix: extractedPrefix,
           isActive: true,
         },
       });
@@ -137,16 +149,20 @@ describe('AuthService', () => {
 
     it('should return null for invalid API key hash', async () => {
       const apiKey = 'sk_live_invalid_key';
+      const extractedPrefix = apiKey.substring(0, 12); // 'sk_live_inva'
       const mockHash = 'hashed_key';
       const mockCompany = {
         id: 'company-123',
         name: 'Test Company',
         apiKeyHash: mockHash,
-        apiKeyPrefix: 'sk_live',
+        apiKeyPrefix: extractedPrefix,
         apiKeyCreatedAt: new Date(),
         apiKeyExpiresAt: new Date(Date.now() + 86400000),
         lastUsedAt: null,
         isActive: true,
+        isApproved: true,
+        isSuspended: false,
+        suspensionReason: null,
         allowedIps: [],
         rateLimitConfig: null,
       };
@@ -163,16 +179,20 @@ describe('AuthService', () => {
 
     it('should throw UnauthorizedException for expired API key', async () => {
       const apiKey = 'sk_live_expired_key';
+      const extractedPrefix = apiKey.substring(0, 12); // 'sk_live_expi'
       const mockHash = 'hashed_key';
       const mockCompany = {
         id: 'company-123',
         name: 'Test Company',
         apiKeyHash: mockHash,
-        apiKeyPrefix: 'sk_live',
+        apiKeyPrefix: extractedPrefix,
         apiKeyCreatedAt: new Date(),
         apiKeyExpiresAt: new Date(Date.now() - 86400000), // 1 day ago
         lastUsedAt: null,
         isActive: true,
+        isApproved: true,
+        isSuspended: false,
+        suspensionReason: null,
         allowedIps: [],
         rateLimitConfig: null,
       };
@@ -185,7 +205,6 @@ describe('AuthService', () => {
 
     it('should return null for inactive company', async () => {
       const apiKey = 'sk_live_inactive_key';
-      const mockHash = 'hashed_key';
 
       (bcrypt.compare as jest.Mock).mockResolvedValue(true);
       (prisma.company.findMany as jest.Mock).mockResolvedValue([]);
@@ -197,7 +216,6 @@ describe('AuthService', () => {
 
     it('should return null when company not found', async () => {
       const apiKey = 'sk_live_not_found_key';
-      const mockHash = 'hashed_key';
 
       (bcrypt.compare as jest.Mock).mockResolvedValue(true);
       (prisma.company.findMany as jest.Mock).mockResolvedValue([]);

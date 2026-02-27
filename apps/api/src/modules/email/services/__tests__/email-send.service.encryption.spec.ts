@@ -10,6 +10,9 @@ import { EmailSendService } from '../email-send.service';
 import { InternalServerErrorException } from '@nestjs/common';
 import * as encryptionUtils from '@email-gateway/shared';
 import { QueueService } from '../../../queue/queue.service';
+import { MetricsService } from '../../../metrics/metrics.service';
+import { ContentValidationService } from '../content-validation.service';
+import { DailyQuotaService } from '../daily-quota.service';
 
 // Mock the shared encryption utilities
 jest.mock('@email-gateway/shared', () => ({
@@ -50,6 +53,27 @@ describe('EmailSendService - Encryption Integration', () => {
           provide: QueueService,
           useValue: {
             addEmailToQueue: jest.fn(),
+          },
+        },
+        {
+          provide: MetricsService,
+          useValue: {
+            recordEmailSent: jest.fn(),
+            recordEmailFailed: jest.fn(),
+            recordEncryptionLatency: jest.fn(),
+          },
+        },
+        {
+          provide: ContentValidationService,
+          useValue: {
+            validate: jest.fn().mockReturnValue({ isValid: true }),
+          },
+        },
+        {
+          provide: DailyQuotaService,
+          useValue: {
+            checkQuota: jest.fn().mockResolvedValue(true),
+            incrementUsage: jest.fn(),
           },
         },
       ],
