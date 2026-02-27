@@ -75,7 +75,6 @@ enum BatchStatus {
 
 // ===== NEW: ESP Self-Hosted Enums =====
 enum EmailProvider {
-  AWS_SES
   POSTAL_SMTP
   POSTAL_API
   MAILU_SMTP

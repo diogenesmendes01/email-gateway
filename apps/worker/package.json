@@ -8,22 +8,18 @@
     "build": "tsc",
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
     "dev:webhook": "ts-node-dev --respawn --transpile-only src/webhook-worker.ts",
-    "dev:ses-events": "ts-node-dev --respawn --transpile-only src/ses-event-worker.ts",
     "start": "node dist/index.js",
     "start:webhook": "node dist/webhook-worker.js",
-    "start:ses-events": "node dist/ses-event-worker.js",
     "start:prod": "node dist/index.js",
     "start:webhook:prod": "node dist/webhook-worker.js",
-    "start:ses-events:prod": "node dist/ses-event-worker.js",
     "lint": "eslint \"{src,test}/**/*.ts\" --fix",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage"
   },
   "dependencies": {
-    "@aws-sdk/client-ses": "^3.913.0",
-    "@email-gateway/database": "*",
-    "@email-gateway/shared": "*",
+    "@email-gateway/database": "workspace:*",
+    "@email-gateway/shared": "workspace:*",
     "@nestjs/bullmq": "^11.0.4",
     "@types/nodemailer": "^7.0.3",
     "@willsoto/nestjs-prometheus": "^6.0.2",
@@ -73,8 +69,7 @@
       "<rootDir>/processors/",
       "<rootDir>/services/logging.service.ts",
       "<rootDir>/services/tracing.service.ts",
-      "<rootDir>/services/audit.service.ts",
-      "<rootDir>/services/domain-management.service.ts"
+      "<rootDir>/services/audit.service.ts"
     ],
     "moduleNameMapper": {
       "^@email-gateway/shared$": "<rootDir>/../../../packages/shared/src/index.ts",

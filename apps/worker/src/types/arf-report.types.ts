@@ -31,6 +31,7 @@ export interface ARFReport {
   sourceIP?: string;
   reportingMUA?: string;
   authFailure?: string; // e.g., "dkim", "spf", "dmarc"
+  authFailureType?: string; // e.g., "dkim", "spf", "dmarc" (from Auth-Failure header)
 }
 
 export type ARFFeedbackType =

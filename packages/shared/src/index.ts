@@ -21,7 +21,6 @@ export * from './types/test-utils.types'; // TASK-022
 export * from './types/email-provider.types';
 
 // Services
-export * from './services/domain-management.service';
 export * from './services/domain-warmup.service'; // TASK-016
 
 // Utils

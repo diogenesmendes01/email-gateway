@@ -36,30 +36,6 @@ class EnvironmentVariables {
   @IsString()
   REDIS_PASSWORD?: string;
 
-  // AWS SES
-  @IsString()
-  AWS_ACCESS_KEY_ID!: string;
-
-  @IsString()
-  AWS_SECRET_ACCESS_KEY!: string;
-
-  @IsString()
-  AWS_REGION!: string;
-
-  @IsString()
-  AWS_SES_REGION!: string;
-
-  @IsString()
-  SES_FROM_ADDRESS!: string;
-
-  @IsOptional()
-  @IsString()
-  SES_REPLY_TO_ADDRESS?: string;
-
-  @IsOptional()
-  @IsString()
-  SES_CONFIGURATION_SET_NAME?: string;
-
   // Dashboard Authentication
   @IsString()
   DASHBOARD_USERNAME!: string;
@@ -125,11 +101,6 @@ class EnvironmentVariables {
   @IsOptional()
   @Transform(({ value }) => value === 'true')
   @IsBoolean()
-  CHAOS_SES_429?: boolean;
-
-  @IsOptional()
-  @Transform(({ value }) => value === 'true')
-  @IsBoolean()
   CHAOS_DISK_FILL?: boolean;
 
   @IsOptional()
@@ -158,21 +129,6 @@ class EnvironmentVariables {
   @Min(1)
   QUEUE_ALERT_FAILED_THRESHOLD?: number;
 
-  // Domain Management (TASK 6.2)
-  @IsOptional()
-  @Transform(({ value }) => parseInt(value, 10))
-  @IsNumber()
-  @Min(1)
-  @Max(100)
-  SES_QUOTA_THRESHOLD?: number;
-
-  @IsOptional()
-  @IsString()
-  SES_ALERT_EMAIL?: string;
-
-  @IsOptional()
-  @IsString()
-  SES_QUOTA_LOG?: string;
 }
 
 /**
@@ -246,24 +202,6 @@ export class AppConfigService {
   }
 
   /**
-   * AWS SES configuration
-   */
-  get ses() {
-    return {
-      accessKeyId: this.config.AWS_ACCESS_KEY_ID,
-      secretAccessKey: this.config.AWS_SECRET_ACCESS_KEY,
-      region: this.config.AWS_REGION,
-      sesRegion: this.config.AWS_SES_REGION,
-      fromAddress: this.config.SES_FROM_ADDRESS,
-      replyToAddress: this.config.SES_REPLY_TO_ADDRESS,
-      configurationSetName: this.config.SES_CONFIGURATION_SET_NAME,
-      quotaThreshold: this.config.SES_QUOTA_THRESHOLD || 80,
-      alertEmail: this.config.SES_ALERT_EMAIL,
-      quotaLog: this.config.SES_QUOTA_LOG,
-    };
-  }
-
-  /**
    * Dashboard authentication
    */
   get dashboard() {
@@ -311,7 +249,6 @@ export class AppConfigService {
    */
   get chaos() {
     return {
-      ses429: this.config.CHAOS_SES_429 || false,
       diskFill: this.config.CHAOS_DISK_FILL || false,
       redisDown60s: this.config.CHAOS_REDIS_DOWN_60S || false,
     };
@@ -344,12 +281,6 @@ export class AppConfigService {
     return {
       database: this.database,
       redis: this.redis,
-      ses: {
-        ...this.ses,
-        // Mascarar credenciais sensíveis
-        accessKeyId: this.maskSensitiveValue(this.ses.accessKeyId),
-        secretAccessKey: this.maskSensitiveValue(this.ses.secretAccessKey),
-      },
       dashboard: {
         ...this.dashboard,
         passwordHash: this.maskSensitiveValue(this.dashboard.passwordHash),

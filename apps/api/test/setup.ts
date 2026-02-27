@@ -105,31 +105,6 @@ jest.mock('@email-gateway/database', () => ({
   },
 }));
 
-// Mock AWS SDK
-jest.mock('@aws-sdk/client-ses', () => ({
-  SESClient: jest.fn(),
-  VerifyDomainIdentityCommand: jest.fn(),
-  GetIdentityVerificationAttributesCommand: jest.fn(),
-  SetIdentityDkimEnabledCommand: jest.fn(),
-  GetIdentityDkimAttributesCommand: jest.fn(),
-  GetAccountSendingEnabledCommand: jest.fn(),
-  GetSendQuotaCommand: jest.fn(),
-}));
-
-jest.mock('@aws-sdk/client-sesv2', () => ({
-  SESv2Client: jest.fn(),
-  PutEmailIdentityDkimSigningAttributesCommand: jest.fn(),
-  GetEmailIdentityCommand: jest.fn(),
-  PutAccountSendingAttributesCommand: jest.fn(),
-  GetAccountVdmAttributesCommand: jest.fn(),
-  GetDedicatedIpPoolCommand: jest.fn(),
-  GetEmailIdentityDkimAttributesCommand: jest.fn(),
-  GetEmailIdentityMailFromAttributesCommand: jest.fn(),
-  GetEmailIdentityPoliciesCommand: jest.fn(),
-  GetEmailIdentityFeedbackAttributesCommand: jest.fn(),
-  GetEmailIdentityVerificationAttributesCommand: jest.fn(),
-}));
-
 // Mock DNS
 jest.mock('dns/promises', () => ({
   resolveTxt: jest.fn(),

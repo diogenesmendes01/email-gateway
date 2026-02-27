@@ -10,11 +10,6 @@ describe('AppConfigService', () => {
     // Set up environment variables before creating the service
     process.env.DATABASE_URL = 'postgresql://user:pass@localhost:5432/db';
     process.env.REDIS_URL = 'redis://localhost:6379';
-    process.env.AWS_ACCESS_KEY_ID = 'test-key';
-    process.env.AWS_SECRET_ACCESS_KEY = 'test-secret';
-    process.env.AWS_REGION = 'us-east-1';
-    process.env.AWS_SES_REGION = 'us-east-1';
-    process.env.SES_FROM_ADDRESS = 'test@example.com';
     process.env.DASHBOARD_USERNAME = 'admin';
     process.env.DASHBOARD_PASSWORD_HASH = 'hashed-password';
     process.env.ENCRYPTION_KEY = 'a'.repeat(32); // 32 caracteres
@@ -23,7 +18,7 @@ describe('AppConfigService', () => {
     process.env.NODE_ENV = 'test';
     process.env.RATE_LIMIT_TTL = '60';
     process.env.RATE_LIMIT_MAX = '100';
-    process.env.SES_QUOTA_THRESHOLD = '80';
+
 
     const mockConfigService = {
       get: jest.fn((key: string, defaultValue?: any) => {
@@ -43,7 +38,6 @@ describe('AppConfigService', () => {
           NODE_ENV: 'test',
           RATE_LIMIT_TTL: '60',
           RATE_LIMIT_MAX: '100',
-          SES_QUOTA_THRESHOLD: '80',
         };
         return config[key] || defaultValue;
       }),
@@ -87,25 +81,6 @@ describe('AppConfigService', () => {
     });
   });
 
-  describe('ses', () => {
-    it('deve retornar configuração do SES', () => {
-      const config = service.ses;
-      
-      expect(config).toEqual({
-        accessKeyId: 'test-key',
-        secretAccessKey: 'test-secret',
-        region: 'us-east-1',
-        sesRegion: 'us-east-1',
-        fromAddress: 'test@example.com',
-        replyToAddress: undefined,
-        configurationSetName: undefined,
-        quotaThreshold: 80,
-        alertEmail: undefined,
-        quotaLog: undefined,
-      });
-    });
-  });
-
   describe('dashboard', () => {
     it('deve retornar configuração do dashboard', () => {
       const config = service.dashboard;
@@ -133,11 +108,6 @@ describe('AppConfigService', () => {
           const config: Record<string, string> = {
             DATABASE_URL: 'postgresql://user:pass@localhost:5432/db',
             REDIS_URL: 'redis://localhost:6379',
-            AWS_ACCESS_KEY_ID: 'test-key',
-            AWS_SECRET_ACCESS_KEY: 'test-secret',
-            AWS_REGION: 'us-east-1',
-            AWS_SES_REGION: 'us-east-1',
-            SES_FROM_ADDRESS: 'test@example.com',
             DASHBOARD_USERNAME: 'admin',
             DASHBOARD_PASSWORD_HASH: 'hashed-password',
             ENCRYPTION_KEY: 'a'.repeat(32),
@@ -194,11 +164,6 @@ describe('AppConfigService', () => {
           const config: Record<string, string> = {
             DATABASE_URL: 'postgresql://user:pass@localhost:5432/db',
             REDIS_URL: 'redis://localhost:6379',
-            AWS_ACCESS_KEY_ID: 'test-key',
-            AWS_SECRET_ACCESS_KEY: 'test-secret',
-            AWS_REGION: 'us-east-1',
-            AWS_SES_REGION: 'us-east-1',
-            SES_FROM_ADDRESS: 'test@example.com',
             DASHBOARD_USERNAME: 'admin',
             DASHBOARD_PASSWORD_HASH: 'hashed-password',
             ENCRYPTION_KEY: 'a'.repeat(32),
@@ -230,11 +195,6 @@ describe('AppConfigService', () => {
           const config: Record<string, string> = {
             DATABASE_URL: 'postgresql://user:pass@localhost:5432/db',
             REDIS_URL: 'redis://localhost:6379',
-            AWS_ACCESS_KEY_ID: 'test-key',
-            AWS_SECRET_ACCESS_KEY: 'test-secret',
-            AWS_REGION: 'us-east-1',
-            AWS_SES_REGION: 'us-east-1',
-            SES_FROM_ADDRESS: 'test@example.com',
             DASHBOARD_USERNAME: 'admin',
             DASHBOARD_PASSWORD_HASH: 'hashed-password',
             ENCRYPTION_KEY: 'a'.repeat(32),
@@ -264,17 +224,12 @@ describe('AppConfigService', () => {
 
       expect(allConfig).toHaveProperty('database');
       expect(allConfig).toHaveProperty('redis');
-      expect(allConfig).toHaveProperty('ses');
       expect(allConfig).toHaveProperty('dashboard');
       expect(allConfig).toHaveProperty('rateLimit');
       expect(allConfig).toHaveProperty('app');
       expect(allConfig).toHaveProperty('encryption');
 
       // Verificar se valores sensíveis estão mascarados
-      // Pattern: first 4 chars + *** + last 4 chars
-      // 'test-key' has 8 chars, so it becomes '***'
-      expect(allConfig.ses.accessKeyId).toBe('***');
-      expect(allConfig.ses.secretAccessKey).toBe('test***cret');
       expect(allConfig.dashboard.passwordHash).toBe('hash***word');
       expect(allConfig.encryption.key).toBe('aaaa***aaaa');
     });
@@ -313,11 +268,6 @@ describe('AppConfigService', () => {
           const config: Record<string, string> = {
             DATABASE_URL: 'postgresql://user:pass@localhost:5432/db',
             // REDIS_URL ausente
-            AWS_ACCESS_KEY_ID: 'test-key',
-            AWS_SECRET_ACCESS_KEY: 'test-secret',
-            AWS_REGION: 'us-east-1',
-            AWS_SES_REGION: 'us-east-1',
-            SES_FROM_ADDRESS: 'test@example.com',
             DASHBOARD_USERNAME: 'admin',
             DASHBOARD_PASSWORD_HASH: 'hashed-password',
             ENCRYPTION_KEY: 'a'.repeat(32),
@@ -350,11 +300,6 @@ describe('AppConfigService', () => {
           const config: Record<string, string> = {
             DATABASE_URL: 'postgresql://user:pass@localhost:5432/db',
             REDIS_URL: 'redis://localhost:6379',
-            AWS_ACCESS_KEY_ID: 'test-key',
-            AWS_SECRET_ACCESS_KEY: 'test-secret',
-            AWS_REGION: 'us-east-1',
-            AWS_SES_REGION: 'us-east-1',
-            SES_FROM_ADDRESS: 'test@example.com',
             DASHBOARD_USERNAME: 'admin',
             DASHBOARD_PASSWORD_HASH: 'hashed-password',
             ENCRYPTION_KEY: 'short',
@@ -388,11 +333,6 @@ describe('AppConfigService', () => {
           const config: Record<string, string> = {
             DATABASE_URL: 'invalid-url-format',
             REDIS_URL: 'redis://localhost:6379',
-            AWS_ACCESS_KEY_ID: 'test-key',
-            AWS_SECRET_ACCESS_KEY: 'test-secret',
-            AWS_REGION: 'us-east-1',
-            AWS_SES_REGION: 'us-east-1',
-            SES_FROM_ADDRESS: 'test@example.com',
             DASHBOARD_USERNAME: 'admin',
             DASHBOARD_PASSWORD_HASH: 'hashed-password',
             ENCRYPTION_KEY: 'a'.repeat(32),
@@ -420,11 +360,6 @@ describe('AppConfigService', () => {
           const config: Record<string, string> = {
             DATABASE_URL: 'postgresql://user:pass@localhost:5432/db',
             REDIS_URL: 'redis://localhost:6379',
-            AWS_ACCESS_KEY_ID: 'test-key',
-            AWS_SECRET_ACCESS_KEY: 'test-secret',
-            AWS_REGION: 'us-east-1',
-            AWS_SES_REGION: 'us-east-1',
-            SES_FROM_ADDRESS: 'test@example.com',
             DASHBOARD_USERNAME: 'admin',
             DASHBOARD_PASSWORD_HASH: 'hashed-password',
             ENCRYPTION_KEY: 'a'.repeat(32),
@@ -458,11 +393,6 @@ describe('AppConfigService', () => {
           const config: Record<string, string> = {
             DATABASE_URL: 'postgresql://user:pass@localhost:5432/db',
             REDIS_URL: 'not-a-redis-url',
-            AWS_ACCESS_KEY_ID: 'test-key',
-            AWS_SECRET_ACCESS_KEY: 'test-secret',
-            AWS_REGION: 'us-east-1',
-            AWS_SES_REGION: 'us-east-1',
-            SES_FROM_ADDRESS: 'test@example.com',
             DASHBOARD_USERNAME: 'admin',
             DASHBOARD_PASSWORD_HASH: 'hashed-password',
             ENCRYPTION_KEY: 'a'.repeat(32),

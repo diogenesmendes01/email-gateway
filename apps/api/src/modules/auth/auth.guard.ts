@@ -39,7 +39,7 @@ export class ApiKeyGuard implements CanActivate {
     // TASK-038: Verifica se a empresa está suspensa
     if (payload.isSuspended) {
       // Record metric for suspended tenant access
-      this.metricsService.recordTenantSuspended(payload.companyId, payload.suspensionReason);
+      this.metricsService.recordTenantSuspended(payload.companyId, payload.suspensionReason ?? undefined);
 
       throw new ForbiddenException({
         code: 'COMPANY_SUSPENDED',

@@ -3,7 +3,7 @@
  *
  * Worker principal para processar jobs de envio de email
  *
- * TASK 4.1 — Pipeline de estados, validações e envio SES
+ * TASK 4.1 — Pipeline de estados, validações e envio SMTP
  * TASK 4.2 — Concorrência, fairness e desligamento gracioso
  * TASK 7.1 — Métricas, logs e tracing
  */
@@ -20,7 +20,6 @@ import { TracingService } from './services/tracing.service';
 import { SLOService } from './services/slo.service';
 import { loadWorkerConfig } from './config/worker.config';
 import { EmailDriverService } from './services/email-driver.service';
-import { loadSESConfig, validateSESConfig } from './config/ses.config';
 import { loadPostalConfig, validatePostalConfig } from './drivers/postal/postal-config';
 import { MXRateLimiterService } from './services/mx-rate-limiter.service';
 
@@ -70,22 +69,6 @@ class EmailWorker {
     // Carrega e valida configurações dos providers
     const providerToggle = (process.env.EMAIL_PROVIDER as EmailProvider | undefined) ?? EmailProvider.POSTAL_SMTP;
 
-    // Carrega SES (desabilitado)
-    let sesConfig = null;
-    const useSES = false;
-
-    if (useSES) {
-      try {
-        sesConfig = loadSESConfig();
-        validateSESConfig(sesConfig);
-      } catch (error) {
-        if (providerToggle === EmailProvider.AWS_SES) {
-          throw error; // Se SES é primary, erro é crítico
-        }
-        console.warn('[EmailWorker] SES config not available for fallback:', error.message);
-      }
-    }
-
     const driverDescriptors = [];
 
     if (providerToggle === EmailProvider.POSTAL_SMTP) {
@@ -98,8 +81,6 @@ class EmailWorker {
         priority: 0,
         isActive: true,
       });
-
-      // SES fallback removido
     } else {
       throw new Error(`[EmailWorker] Unsupported EMAIL_PROVIDER: ${providerToggle}. Use POSTAL_SMTP.`);
     }

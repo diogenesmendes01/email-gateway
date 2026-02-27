@@ -1,9 +1,7 @@
 /**
  * @email-gateway/api - Domain Management DTOs
  *
- * DTOs para gerenciamento de domínios, DNS e configurações SES
- *
- * TASK 6.2 — SES, domínio e DNS (SPF/DKIM)
+ * DTOs para gerenciamento de domínios e DNS (SPF/DKIM)
  */
 
 import { IsString, IsNumber, IsOptional, IsBoolean, IsDateString, Min, Max } from 'class-validator';
@@ -37,7 +35,7 @@ export class DNSRecord {
   @IsString()
   type!: 'TXT' | 'CNAME' | 'MX';
 
-  @ApiProperty({ description: 'Nome do registro', example: '_amazonses.example.com' })
+  @ApiProperty({ description: 'Nome do registro', example: '_emailgateway.example.com' })
   @IsString()
   name!: string;
 
@@ -118,35 +116,6 @@ export class DNSRecordsResponse {
 }
 
 /**
- * Response de status da quota SES
- */
-export class SESQuotaStatusResponse {
-  @ApiProperty({ description: 'Quota máxima de envio em 24h', example: 200 })
-  max24HourSend!: number;
-
-  @ApiProperty({ description: 'Taxa máxima de envio por segundo', example: 14 })
-  maxSendRate!: number;
-
-  @ApiProperty({ description: 'Emails enviados nas últimas 24h', example: 150 })
-  sentLast24Hours!: number;
-
-  @ApiProperty({ description: 'Percentual de quota usada', example: 75.0 })
-  percentageUsed!: number;
-
-  @ApiProperty({ description: 'Se está próximo do limite', example: false })
-  isNearLimit!: boolean;
-
-  @ApiProperty({ description: 'Região AWS', example: 'us-east-1' })
-  region!: string;
-
-  @ApiPropertyOptional({ description: 'Espaço disponível restante', example: 50 })
-  remainingQuota?: number;
-
-  @ApiPropertyOptional({ description: 'Data da última atualização' })
-  lastUpdated?: string;
-}
-
-/**
  * Request para configuração de warm-up
  */
 export class WarmupConfigRequest {
@@ -185,69 +154,6 @@ export class WarmupConfigResponse {
 
   @ApiProperty({ description: 'Se o warm-up foi configurado com sucesso', example: true })
   success!: boolean;
-
-  @ApiPropertyOptional({ description: 'Mensagem de erro' })
-  errorMessage?: string;
-}
-
-/**
- * Item do checklist
- */
-export class ChecklistItem {
-  @ApiProperty({ description: 'ID do item', example: 'domain-verification' })
-  id!: string;
-
-  @ApiProperty({ description: 'Descrição do item', example: 'Verificar se todos os domínios estão verificados' })
-  description!: string;
-
-  @ApiProperty({ description: 'Status do item', example: 'pending' })
-  status!: 'pending' | 'completed' | 'failed';
-
-  @ApiProperty({ description: 'Prioridade do item', example: 'high' })
-  priority!: 'high' | 'medium' | 'low';
-
-  @ApiPropertyOptional({ description: 'Data de conclusão' })
-  completedAt?: string;
-
-  @ApiPropertyOptional({ description: 'Observações' })
-  notes?: string;
-}
-
-/**
- * Response do checklist de sandbox para produção
- */
-export class SandboxChecklistResponse {
-  @ApiProperty({ description: 'Itens do checklist', type: [ChecklistItem] })
-  items!: ChecklistItem[];
-
-  @ApiProperty({ description: 'Percentual de conclusão', example: 25.0 })
-  completionPercentage!: number;
-
-  @ApiProperty({ description: 'Itens pendentes', example: 6 })
-  pendingItems!: number;
-
-  @ApiProperty({ description: 'Itens concluídos', example: 2 })
-  completedItems!: number;
-
-  @ApiProperty({ description: 'Itens com falha', example: 0 })
-  failedItems!: number;
-}
-
-/**
- * Response de validação de região
- */
-export class RegionValidationResponse {
-  @ApiProperty({ description: 'Região validada', example: 'us-east-1' })
-  region!: string;
-
-  @ApiProperty({ description: 'Se a região é válida', example: true })
-  isValid!: boolean;
-
-  @ApiProperty({ description: 'Se a região é recomendada', example: true })
-  isRecommended!: boolean;
-
-  @ApiPropertyOptional({ description: 'Informações de quota da região' })
-  quotaInfo?: SESQuotaStatusResponse;
 
   @ApiPropertyOptional({ description: 'Mensagem de erro' })
   errorMessage?: string;

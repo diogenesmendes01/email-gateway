@@ -221,10 +221,6 @@ describe('Health Endpoints (Integration)', () => {
       const requiredVars = [
         'DATABASE_URL',
         'REDIS_URL',
-        'AWS_ACCESS_KEY_ID',
-        'AWS_SECRET_ACCESS_KEY',
-        'AWS_SES_REGION',
-        'SES_FROM_ADDRESS',
         'ENCRYPTION_KEY',
       ];
 

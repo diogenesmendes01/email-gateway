@@ -1,86 +1,53 @@
 /**
  * @email-gateway/api - Domain Management Service
  *
- * Service para gerenciamento de domínios, DNS e configurações SES
- *
- * TASK 6.2 — SES, domínio e DNS (SPF/DKIM)
- * Lógica de negócio para verificação de domínio, criação de registros DNS,
- * validação de região/quota e warm-up de volumetria
+ * Service para gerenciamento de domínios e DNS (SPF/DKIM)
+ * Usa banco de dados (Prisma) e verificação DNS nativa (dns/promises)
+ * Sem dependência de AWS SES.
  */
 
 import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { prisma } from '@email-gateway/database';
 import { DomainVerificationStatus as PrismaDomainVerificationStatus } from '@prisma/client';
+import * as crypto from 'crypto';
+import * as dns from 'dns/promises';
 
 // DTOs
 import {
   DomainVerificationRequest,
   DomainVerificationResponse,
   DNSRecordsResponse,
-  SESQuotaStatusResponse,
   WarmupConfigRequest,
   WarmupConfigResponse,
-  SandboxChecklistResponse,
-  RegionValidationResponse,
   DomainListResponse,
   DomainVerificationStatus,
   DKIMVerificationStatus,
   DNSRecord,
-  ChecklistItem,
 } from './dto/domain.dto';
 
-// Domain management service from worker (TODO: move to shared package)
-import { DomainManagementService } from '../../../../worker/src/services/domain-management.service';
-
-/**
- * Service de gerenciamento de domínios
- */
 @Injectable()
 export class DomainService {
   private readonly logger = new Logger(DomainService.name);
-  private domainManagementService: DomainManagementService;
-
-  constructor(private configService: ConfigService) {
-    const region = this.configService.get<string>('AWS_REGION', 'us-east-1');
-    this.domainManagementService = new DomainManagementService(region);
-  }
 
   /**
    * Lista domínios configurados para uma empresa
    */
   async listDomains(companyId: string): Promise<DomainListResponse> {
-    // Busca domínios no banco de dados
     const domains = await prisma.domain.findMany({
       where: { companyId },
       orderBy: { createdAt: 'desc' },
+      include: { onboarding: true },
     });
 
-    // Converte para response format
-    const domainResponses: DomainVerificationResponse[] = await Promise.all(
-      domains.map(async (domain) => {
-        try {
-          const status = await this.domainManagementService.verifyDomainStatus(domain.domain);
-          return {
-            domain: domain.domain,
-            status: status.status,
-            verificationToken: status.verificationToken,
-            dnsRecords: status.dnsRecords,
-            dkimTokens: status.dkimTokens,
-            dkimStatus: status.dkimStatus,
-            lastChecked: status.lastChecked?.toISOString(),
-            errorMessage: status.errorMessage,
-          };
-        } catch (error) {
-          return {
-            domain: domain.domain,
-            status: DomainVerificationStatus.FAILED,
-            dnsRecords: [],
-            errorMessage: error instanceof Error ? error.message : 'Unknown error',
-          };
-        }
-      })
-    );
+    const domainResponses: DomainVerificationResponse[] = domains.map((domain) => ({
+      domain: domain.domain,
+      status: this.mapPrismaStatus(domain.status),
+      dnsRecords: [],
+      dkimTokens: domain.dkimTokens,
+      dkimStatus: this.mapDkimStatus(domain.dkimStatus),
+      lastChecked: domain.lastChecked?.toISOString(),
+      errorMessage: domain.errorMessage ?? undefined,
+    }));
 
     const verified = domainResponses.filter(d => d.status === DomainVerificationStatus.SUCCESS).length;
     const pending = domainResponses.filter(d => d.status === DomainVerificationStatus.PENDING).length;
@@ -102,17 +69,12 @@ export class DomainService {
     companyId: string,
     request: DomainVerificationRequest,
   ): Promise<DomainVerificationResponse> {
-    // Valida formato do domínio
     if (!this.isValidDomain(request.domain)) {
       throw new BadRequestException(`Invalid domain format: ${request.domain}`);
     }
 
-    // Verifica se o domínio já existe
     const existingDomain = await prisma.domain.findFirst({
-      where: {
-        companyId,
-        domain: request.domain,
-      },
+      where: { companyId, domain: request.domain },
     });
 
     if (existingDomain) {
@@ -120,45 +82,67 @@ export class DomainService {
     }
 
     try {
-      // Inicia verificação do domínio
-      const verificationInfo = await this.domainManagementService.startDomainVerification(request.domain);
+      // Gera token de verificação único
+      const verificationToken = crypto.randomBytes(32).toString('hex');
 
-      // Salva no banco de dados
-      await prisma.domain.create({
+      // Cria domínio no banco
+      const domain = await prisma.domain.create({
         data: {
           companyId,
           domain: request.domain,
-          status: verificationInfo.status as unknown as PrismaDomainVerificationStatus,
-          dkimTokens: verificationInfo.dkimTokens || [],
+          status: 'PENDING',
+          dkimStatus: 'PENDING',
         },
       });
 
-      // Habilita DKIM se solicitado
+      // Registros DNS que o usuário precisa configurar
+      const dnsRecords: DNSRecord[] = [
+        {
+          type: 'TXT',
+          name: `_emailgateway.${request.domain}`,
+          value: `v=emailgateway1 verify=${verificationToken}`,
+          ttl: 300,
+        },
+      ];
+
+      // Cria registros DNS no banco
+      await prisma.dNSRecord.create({
+        data: {
+          domainId: domain.id,
+          recordType: 'TXT',
+          name: `_emailgateway.${request.domain}`,
+          value: `v=emailgateway1 verify=${verificationToken}`,
+          isVerified: false,
+        },
+      });
+
+      // Se DKIM solicitado, gera par de chaves
+      let dkimTokens: string[] = [];
       if (request.enableDKIM) {
-        await this.domainManagementService.enableDKIM(request.domain);
+        dkimTokens = await this.generateDKIM(domain.id, request.domain, dnsRecords);
       }
+
+      // Cria registro de onboarding
+      await prisma.domainOnboarding.create({
+        data: {
+          domainId: domain.id,
+          status: 'DNS_PENDING',
+          spfRecord: `v=spf1 include:${request.domain} ~all`,
+          returnPath: `bounces.${request.domain}`,
+        },
+      });
 
       return {
         domain: request.domain,
-        status: verificationInfo.status,
-        verificationToken: verificationInfo.verificationToken,
-        dnsRecords: verificationInfo.dnsRecords,
-        dkimTokens: verificationInfo.dkimTokens,
-        dkimStatus: verificationInfo.dkimStatus,
-        lastChecked: verificationInfo.lastChecked?.toISOString(),
-        errorMessage: verificationInfo.errorMessage,
+        status: DomainVerificationStatus.PENDING,
+        verificationToken,
+        dnsRecords,
+        dkimTokens,
+        dkimStatus: request.enableDKIM ? DKIMVerificationStatus.PENDING : DKIMVerificationStatus.NOT_STARTED,
       };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      const errorStack = error instanceof Error ? error.stack : undefined;
-
-      this.logger.error({
-        message: 'Failed to add domain',
-        domain: request.domain,
-        error: errorMessage,
-        stack: errorStack,
-      });
-
+      this.logger.error({ message: 'Failed to add domain', domain: request.domain, error: errorMessage });
       throw new BadRequestException(`Failed to add domain: ${errorMessage}`);
     }
   }
@@ -170,77 +154,44 @@ export class DomainService {
     companyId: string,
     domain: string,
   ): Promise<DomainVerificationResponse> {
-    // Busca domínio no banco
     const dbDomain = await prisma.domain.findFirst({
-      where: {
-        companyId,
-        domain: domain,
-      },
+      where: { companyId, domain },
+      include: { onboarding: true },
     });
 
     if (!dbDomain) {
       throw new NotFoundException(`Domain ${domain} not found`);
     }
 
-    try {
-      // Obtém status atualizado do SES
-      const verificationInfo = await this.domainManagementService.verifyDomainStatus(domain);
+    const dnsRecords = await prisma.dNSRecord.findMany({
+      where: { domainId: dbDomain.id },
+    });
 
-      // Atualiza status no banco se mudou
-      const newStatus = verificationInfo.status as unknown as PrismaDomainVerificationStatus;
-      if (newStatus !== dbDomain.status) {
-        await prisma.domain.update({
-          where: { id: dbDomain.id },
-          data: {
-            status: newStatus,
-            lastChecked: new Date(),
-          },
-        });
-      }
-
-      return {
-        domain,
-        status: verificationInfo.status,
-        verificationToken: verificationInfo.verificationToken,
-        dnsRecords: verificationInfo.dnsRecords,
-        dkimTokens: verificationInfo.dkimTokens,
-        dkimStatus: verificationInfo.dkimStatus,
-        lastChecked: verificationInfo.lastChecked?.toISOString(),
-        errorMessage: verificationInfo.errorMessage,
-      };
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      const errorStack = error instanceof Error ? error.stack : undefined;
-
-      this.logger.error({
-        message: 'Failed to get domain status',
-        domain,
-        error: errorMessage,
-        stack: errorStack,
-      });
-
-      return {
-        domain,
-        status: DomainVerificationStatus.FAILED,
-        dnsRecords: [],
-        errorMessage,
-      };
-    }
+    return {
+      domain,
+      status: this.mapPrismaStatus(dbDomain.status),
+      dnsRecords: dnsRecords.map(r => ({
+        type: r.recordType as 'TXT' | 'CNAME' | 'MX',
+        name: r.name,
+        value: r.value,
+        ttl: 300,
+      })),
+      dkimTokens: dbDomain.dkimTokens,
+      dkimStatus: this.mapDkimStatus(dbDomain.dkimStatus),
+      lastChecked: dbDomain.lastChecked?.toISOString(),
+      errorMessage: dbDomain.errorMessage ?? undefined,
+    };
   }
 
   /**
-   * Inicia verificação de um domínio
+   * Inicia verificação de um domínio (checa DNS real)
    */
   async verifyDomain(
     companyId: string,
     domain: string,
   ): Promise<DomainVerificationResponse> {
-    // Verifica se o domínio existe
     const dbDomain = await prisma.domain.findFirst({
-      where: {
-        companyId,
-        domain: domain,
-      },
+      where: { companyId, domain },
     });
 
     if (!dbDomain) {
@@ -248,37 +199,64 @@ export class DomainService {
     }
 
     try {
-      // Inicia verificação
-      const verificationInfo = await this.domainManagementService.startDomainVerification(domain);
+      // Busca registros DNS esperados
+      const expectedRecords = await prisma.dNSRecord.findMany({
+        where: { domainId: dbDomain.id },
+      });
 
-      // Atualiza no banco
+      let allVerified = true;
+
+      for (const record of expectedRecords) {
+        const verified = await this.verifyDNSRecord(record.name, record.recordType, record.value);
+        await prisma.dNSRecord.update({
+          where: { id: record.id },
+          data: { isVerified: verified, lastChecked: new Date() },
+        });
+        if (!verified) allVerified = false;
+      }
+
+      const newStatus: PrismaDomainVerificationStatus = allVerified ? 'VERIFIED' : 'PENDING';
+
       await prisma.domain.update({
         where: { id: dbDomain.id },
         data: {
-          status: verificationInfo.status as unknown as PrismaDomainVerificationStatus,
+          status: newStatus,
           lastChecked: new Date(),
+          ...(allVerified ? { lastVerified: new Date() } : {}),
         },
       });
 
+      // Atualiza onboarding se verificado
+      if (allVerified) {
+        await prisma.domainOnboarding.updateMany({
+          where: { domainId: dbDomain.id },
+          data: { status: 'DKIM_VERIFIED' },
+        });
+      }
+
       return {
         domain,
-        status: verificationInfo.status,
-        verificationToken: verificationInfo.verificationToken,
-        dnsRecords: verificationInfo.dnsRecords,
-        dkimTokens: verificationInfo.dkimTokens,
-        dkimStatus: verificationInfo.dkimStatus,
-        lastChecked: verificationInfo.lastChecked?.toISOString(),
-        errorMessage: verificationInfo.errorMessage,
+        status: allVerified ? DomainVerificationStatus.SUCCESS : DomainVerificationStatus.PENDING,
+        dnsRecords: expectedRecords.map(r => ({
+          type: r.recordType as 'TXT' | 'CNAME' | 'MX',
+          name: r.name,
+          value: r.value,
+          ttl: 300,
+        })),
+        dkimTokens: dbDomain.dkimTokens,
+        lastChecked: new Date().toISOString(),
       };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      const errorStack = error instanceof Error ? error.stack : undefined;
+      this.logger.error({ message: 'Failed to verify domain', domain, error: errorMessage });
 
-      this.logger.error({
-        message: 'Failed to verify domain',
-        domain,
-        error: errorMessage,
-        stack: errorStack,
+      await prisma.domain.update({
+        where: { id: dbDomain.id },
+        data: {
+          status: 'TEMPORARY_FAILURE',
+          lastChecked: new Date(),
+          errorMessage,
+        },
       });
 
       throw new BadRequestException(`Failed to verify domain: ${errorMessage}`);
@@ -292,44 +270,28 @@ export class DomainService {
     companyId: string,
     domain: string,
   ): Promise<DNSRecordsResponse> {
-    // Verifica se o domínio existe
     const dbDomain = await prisma.domain.findFirst({
-      where: {
-        companyId,
-        domain: domain,
-      },
+      where: { companyId, domain },
     });
 
     if (!dbDomain) {
       throw new NotFoundException(`Domain ${domain} not found`);
     }
 
-    try {
-      const records = await this.domainManagementService.generateDNSRecords(domain);
-      
-      return {
-        domain,
-        records,
-        isValid: true,
-      };
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      const errorStack = error instanceof Error ? error.stack : undefined;
+    const records = await prisma.dNSRecord.findMany({
+      where: { domainId: dbDomain.id },
+    });
 
-      this.logger.error({
-        message: 'Failed to get DNS records',
-        domain,
-        error: errorMessage,
-        stack: errorStack,
-      });
-
-      return {
-        domain,
-        records: [],
-        isValid: false,
-        errorMessage,
-      };
-    }
+    return {
+      domain,
+      records: records.map(r => ({
+        type: r.recordType as 'TXT' | 'CNAME' | 'MX',
+        name: r.name,
+        value: r.value,
+        ttl: 300,
+      })),
+      isValid: records.every(r => r.isVerified),
+    };
   }
 
   /**
@@ -339,12 +301,8 @@ export class DomainService {
     companyId: string,
     domain: string,
   ): Promise<DNSRecordsResponse> {
-    // Verifica se o domínio existe
     const dbDomain = await prisma.domain.findFirst({
-      where: {
-        companyId,
-        domain: domain,
-      },
+      where: { companyId, domain },
     });
 
     if (!dbDomain) {
@@ -352,43 +310,33 @@ export class DomainService {
     }
 
     try {
-      // Habilita DKIM
-      const dkimTokens = await this.domainManagementService.enableDKIM(domain);
+      const dnsRecords: DNSRecord[] = [];
+      await this.generateDKIM(dbDomain.id, domain, dnsRecords);
 
-      // Atualiza no banco
       await prisma.domain.update({
         where: { id: dbDomain.id },
-        data: {
-          dkimStatus: 'PENDING',
-          dkimTokens,
-        },
+        data: { dkimStatus: 'PENDING' },
       });
 
-      // Obtém registros DNS atualizados
-      const records = await this.domainManagementService.generateDNSRecords(domain);
+      // Retorna todos os registros DNS do domínio
+      const allRecords = await prisma.dNSRecord.findMany({
+        where: { domainId: dbDomain.id },
+      });
 
       return {
         domain,
-        records,
-        isValid: true,
+        records: allRecords.map(r => ({
+          type: r.recordType as 'TXT' | 'CNAME' | 'MX',
+          name: r.name,
+          value: r.value,
+          ttl: 300,
+        })),
+        isValid: false,
       };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      const errorStack = error instanceof Error ? error.stack : undefined;
-
-      this.logger.error({
-        message: 'Failed to enable DKIM',
-        domain,
-        error: errorMessage,
-        stack: errorStack,
-      });
-
-      return {
-        domain,
-        records: [],
-        isValid: false,
-        errorMessage,
-      };
+      this.logger.error({ message: 'Failed to enable DKIM', domain, error: errorMessage });
+      return { domain, records: [], isValid: false, errorMessage };
     }
   }
 
@@ -399,75 +347,48 @@ export class DomainService {
     companyId: string,
     domain: string,
   ): Promise<DNSRecordsResponse> {
-    // Verifica se o domínio existe
     const dbDomain = await prisma.domain.findFirst({
-      where: {
-        companyId,
-        domain: domain,
-      },
+      where: { companyId, domain },
     });
 
     if (!dbDomain) {
       throw new NotFoundException(`Domain ${domain} not found`);
     }
 
-    try {
-      const validation = await this.domainManagementService.validateDNSRecords(domain);
-      const records = await this.domainManagementService.generateDNSRecords(domain);
+    const records = await prisma.dNSRecord.findMany({
+      where: { domainId: dbDomain.id },
+    });
 
-      return {
-        domain,
-        records,
-        missingRecords: validation.missingRecords,
-        incorrectRecords: validation.incorrectRecords,
-        isValid: validation.isValid,
+    const missingRecords: DNSRecord[] = [];
+    const validRecords: DNSRecord[] = [];
+
+    for (const record of records) {
+      const verified = await this.verifyDNSRecord(record.name, record.recordType, record.value);
+      const dnsRecord: DNSRecord = {
+        type: record.recordType as 'TXT' | 'CNAME' | 'MX',
+        name: record.name,
+        value: record.value,
+        ttl: 300,
       };
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      const errorStack = error instanceof Error ? error.stack : undefined;
 
-      this.logger.error({
-        message: 'Failed to validate DNS',
-        domain,
-        error: errorMessage,
-        stack: errorStack,
+      if (verified) {
+        validRecords.push(dnsRecord);
+      } else {
+        missingRecords.push(dnsRecord);
+      }
+
+      await prisma.dNSRecord.update({
+        where: { id: record.id },
+        data: { isVerified: verified, lastChecked: new Date() },
       });
-
-      return {
-        domain,
-        records: [],
-        isValid: false,
-        errorMessage,
-      };
     }
-  }
 
-  /**
-   * Obtém status da quota SES
-   */
-  async getSESQuotaStatus(companyId: string): Promise<SESQuotaStatusResponse> {
-    try {
-      const quotaStatus = await this.domainManagementService.getSESQuotaStatus();
-      const remainingQuota = quotaStatus.max24HourSend - quotaStatus.sentLast24Hours;
-
-      return {
-        ...quotaStatus,
-        remainingQuota: Math.max(0, remainingQuota),
-        lastUpdated: new Date().toISOString(),
-      };
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      const errorStack = error instanceof Error ? error.stack : undefined;
-
-      this.logger.error({
-        message: 'Failed to get SES quota status',
-        companyId,
-        error: errorMessage,
-        stack: errorStack,
-      });
-
-      throw new BadRequestException(`Failed to get SES quota status: ${errorMessage}`);
-    }
+    return {
+      domain,
+      records: validRecords,
+      missingRecords,
+      isValid: missingRecords.length === 0 && records.length > 0,
+    };
   }
 
   /**
@@ -478,12 +399,8 @@ export class DomainService {
     domain: string,
     config: WarmupConfigRequest,
   ): Promise<WarmupConfigResponse> {
-    // Verifica se o domínio existe
     const dbDomain = await prisma.domain.findFirst({
-      where: {
-        companyId,
-        domain: domain,
-      },
+      where: { companyId, domain },
     });
 
     if (!dbDomain) {
@@ -491,99 +408,24 @@ export class DomainService {
     }
 
     try {
-      await this.domainManagementService.configureDomainWarmup({
-        domain,
-        ...config,
-        startDate: new Date(config.startDate),
+      await prisma.domain.update({
+        where: { id: dbDomain.id },
+        data: {
+          warmupEnabled: true,
+          warmupStartDate: new Date(config.startDate),
+          warmupConfig: {
+            dailyVolume: config.dailyVolume,
+            durationDays: config.durationDays,
+            incrementPercentage: config.incrementPercentage,
+          },
+        },
       });
 
-      return {
-        domain,
-        config,
-        success: true,
-      };
+      return { domain, config, success: true };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      const errorStack = error instanceof Error ? error.stack : undefined;
-
-      this.logger.error({
-        message: 'Failed to configure warm-up',
-        domain,
-        companyId,
-        error: errorMessage,
-        stack: errorStack,
-      });
-
-      return {
-        domain,
-        config,
-        success: false,
-        errorMessage,
-      };
-    }
-  }
-
-  /**
-   * Obtém checklist de sandbox para produção
-   */
-  async getSandboxChecklist(companyId: string): Promise<SandboxChecklistResponse> {
-    try {
-      const checklist = await this.domainManagementService.generateSandboxToProductionChecklist();
-      
-      // Calcula estatísticas
-      const completedItems = checklist.items.filter(item => item.status === 'completed').length;
-      const pendingItems = checklist.items.filter(item => item.status === 'pending').length;
-      const failedItems = checklist.items.filter(item => item.status === 'failed').length;
-      const totalItems = checklist.items.length;
-      const completionPercentage = totalItems > 0 ? (completedItems / totalItems) * 100 : 0;
-
-      return {
-        items: checklist.items,
-        completionPercentage,
-        pendingItems,
-        completedItems,
-        failedItems,
-      };
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      const errorStack = error instanceof Error ? error.stack : undefined;
-
-      this.logger.error({
-        message: 'Failed to get sandbox checklist',
-        companyId,
-        error: errorMessage,
-        stack: errorStack,
-      });
-
-      throw new BadRequestException(`Failed to get sandbox checklist: ${errorMessage}`);
-    }
-  }
-
-  /**
-   * Valida região SES
-   */
-  async validateRegion(companyId: string, region?: string): Promise<RegionValidationResponse> {
-    try {
-      const regionToValidate = region || this.configService.get<string>('AWS_REGION', 'us-east-1');
-      const validation = await this.domainManagementService.validateSESRegion(regionToValidate);
-
-      return {
-        region: regionToValidate,
-        ...validation,
-      };
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      const errorStack = error instanceof Error ? error.stack : undefined;
-
-      this.logger.error({
-        message: 'Failed to validate region',
-        region: region || 'default',
-        companyId,
-        error: errorMessage,
-        stack: errorStack,
-      });
-
-      throw new BadRequestException(`Failed to validate region: ${errorMessage}`);
+      this.logger.error({ message: 'Failed to configure warm-up', domain, error: errorMessage });
+      return { domain, config, success: false, errorMessage };
     }
   }
 
@@ -591,12 +433,8 @@ export class DomainService {
    * Remove um domínio
    */
   async removeDomain(companyId: string, domain: string): Promise<void> {
-    // Verifica se o domínio existe
     const dbDomain = await prisma.domain.findFirst({
-      where: {
-        companyId,
-        domain: domain,
-      },
+      where: { companyId, domain },
     });
 
     if (!dbDomain) {
@@ -604,113 +442,63 @@ export class DomainService {
     }
 
     try {
-      // Remove do banco de dados
       await prisma.domain.delete({
         where: { id: dbDomain.id },
       });
-
-      // TODO: Implementar remoção do SES se necessário
-      // await this.domainManagementService.removeDomainFromSES(domain);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      const errorStack = error instanceof Error ? error.stack : undefined;
-
-      this.logger.error({
-        message: 'Failed to remove domain',
-        domain,
-        companyId,
-        error: errorMessage,
-        stack: errorStack,
-      });
-
+      this.logger.error({ message: 'Failed to remove domain', domain, error: errorMessage });
       throw new BadRequestException(`Failed to remove domain: ${errorMessage}`);
     }
   }
 
   /**
    * Obtém detalhes de um domínio específico por ID
-   * TASK-028: Endpoint para obter detalhes do domínio
    */
   async getDomainById(
     companyId: string,
     domainId: string,
   ): Promise<DomainVerificationResponse> {
-    // Busca domínio no banco
     const dbDomain = await prisma.domain.findFirst({
-      where: {
-        id: domainId,
-        companyId,
-      },
+      where: { id: domainId, companyId },
     });
 
     if (!dbDomain) {
       throw new NotFoundException(`Domain with ID ${domainId} not found`);
     }
 
-    try {
-      // Obtém status atualizado do SES
-      const verificationInfo = await this.domainManagementService.verifyDomainStatus(dbDomain.domain);
+    const dnsRecords = await prisma.dNSRecord.findMany({
+      where: { domainId: dbDomain.id },
+    });
 
-      // Atualiza status no banco se mudou
-      const newStatus = verificationInfo.status as unknown as PrismaDomainVerificationStatus;
-      if (newStatus !== dbDomain.status) {
-        await prisma.domain.update({
-          where: { id: dbDomain.id },
-          data: {
-            status: newStatus,
-            lastChecked: new Date(),
-          },
-        });
-      }
-
-      return {
-        domain: dbDomain.domain,
-        status: verificationInfo.status,
-        verificationToken: verificationInfo.verificationToken,
-        dnsRecords: verificationInfo.dnsRecords,
-        dkimTokens: verificationInfo.dkimTokens,
-        dkimStatus: verificationInfo.dkimStatus,
-        lastChecked: verificationInfo.lastChecked?.toISOString(),
-        errorMessage: verificationInfo.errorMessage,
-      };
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-
-      this.logger.error({
-        message: 'Failed to get domain details',
-        domainId,
-        companyId,
-        error: errorMessage,
-      });
-
-      // Retorna informações do banco se não conseguir consultar SES
-      return {
-        domain: dbDomain.domain,
-        status: dbDomain.status as unknown as DomainVerificationStatus,
-        dnsRecords: [],
-        errorMessage: `Failed to fetch latest status: ${errorMessage}`,
-      };
-    }
+    return {
+      domain: dbDomain.domain,
+      status: this.mapPrismaStatus(dbDomain.status),
+      dnsRecords: dnsRecords.map(r => ({
+        type: r.recordType as 'TXT' | 'CNAME' | 'MX',
+        name: r.name,
+        value: r.value,
+        ttl: 300,
+      })),
+      dkimTokens: dbDomain.dkimTokens,
+      dkimStatus: this.mapDkimStatus(dbDomain.dkimStatus),
+      lastChecked: dbDomain.lastChecked?.toISOString(),
+      errorMessage: dbDomain.errorMessage ?? undefined,
+    };
   }
 
   /**
    * Define um domínio como padrão para a empresa
-   * TASK-028: Endpoint para definir domínio padrão
    */
   async setDefaultDomain(companyId: string, domainId: string) {
-    // Busca domínio no banco
     const dbDomain = await prisma.domain.findFirst({
-      where: {
-        id: domainId,
-        companyId,
-      },
+      where: { id: domainId, companyId },
     });
 
     if (!dbDomain) {
       throw new NotFoundException(`Domain with ID ${domainId} not found`);
     }
 
-    // Verifica se o domínio está verificado
     if (dbDomain.status !== 'VERIFIED') {
       throw new BadRequestException(
         `Cannot set unverified domain as default. Current status: ${dbDomain.status}`
@@ -718,22 +506,16 @@ export class DomainService {
     }
 
     try {
-      // Atualiza empresa com o novo domínio padrão
       const updatedCompany = await prisma.company.update({
         where: { id: companyId },
         data: {
           domainId: dbDomain.id,
-          defaultFromAddress: `noreply@${dbDomain.domain}`, // Endereço padrão
-          defaultFromName: null, // Pode ser configurado depois
+          defaultFromAddress: `noreply@${dbDomain.domain}`,
+          defaultFromName: null,
         },
       });
 
-      this.logger.log({
-        message: 'Default domain set successfully',
-        companyId,
-        domainId,
-        domain: dbDomain.domain,
-      });
+      this.logger.log({ message: 'Default domain set successfully', companyId, domainId, domain: dbDomain.domain });
 
       return {
         success: true,
@@ -743,25 +525,123 @@ export class DomainService {
       };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      const errorStack = error instanceof Error ? error.stack : undefined;
-
-      this.logger.error({
-        message: 'Failed to set default domain',
-        companyId,
-        domainId,
-        error: errorMessage,
-        stack: errorStack,
-      });
-
+      this.logger.error({ message: 'Failed to set default domain', companyId, domainId, error: errorMessage });
       throw new BadRequestException(`Failed to set default domain: ${errorMessage}`);
     }
   }
 
-  /**
-   * Valida formato de domínio
-   */
+  // --- Private helpers ---
+
   private isValidDomain(domain: string): boolean {
     const domainRegex = /^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)*$/;
     return domainRegex.test(domain);
+  }
+
+  /**
+   * Verifica um registro DNS real usando dns/promises
+   */
+  private async verifyDNSRecord(name: string, recordType: string, expectedValue: string): Promise<boolean> {
+    try {
+      if (recordType === 'TXT') {
+        const records = await dns.resolveTxt(name);
+        const flatRecords = records.map(r => r.join(''));
+        return flatRecords.some(r => r.includes(expectedValue) || expectedValue.includes(r));
+      }
+
+      if (recordType === 'CNAME') {
+        const records = await dns.resolveCname(name);
+        return records.some(r => r === expectedValue || r === `${expectedValue}.`);
+      }
+
+      if (recordType === 'MX') {
+        const records = await dns.resolveMx(name);
+        return records.some(r => r.exchange === expectedValue || r.exchange === `${expectedValue}.`);
+      }
+
+      return false;
+    } catch {
+      // DNS lookup failed (NXDOMAIN, SERVFAIL, etc) = not verified
+      return false;
+    }
+  }
+
+  /**
+   * Gera par de chaves DKIM e cria registros DNS
+   */
+  private async generateDKIM(domainId: string, domain: string, dnsRecords: DNSRecord[]): Promise<string[]> {
+    const selector = `emailgw${Date.now().toString(36)}`;
+
+    const { publicKey, privateKey } = crypto.generateKeyPairSync('rsa', {
+      modulusLength: 2048,
+      publicKeyEncoding: { type: 'spki', format: 'pem' },
+      privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+    });
+
+    // Extrai a chave pública sem headers PEM para o registro DNS
+    const publicKeyBase64 = publicKey
+      .replace('-----BEGIN PUBLIC KEY-----', '')
+      .replace('-----END PUBLIC KEY-----', '')
+      .replace(/\n/g, '');
+
+    const dkimRecordName = `${selector}._domainkey.${domain}`;
+    const dkimRecordValue = `v=DKIM1; k=rsa; p=${publicKeyBase64}`;
+
+    // Adiciona registro DKIM ao array
+    dnsRecords.push({
+      type: 'TXT',
+      name: dkimRecordName,
+      value: dkimRecordValue,
+      ttl: 300,
+    });
+
+    // Salva no banco
+    await prisma.dNSRecord.create({
+      data: {
+        domainId,
+        recordType: 'TXT',
+        name: dkimRecordName,
+        value: dkimRecordValue,
+        isVerified: false,
+      },
+    });
+
+    // Atualiza onboarding com chaves DKIM
+    await prisma.domainOnboarding.updateMany({
+      where: { domainId },
+      data: {
+        dkimGenerated: true,
+        dkimPublic: publicKey,
+        dkimPrivate: privateKey,
+        dkimSelector: selector,
+      },
+    });
+
+    // Atualiza domain com tokens DKIM
+    await prisma.domain.update({
+      where: { id: domainId },
+      data: { dkimTokens: [selector] },
+    });
+
+    return [selector];
+  }
+
+  private mapPrismaStatus(status: PrismaDomainVerificationStatus): DomainVerificationStatus {
+    const map: Record<string, DomainVerificationStatus> = {
+      PENDING: DomainVerificationStatus.PENDING,
+      VERIFIED: DomainVerificationStatus.SUCCESS,
+      FAILED: DomainVerificationStatus.FAILED,
+      TEMPORARY_FAILURE: DomainVerificationStatus.TEMPORARY_FAILURE,
+    };
+    return map[status] ?? DomainVerificationStatus.PENDING;
+  }
+
+  private mapDkimStatus(status: string): DKIMVerificationStatus {
+    const map: Record<string, DKIMVerificationStatus> = {
+      NOT_STARTED: DKIMVerificationStatus.NOT_STARTED,
+      PENDING: DKIMVerificationStatus.PENDING,
+      VERIFIED: DKIMVerificationStatus.SUCCESS,
+      FAILED: DKIMVerificationStatus.FAILED,
+    };
+    return map[status] ?? DKIMVerificationStatus.NOT_STARTED;
   }
 }

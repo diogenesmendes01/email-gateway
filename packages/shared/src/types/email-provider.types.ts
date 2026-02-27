@@ -6,7 +6,6 @@
  */
 
 export enum EmailProvider {
-  AWS_SES = 'AWS_SES',
   POSTAL_SMTP = 'POSTAL_SMTP',
   POSTAL_API = 'POSTAL_API',
   MAILU_SMTP = 'MAILU_SMTP',

@@ -1,11 +1,8 @@
 /**
  * @email-gateway/api - Domain Management Controller
  *
- * Controller para gerenciamento de domínios, DNS e configurações SES
- *
- * TASK 6.2 — SES, domínio e DNS (SPF/DKIM)
- * Endpoints para verificação de domínio, criação de registros DNS,
- * validação de região/quota e warm-up de volumetria
+ * Controller para gerenciamento de domínios e DNS (SPF/DKIM)
+ * Verificação de domínio via registros DNS, sem dependência de AWS SES.
  */
 
 import {
@@ -16,18 +13,13 @@ import {
   Delete,
   Param,
   Body,
-  Query,
   HttpStatus,
   HttpCode,
-  UseGuards,
   Request,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
 
 // Guards
-import { ApiKeyGuard } from '../auth/auth.guard';
-import { BasicAuthGuard } from '../auth/basic-auth.guard';
-import { RateLimitGuard } from '../auth/rate-limit.guard';
 import { Company, SandboxAllowed } from '../auth/decorators';
 
 // Services
@@ -38,10 +30,7 @@ import {
   DomainVerificationRequest,
   DomainVerificationResponse,
   DNSRecordsResponse,
-  SESQuotaStatusResponse,
   WarmupConfigRequest,
-  SandboxChecklistResponse,
-  RegionValidationResponse,
 } from './dto/domain.dto';
 
 @ApiTags('Domain Management')
@@ -54,13 +43,10 @@ export class DomainController {
    * Lista domínios configurados
    */
   @Get()
-  @SandboxAllowed() // TASK-038: Permite acesso a empresas em sandbox
+  @SandboxAllowed()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Lista domínios configurados' })
-  @ApiResponse({
-    status: 200,
-    description: 'Lista de domínios retornada com sucesso',
-  })
+  @ApiResponse({ status: 200, description: 'Lista de domínios retornada com sucesso' })
   async listDomains(@Company() companyId: string) {
     return this.domainService.listDomains(companyId);
   }
@@ -70,13 +56,10 @@ export class DomainController {
    * Adiciona novo domínio para verificação
    */
   @Post()
-  @SandboxAllowed() // TASK-038: Permite acesso a empresas em sandbox
+  @SandboxAllowed()
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Adiciona novo domínio para verificação' })
-  @ApiResponse({
-    status: 201,
-    description: 'Domínio adicionado com sucesso',
-  })
+  @ApiResponse({ status: 201, description: 'Domínio adicionado com sucesso' })
   async addDomain(
     @Body() body: DomainVerificationRequest,
     @Company() companyId: string,
@@ -89,14 +72,11 @@ export class DomainController {
    * Verifica status de verificação de um domínio
    */
   @Get(':domain/status')
-  @SandboxAllowed() // TASK-038: Permite acesso a empresas em sandbox
+  @SandboxAllowed()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Verifica status de verificação de um domínio' })
   @ApiParam({ name: 'domain', description: 'Nome do domínio' })
-  @ApiResponse({
-    status: 200,
-    description: 'Status de verificação retornado com sucesso',
-  })
+  @ApiResponse({ status: 200, description: 'Status de verificação retornado com sucesso' })
   async getDomainStatus(
     @Param('domain') domain: string,
     @Company() companyId: string,
@@ -106,17 +86,14 @@ export class DomainController {
 
   /**
    * POST /v1/domains/:domain/verify
-   * Inicia verificação de um domínio
+   * Inicia verificação DNS de um domínio
    */
   @Post(':domain/verify')
-  @SandboxAllowed() // TASK-038: Permite acesso a empresas em sandbox
+  @SandboxAllowed()
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Inicia verificação de um domínio' })
+  @ApiOperation({ summary: 'Inicia verificação DNS de um domínio' })
   @ApiParam({ name: 'domain', description: 'Nome do domínio' })
-  @ApiResponse({
-    status: 200,
-    description: 'Verificação iniciada com sucesso',
-  })
+  @ApiResponse({ status: 200, description: 'Verificação iniciada com sucesso' })
   async verifyDomain(
     @Param('domain') domain: string,
     @Request() req: any,
@@ -130,14 +107,11 @@ export class DomainController {
    * Obtém registros DNS necessários para um domínio
    */
   @Get(':domain/dns-records')
-  @SandboxAllowed() // TASK-038: Permite acesso a empresas em sandbox
+  @SandboxAllowed()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Obtém registros DNS necessários para um domínio' })
   @ApiParam({ name: 'domain', description: 'Nome do domínio' })
-  @ApiResponse({
-    status: 200,
-    description: 'Registros DNS retornados com sucesso',
-  })
+  @ApiResponse({ status: 200, description: 'Registros DNS retornados com sucesso' })
   async getDNSRecords(
     @Param('domain') domain: string,
     @Request() req: any,
@@ -151,14 +125,11 @@ export class DomainController {
    * Habilita DKIM para um domínio
    */
   @Post(':domain/dkim')
-  @SandboxAllowed() // TASK-038: Permite acesso a empresas em sandbox
+  @SandboxAllowed()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Habilita DKIM para um domínio' })
   @ApiParam({ name: 'domain', description: 'Nome do domínio' })
-  @ApiResponse({
-    status: 200,
-    description: 'DKIM habilitado com sucesso',
-  })
+  @ApiResponse({ status: 200, description: 'DKIM habilitado com sucesso' })
   async enableDKIM(
     @Param('domain') domain: string,
     @Request() req: any,
@@ -172,36 +143,17 @@ export class DomainController {
    * Valida registros DNS de um domínio
    */
   @Post(':domain/validate-dns')
-  @SandboxAllowed() // TASK-038: Permite acesso a empresas em sandbox
+  @SandboxAllowed()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Valida registros DNS de um domínio' })
   @ApiParam({ name: 'domain', description: 'Nome do domínio' })
-  @ApiResponse({
-    status: 200,
-    description: 'Validação DNS retornada com sucesso',
-  })
+  @ApiResponse({ status: 200, description: 'Validação DNS retornada com sucesso' })
   async validateDNS(
     @Param('domain') domain: string,
     @Request() req: any,
   ): Promise<DNSRecordsResponse> {
     const companyId = req.companyId;
     return this.domainService.validateDNS(companyId, domain);
-  }
-
-  /**
-   * GET /v1/domains/ses-quota
-   * Obtém status da quota SES
-   */
-  @Get('ses-quota')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Obtém status da quota SES' })
-  @ApiResponse({
-    status: 200,
-    description: 'Status da quota SES retornado com sucesso',
-  })
-  async getSESQuotaStatus(@Request() req: any): Promise<SESQuotaStatusResponse> {
-    const companyId = req.companyId;
-    return this.domainService.getSESQuotaStatus(companyId);
   }
 
   /**
@@ -212,10 +164,7 @@ export class DomainController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Configura warm-up para um domínio' })
   @ApiParam({ name: 'domain', description: 'Nome do domínio' })
-  @ApiResponse({
-    status: 200,
-    description: 'Warm-up configurado com sucesso',
-  })
+  @ApiResponse({ status: 200, description: 'Warm-up configurado com sucesso' })
   async configureWarmup(
     @Param('domain') domain: string,
     @Body() body: WarmupConfigRequest,
@@ -226,54 +175,14 @@ export class DomainController {
   }
 
   /**
-   * GET /v1/domains/sandbox-checklist
-   * Obtém checklist de sandbox para produção
-   */
-  @Get('sandbox-checklist')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Obtém checklist de sandbox para produção' })
-  @ApiResponse({
-    status: 200,
-    description: 'Checklist retornado com sucesso',
-  })
-  async getSandboxChecklist(@Request() req: any): Promise<SandboxChecklistResponse> {
-    const companyId = req.companyId;
-    return this.domainService.getSandboxChecklist(companyId);
-  }
-
-  /**
-   * GET /v1/domains/validate-region
-   * Valida região SES
-   */
-  @Get('validate-region')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Valida região SES' })
-  @ApiQuery({ name: 'region', description: 'Região AWS', required: false })
-  @ApiResponse({
-    status: 200,
-    description: 'Validação de região retornada com sucesso',
-  })
-  async validateRegion(
-    @Query('region') region?: string,
-    @Request() req?: any,
-  ): Promise<RegionValidationResponse> {
-    const companyId = req?.companyId;
-    return this.domainService.validateRegion(companyId, region);
-  }
-
-  /**
    * GET /v1/domains/:id
    * Obtém detalhes de um domínio específico por ID
-   * TASK-028: Endpoint para detalhes do domínio
    */
   @Get(':id')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Obtém detalhes de um domínio específico' })
   @ApiParam({ name: 'id', description: 'ID do domínio' })
-  @ApiResponse({
-    status: 200,
-    description: 'Detalhes do domínio retornados com sucesso',
-  })
+  @ApiResponse({ status: 200, description: 'Detalhes do domínio retornados com sucesso' })
   async getDomainById(
     @Param('id') id: string,
     @Request() req: any,
@@ -283,19 +192,15 @@ export class DomainController {
   }
 
   /**
-   * PATCH /v1/domains/:id/default
+   * PUT /v1/domains/:id/default
    * Define um domínio como padrão para a empresa
-   * TASK-028: Endpoint para definir domínio padrão
    */
   @Put(':id/default')
-  @SandboxAllowed() // TASK-038: Permite acesso a empresas em sandbox
+  @SandboxAllowed()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Define um domínio como padrão para a empresa' })
   @ApiParam({ name: 'id', description: 'ID do domínio' })
-  @ApiResponse({
-    status: 200,
-    description: 'Domínio definido como padrão com sucesso',
-  })
+  @ApiResponse({ status: 200, description: 'Domínio definido como padrão com sucesso' })
   async setDefaultDomain(
     @Param('id') id: string,
     @Company() companyId: string,
@@ -311,10 +216,7 @@ export class DomainController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Remove um domínio' })
   @ApiParam({ name: 'domain', description: 'Nome do domínio' })
-  @ApiResponse({
-    status: 204,
-    description: 'Domínio removido com sucesso',
-  })
+  @ApiResponse({ status: 204, description: 'Domínio removido com sucesso' })
   async removeDomain(
     @Param('domain') domain: string,
     @Request() req: any,

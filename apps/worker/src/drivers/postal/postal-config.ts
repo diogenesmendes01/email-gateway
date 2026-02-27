@@ -7,7 +7,7 @@ export interface PostalSMTPConfig extends DriverConfig {
   host: string;
   port: number;
   secure: boolean;
-  auth: DriverAuthConfig;
+  auth?: DriverAuthConfig;
   fromAddress: string;
   returnPathDomain?: string;
 }

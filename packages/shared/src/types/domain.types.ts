@@ -1,7 +1,7 @@
 /**
  * Domain Management Types
- * 
- * TASK 6.2 - SES Domain and DNS Management
+ *
+ * Types para gerenciamento de domínios e DNS (SPF/DKIM)
  */
 
 export interface DomainCreateRequest {
@@ -70,32 +70,9 @@ export interface DNSValidationResponse {
   errors: string[];
 }
 
-export interface SESQuotaResponse {
-  max24HourSend: number;
-  maxSendRate: number;
-  sentLast24Hours: number;
-  remainingQuota: number;
-  quotaPercentage: number;
-}
-
 export interface WarmupConfigRequest {
   dailyLimit: number;
   weeklyIncrease: number;
   maxDailyLimit: number;
   isActive: boolean;
-}
-
-export interface SandboxChecklistResponse {
-  domain: string;
-  checklist: Array<{
-    item: string;
-    status: 'PENDING' | 'COMPLETED' | 'FAILED';
-    description: string;
-  }>;
-}
-
-export interface RegionValidationResponse {
-  region: string;
-  isRecommended: boolean;
-  recommendations: string[];
 }

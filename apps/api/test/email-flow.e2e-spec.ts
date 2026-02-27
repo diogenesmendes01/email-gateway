@@ -1,7 +1,7 @@
 /**
  * Email Flow E2E Tests
  *
- * Tests complete email flow: API → Redis → Worker → SES
+ * Tests complete email flow: API → Redis → Worker → SMTP
  * Uses TestContainers for Redis and Postgres isolation
  */
 
@@ -10,8 +10,6 @@ import { INestApplication, ValidationPipe } from '@nestjs/common';
 import * as request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { Worker, Job } from 'bullmq';
-import { mockClient } from 'aws-sdk-client-mock';
-import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
 import {
   setupE2EEnvironment,
   teardownE2EEnvironment,
@@ -28,7 +26,6 @@ describe('Email Flow (E2E - Full Integration)', () => {
   let apiKey: string;
   let companyId: string;
   let prisma: PrismaClient;
-  const sesMock = mockClient(SESClient);
   const logger = new Logger('EmailFlowE2E');
 
   beforeAll(async () => {
@@ -40,11 +37,6 @@ describe('Email Flow (E2E - Full Integration)', () => {
     // Configure environment variables
     process.env.DATABASE_URL = env.databaseUrl;
     process.env.REDIS_URL = env.redisUrl;
-    process.env.AWS_REGION = 'us-east-1';
-    process.env.AWS_SES_REGION = 'us-east-1';
-    process.env.AWS_ACCESS_KEY_ID = 'test-access-key';
-    process.env.AWS_SECRET_ACCESS_KEY = 'test-secret-key';
-    process.env.SES_FROM_ADDRESS = 'noreply@test.com';
     process.env.ENCRYPTION_KEY = 'test-key-32-characters-long!!!';
     process.env.RATE_LIMIT_TTL = '60';
     process.env.RATE_LIMIT_MAX = '100';
@@ -92,11 +84,6 @@ describe('Email Flow (E2E - Full Integration)', () => {
     companyId = testCompany.id;
     apiKey = testCompany.apiKey;
 
-    // Mock AWS SES
-    sesMock.on(SendEmailCommand).resolves({
-      MessageId: 'mock-ses-message-id-123',
-    });
-
     logger.log('E2E test suite setup completed');
   }, 120000); // 2 minutes timeout for container startup
 
@@ -117,10 +104,6 @@ describe('Email Flow (E2E - Full Integration)', () => {
     await prisma.emailOutbox.deleteMany({ where: { companyId } });
     await prisma.recipient.deleteMany({ where: { companyId } });
     await prisma.idempotencyKey.deleteMany({ where: { companyId } });
-    sesMock.reset();
-    sesMock.on(SendEmailCommand).resolves({
-      MessageId: 'mock-ses-message-id-123',
-    });
   });
 
   describe('Complete email flow: API → Queue → Worker (Mock)', () => {

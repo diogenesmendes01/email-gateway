@@ -8,6 +8,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { ProfileController } from '../profile.controller';
 import { CompanyService } from '../../services/company.service';
+import { DomainService } from '../../../domain/domain.service';
 import { ApiKeyGuard } from '../../../auth/auth.guard';
 import { AuditInterceptor } from '../../../auth/audit.interceptor';
 
@@ -16,6 +17,21 @@ const mockCompanyService = {
   getProfile: jest.fn(),
   updateProfile: jest.fn(),
   regenerateApiKey: jest.fn(),
+};
+
+// Mock DomainService
+const mockDomainService = {
+  listDomains: jest.fn(),
+  addDomain: jest.fn(),
+  getDomainStatus: jest.fn(),
+  verifyDomain: jest.fn(),
+  getDNSRecords: jest.fn(),
+  enableDKIM: jest.fn(),
+  validateDNS: jest.fn(),
+  configureWarmup: jest.fn(),
+  removeDomain: jest.fn(),
+  getDomainById: jest.fn(),
+  setDefaultDomain: jest.fn(),
 };
 
 // Mock guard to bypass authentication in tests
@@ -33,6 +49,10 @@ describe('ProfileController - TASK-037', () => {
         {
           provide: CompanyService,
           useValue: mockCompanyService,
+        },
+        {
+          provide: DomainService,
+          useValue: mockDomainService,
         },
       ],
     })

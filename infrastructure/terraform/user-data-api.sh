@@ -74,9 +74,10 @@ ARTIFACT_BUCKET="email-gateway-artifacts-${ENVIRONMENT}"
 aws s3 cp "s3://$ARTIFACT_BUCKET/api-latest.tar.gz" /tmp/api.tar.gz
 tar -xzf /tmp/api.tar.gz -C "$APP_DIR"
 
-# Install dependencies
+# Install pnpm and dependencies
 cd "$APP_DIR"
-npm ci --production
+corepack enable && corepack prepare pnpm@9 --activate
+pnpm install --frozen-lockfile --prod
 
 # ------------------------------------------------------------------------------
 # Environment Configuration

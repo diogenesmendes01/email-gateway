@@ -79,6 +79,6 @@ logs/
 lerna-debug.log*
 *.lcov
 
-# Package lock (usando workspaces)
+# Package lock (usando pnpm)
 yarn.lock
-pnpm-lock.yaml
+package-lock.json

@@ -7,22 +7,26 @@ RUN apk add --no-cache \
     && addgroup -g 1001 -S nodejs \
     && adduser -S nestjs -u 1001
 
+# Habilitar corepack para pnpm
+RUN corepack enable && corepack prepare pnpm@9 --activate
+
 # Definir diretório de trabalho
 WORKDIR /app
 
-# Copiar arquivos de dependências
-COPY package*.json ./
-COPY packages/*/package*.json ./packages/*/
+# Copiar arquivos de configuração do workspace
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml .npmrc ./
+COPY packages/*/package.json ./packages/*/
+COPY apps/api/package.json ./apps/api/
 
 # Instalar dependências
 FROM base AS deps
-RUN npm ci --only=production && npm cache clean --force
+RUN pnpm install --frozen-lockfile --prod && pnpm store prune
 
 # Build da aplicação
 FROM base AS build
-RUN npm ci
+RUN pnpm install --frozen-lockfile
 COPY . .
-RUN npm run build
+RUN pnpm build
 
 # Imagem de produção
 FROM node:18-alpine AS production
@@ -46,7 +50,7 @@ COPY --from=build --chown=nestjs:nodejs /app/packages/database/dist ./packages/d
 COPY --from=build --chown=nestjs:nodejs /app/packages/shared/dist ./packages/shared/dist
 
 # Copiar arquivos necessários
-COPY --chown=nestjs:nodejs package*.json ./
+COPY --chown=nestjs:nodejs package.json ./
 COPY --chown=nestjs:nodejs apps/api/package.json ./apps/api/
 COPY --chown=nestjs:nodejs packages/*/package.json ./packages/*/
 

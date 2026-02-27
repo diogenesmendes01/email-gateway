@@ -405,7 +405,7 @@ export class ARFParserService {
     return {
       authMethod,
       domain,
-      failure: arf.authFailure,
+      failure: arf.authFailure ?? 'unknown',
       timestamp: arf.timestamp,
     };
   }

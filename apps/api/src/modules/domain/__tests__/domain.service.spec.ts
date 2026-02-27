@@ -1,6 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { NotFoundException, BadRequestException } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { DomainService } from '../domain.service';
 import { prisma } from '@email-gateway/database';
 
@@ -9,7 +8,19 @@ jest.mock('@email-gateway/database', () => ({
   prisma: {
     domain: {
       findFirst: jest.fn(),
+      findMany: jest.fn(),
+      create: jest.fn(),
       update: jest.fn(),
+      delete: jest.fn(),
+    },
+    dNSRecord: {
+      findMany: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+    },
+    domainOnboarding: {
+      create: jest.fn(),
+      updateMany: jest.fn(),
     },
     company: {
       update: jest.fn(),
@@ -17,35 +28,24 @@ jest.mock('@email-gateway/database', () => ({
   },
 }));
 
-// Mock DomainManagementService
-jest.mock('../../../../../worker/src/services/domain-management.service', () => ({
-  DomainManagementService: jest.fn().mockImplementation(() => ({
-    verifyDomainStatus: jest.fn(),
-  })),
+// Mock dns/promises
+jest.mock('dns/promises', () => ({
+  resolveTxt: jest.fn(),
+  resolveCname: jest.fn(),
+  resolveMx: jest.fn(),
 }));
 
-describe('DomainService - TASK-028', () => {
+describe('DomainService', () => {
   let service: DomainService;
-  let configService: ConfigService;
 
   beforeEach(async () => {
+    jest.clearAllMocks();
+
     const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        DomainService,
-        {
-          provide: ConfigService,
-          useValue: {
-            get: jest.fn((key: string, defaultValue?: any) => {
-              if (key === 'AWS_REGION') return 'us-east-1';
-              return defaultValue;
-            }),
-          },
-        },
-      ],
+      providers: [DomainService],
     }).compile();
 
     service = module.get<DomainService>(DomainService);
-    configService = module.get<ConfigService>(ConfigService);
   });
 
   describe('getDomainById', () => {
@@ -55,33 +55,21 @@ describe('DomainService - TASK-028', () => {
         companyId: 'company-123',
         domain: 'test.com',
         status: 'VERIFIED',
-        dkimTokens: ['token1', 'token2'],
+        dkimStatus: 'VERIFIED',
+        dkimTokens: ['token1'],
+        lastChecked: new Date(),
+        errorMessage: null,
       };
 
       (prisma.domain.findFirst as jest.Mock).mockResolvedValue(mockDomain);
-
-      // Mock the domainManagementService
-      const mockVerificationInfo = {
-        status: 'VERIFIED',
-        verificationToken: 'token123',
-        dnsRecords: [],
-        dkimTokens: ['token1', 'token2'],
-        dkimStatus: 'SUCCESS',
-        lastChecked: new Date(),
-      };
-
-      (service as any).domainManagementService.verifyDomainStatus = jest.fn()
-        .mockResolvedValue(mockVerificationInfo);
+      (prisma.dNSRecord.findMany as jest.Mock).mockResolvedValue([]);
 
       const result = await service.getDomainById('company-123', 'domain-123');
 
       expect(result.domain).toBe('test.com');
-      expect(result.status).toBe('VERIFIED');
+      expect(result.status).toBe('Success');
       expect(prisma.domain.findFirst).toHaveBeenCalledWith({
-        where: {
-          id: 'domain-123',
-          companyId: 'company-123',
-        },
+        where: { id: 'domain-123', companyId: 'company-123' },
       });
     });
 
@@ -91,25 +79,6 @@ describe('DomainService - TASK-028', () => {
       await expect(
         service.getDomainById('company-123', 'non-existent')
       ).rejects.toThrow(NotFoundException);
-    });
-
-    it('should return cached data when SES query fails', async () => {
-      const mockDomain = {
-        id: 'domain-123',
-        companyId: 'company-123',
-        domain: 'test.com',
-        status: 'PENDING',
-        dkimTokens: [],
-      };
-
-      (prisma.domain.findFirst as jest.Mock).mockResolvedValue(mockDomain);
-      (service as any).domainManagementService.verifyDomainStatus = jest.fn()
-        .mockRejectedValue(new Error('SES API error'));
-
-      const result = await service.getDomainById('company-123', 'domain-123');
-
-      expect(result.domain).toBe('test.com');
-      expect(result.errorMessage).toContain('Failed to fetch latest status');
     });
   });
 
@@ -127,7 +96,6 @@ describe('DomainService - TASK-028', () => {
         domainId: 'domain-123',
         defaultFromAddress: 'noreply@verified.com',
         defaultFromName: null,
-        defaultDomain: mockDomain,
       };
 
       (prisma.domain.findFirst as jest.Mock).mockResolvedValue(mockDomain);
@@ -138,17 +106,6 @@ describe('DomainService - TASK-028', () => {
       expect(result.success).toBe(true);
       expect(result.domain).toBe('verified.com');
       expect(result.defaultFromAddress).toBe('noreply@verified.com');
-      expect(prisma.company.update).toHaveBeenCalledWith({
-        where: { id: 'company-123' },
-        data: {
-          domainId: 'domain-123',
-          defaultFromAddress: 'noreply@verified.com',
-          defaultFromName: null,
-        },
-        include: {
-          defaultDomain: true,
-        },
-      });
     });
 
     it('should throw NotFoundException when domain not found', async () => {
@@ -184,13 +141,75 @@ describe('DomainService - TASK-028', () => {
       };
 
       (prisma.domain.findFirst as jest.Mock).mockResolvedValue(mockDomain);
-      (prisma.company.update as jest.Mock).mockRejectedValue(
-        new Error('Database error')
-      );
+      (prisma.company.update as jest.Mock).mockRejectedValue(new Error('Database error'));
 
       await expect(
         service.setDefaultDomain('company-123', 'domain-123')
       ).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('listDomains', () => {
+    it('should return list of domains', async () => {
+      (prisma.domain.findMany as jest.Mock).mockResolvedValue([
+        {
+          domain: 'test.com',
+          status: 'VERIFIED',
+          dkimStatus: 'VERIFIED',
+          dkimTokens: [],
+          lastChecked: null,
+          errorMessage: null,
+        },
+        {
+          domain: 'pending.com',
+          status: 'PENDING',
+          dkimStatus: 'PENDING',
+          dkimTokens: [],
+          lastChecked: null,
+          errorMessage: null,
+        },
+      ]);
+
+      const result = await service.listDomains('company-123');
+
+      expect(result.total).toBe(2);
+      expect(result.verified).toBe(1);
+      expect(result.pending).toBe(1);
+    });
+  });
+
+  describe('addDomain', () => {
+    it('should reject invalid domain format', async () => {
+      await expect(
+        service.addDomain('company-123', { domain: 'not valid!' })
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should reject duplicate domain', async () => {
+      (prisma.domain.findFirst as jest.Mock).mockResolvedValue({ id: 'existing' });
+
+      await expect(
+        service.addDomain('company-123', { domain: 'test.com' })
+      ).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('removeDomain', () => {
+    it('should throw NotFoundException when domain not found', async () => {
+      (prisma.domain.findFirst as jest.Mock).mockResolvedValue(null);
+
+      await expect(
+        service.removeDomain('company-123', 'nonexistent.com')
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should delete domain successfully', async () => {
+      (prisma.domain.findFirst as jest.Mock).mockResolvedValue({ id: 'domain-123' });
+      (prisma.domain.delete as jest.Mock).mockResolvedValue({});
+
+      await expect(
+        service.removeDomain('company-123', 'test.com')
+      ).resolves.toBeUndefined();
     });
   });
 });

@@ -51,10 +51,6 @@ check_environment() {
     REQUIRED_VARS=(
         "DATABASE_URL"
         "REDIS_URL"
-        "AWS_ACCESS_KEY_ID"
-        "AWS_SECRET_ACCESS_KEY"
-        "AWS_SES_REGION"
-        "SES_FROM_ADDRESS"
         "DASHBOARD_USERNAME"
         "DASHBOARD_PASSWORD_HASH"
         "ENCRYPTION_KEY"
@@ -100,10 +96,10 @@ build_application() {
     log "Construindo aplicação..."
     
     # Instalar dependências
-    npm ci --only=production || error "Falha na instalação de dependências"
-    
+    pnpm install --frozen-lockfile --prod || error "Falha na instalação de dependências"
+
     # Build
-    npm run build || error "Falha no build da aplicação"
+    pnpm build || error "Falha no build da aplicação"
     
     log "✅ Aplicação construída com sucesso"
 }
@@ -112,7 +108,7 @@ build_application() {
 run_migrations() {
     log "Executando migrações do banco de dados..."
     
-    npx prisma migrate deploy || error "Falha na execução das migrações"
+    pnpm exec prisma migrate deploy || error "Falha na execução das migrações"
     
     log "✅ Migrações executadas com sucesso"
 }

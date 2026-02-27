@@ -1,7 +1,6 @@
 import {
   EmailProvider,
   ProviderQuotaInfo,
-  DomainVerificationResult,
 } from '@email-gateway/shared';
 
 import { MappedError } from '../../services/error-mapping.service';
@@ -18,4 +17,10 @@ export interface SendResult {
 
 export type QuotaInfo = ProviderQuotaInfo;
 
-export type DomainVerification = DomainVerificationResult;
+export interface DomainVerification {
+  domain: string;
+  isVerified: boolean;
+  dkimVerified: boolean;
+  spfVerified: boolean;
+  dmarcVerified: boolean;
+}

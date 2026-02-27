@@ -1,13 +1,11 @@
 /**
  * @email-gateway/api - Domain Management Module
  *
- * Módulo para gerenciamento de domínios, DNS e configurações SES
- *
- * TASK 6.2 — SES, domínio e DNS (SPF/DKIM)
+ * Módulo para gerenciamento de domínios e DNS (SPF/DKIM)
+ * Verificação de domínio via registros DNS, sem dependência de AWS SES.
  */
 
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
 
 // Controllers
 import { DomainController } from './domain.controller';
@@ -27,10 +25,9 @@ import { MetricsModule } from '../metrics/metrics.module';
 
 @Module({
   imports: [
-    ConfigModule,
-    AuthModule, // Para usar guards de autenticação
-    DatabaseModule, // Para usar PrismaService
-    MetricsModule, // Para métricas de bloqueio TASK-038
+    AuthModule,
+    DatabaseModule,
+    MetricsModule,
   ],
   controllers: [DomainController, DNSRecordsController],
   providers: [DomainService],

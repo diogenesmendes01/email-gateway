@@ -212,24 +212,23 @@ export class DNSRecordsController {
     try {
       this.logger.log(`Verifying DNS record: ${recordId}`);
 
-      // TASK-038: Get the record and validate domain ownership
-      const record = await this.prisma.dNSRecord.findFirst({
-        where: {
-          id: recordId,
-          domainId,
-        },
-        include: {
-          domain: {
-            where: { companyId },
-            select: { id: true },
-          },
-        },
+      // TASK-038: Validate domain ownership first
+      const domain = await this.prisma.domain.findFirst({
+        where: { id: domainId, companyId },
+        select: { id: true },
       });
 
-      if (!record || !record.domain) {
-        // TASK-038: Record domain access denied metric
+      if (!domain) {
         this.metricsService.recordDomainAccessDenied(companyId, domainId, 'verify');
-        throw new NotFoundException('DNS record not found or domain does not belong to your company');
+        throw new NotFoundException('Domain not found or does not belong to your company');
+      }
+
+      const record = await this.prisma.dNSRecord.findFirst({
+        where: { id: recordId, domainId },
+      });
+
+      if (!record) {
+        throw new NotFoundException('DNS record not found');
       }
 
       // For now, mark as verified (in production, would do actual DNS lookup)
@@ -276,13 +275,21 @@ export class DNSRecordsController {
       this.logger.log(`Deleting DNS record: ${recordId}`);
 
       // TASK-038: Delete the record with domain ownership validation
+      // First validate domain belongs to company
+      const domainRecord = await this.prisma.domain.findFirst({
+        where: { id: domainId, companyId },
+        select: { id: true },
+      });
+
+      if (!domainRecord) {
+        this.metricsService.recordDomainAccessDenied(companyId, domainId, 'delete');
+        throw new NotFoundException('Domain not found or does not belong to your company');
+      }
+
       const result = await this.prisma.dNSRecord.deleteMany({
         where: {
           id: recordId,
-          domain: {
-            id: domainId,
-            companyId,
-          },
+          domainId,
         },
       });
 
