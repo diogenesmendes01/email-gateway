@@ -1,5 +1,6 @@
 import { Redis } from 'ioredis';
 import { Queue } from 'bullmq';
+import { getQueueDepth as getQueueDepthFromShared } from '@email-gateway/shared';
 
 /**
  * Metrics Service - TASK 7.1
@@ -112,8 +113,7 @@ export class MetricsService {
    * Get queue depth (waiting + active jobs)
    */
   async getQueueDepth(): Promise<number> {
-    const counts = await this.queue.getJobCounts('waiting', 'active', 'delayed');
-    return (counts.waiting || 0) + (counts.active || 0) + (counts.delayed || 0);
+    return getQueueDepthFromShared(this.queue);
   }
 
   /**

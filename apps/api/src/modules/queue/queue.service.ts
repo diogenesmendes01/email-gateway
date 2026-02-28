@@ -8,16 +8,7 @@
 import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
 import { Queue, QueueOptions } from 'bullmq';
 import Redis from 'ioredis';
-import { EMAIL_JOB_CONFIG, EmailSendJobData } from '@email-gateway/shared';
-
-export interface QueueHealth {
-  waiting: number;
-  active: number;
-  completed: number;
-  failed: number;
-  delayed: number;
-  total: number;
-}
+import { EMAIL_JOB_CONFIG, EmailSendJobData, QueueHealth, getQueueHealth as getQueueHealthFromShared } from '@email-gateway/shared';
 
 @Injectable()
 export class QueueService implements OnModuleInit, OnModuleDestroy {
@@ -144,22 +135,7 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
    * Used for monitoring and health checks
    */
   async getQueueHealth(): Promise<QueueHealth> {
-    const [waiting, active, completed, failed, delayed] = await Promise.all([
-      this.queue.getWaitingCount(),
-      this.queue.getActiveCount(),
-      this.queue.getCompletedCount(),
-      this.queue.getFailedCount(),
-      this.queue.getDelayedCount(),
-    ]);
-
-    return {
-      waiting,
-      active,
-      completed,
-      failed,
-      delayed,
-      total: waiting + active + delayed,
-    };
+    return getQueueHealthFromShared(this.queue);
   }
 
   /**

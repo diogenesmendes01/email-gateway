@@ -7,6 +7,7 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Queue, QueueEvents } from 'bullmq';
+import { QueueHealth, getQueueHealth as getQueueHealthFromShared } from '@email-gateway/shared';
 import { WebhookJobData } from './types/webhook.types';
 
 @Injectable()
@@ -106,21 +107,8 @@ export class WebhookQueueService implements OnModuleInit, OnModuleDestroy {
   /**
    * Get queue health metrics
    */
-  async getQueueHealth() {
-    const waiting = await this.queue.getWaitingCount();
-    const active = await this.queue.getActiveCount();
-    const completed = await this.queue.getCompletedCount();
-    const failed = await this.queue.getFailedCount();
-    const delayed = await this.queue.getDelayedCount();
-
-    return {
-      waiting,
-      active,
-      completed,
-      failed,
-      delayed,
-      total: waiting + active + delayed,
-    };
+  async getQueueHealth(): Promise<QueueHealth> {
+    return getQueueHealthFromShared(this.queue);
   }
 
   /**

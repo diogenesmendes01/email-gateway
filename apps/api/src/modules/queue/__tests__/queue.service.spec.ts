@@ -4,7 +4,7 @@
  */
 
 // Mocks de BullMQ e ioredis antes de importar o SUT
-const mockCounts = { waiting: 0, active: 0, completed: 0, failed: 0, delayed: 0 };
+const mockCounts = { waiting: 0, active: 0, completed: 0, failed: 0, delayed: 0, prioritized: 0 };
 class MockQueue {
   add = jest.fn(async (_name: string, _data: any, opts: any) => ({ id: opts.jobId }));
   getWaitingCount = jest.fn(async () => mockCounts.waiting);
@@ -12,6 +12,7 @@ class MockQueue {
   getCompletedCount = jest.fn(async () => mockCounts.completed);
   getFailedCount = jest.fn(async () => mockCounts.failed);
   getDelayedCount = jest.fn(async () => mockCounts.delayed);
+  getPrioritizedCount = jest.fn(async () => mockCounts.prioritized);
   getJob = jest.fn();
   pause = jest.fn(async () => void 0);
   resume = jest.fn(async () => void 0);
@@ -46,6 +47,7 @@ describe('QueueService', () => {
     mockCounts.completed = 0;
     mockCounts.failed = 0;
     mockCounts.delayed = 0;
+    mockCounts.prioritized = 0;
 
     // Set environment variables for tests
     process.env = {
@@ -134,21 +136,22 @@ describe('QueueService', () => {
 
   describe('getQueueHealth', () => {
     it('should return queue health metrics', async () => {
-      mockCounts.waiting = 10;
+      mockCounts.waiting = 5;
       mockCounts.active = 5;
       mockCounts.completed = 100;
       mockCounts.failed = 2;
       mockCounts.delayed = 3;
+      mockCounts.prioritized = 5;
 
       const health = await (service as any).getQueueHealth();
 
       expect(health).toEqual({
-        waiting: 10,
+        waiting: 10, // waiting (5) + prioritized (5)
         active: 5,
         completed: 100,
         failed: 2,
         delayed: 3,
-        total: 18, // waiting + active + delayed
+        total: 18, // waiting (5) + active (5) + delayed (3) + prioritized (5)
       });
     });
 

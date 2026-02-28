@@ -30,6 +30,7 @@ export * from './utils/key-validation.util';
 export * from './utils/retention.util';
 export * from './utils/access-control.util';
 export * from './utils/html-sanitization.util';
+export * from './utils/queue-metrics.util';
 
 // Constants (quando criados)
 // export * from './constants';

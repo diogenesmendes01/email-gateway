@@ -31,6 +31,12 @@ describe('MetricsService', () => {
       types.forEach((t) => (res[t] = map[t] || 0));
       return res;
     }),
+    getWaitingCount: jest.fn(async () => 2),
+    getActiveCount: jest.fn(async () => 1),
+    getCompletedCount: jest.fn(async () => 0),
+    getFailedCount: jest.fn(async () => 0),
+    getDelayedCount: jest.fn(async () => 1),
+    getPrioritizedCount: jest.fn(async () => 0),
   } as any;
 
   const service = new MetricsService(redis, queue);

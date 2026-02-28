@@ -98,9 +98,6 @@ describe('QueueService Integration Tests', () => {
     });
 
     it('should respect idempotency - duplicate outboxId', async () => {
-      // Pause queue to prevent immediate processing
-      await (service as any).pause();
-
       const jobData: any = {
         outboxId: 'idempotent-test-id',
         companyId: '00000000-0000-0000-0000-000000000002',
@@ -122,20 +119,14 @@ describe('QueueService Integration Tests', () => {
 
       expect(jobId1).toBe(jobId2);
 
-      // Verify only one job in queue
+      // Verify only one job in queue (jobs with priority go to "prioritized" state in BullMQ v5)
       const queue = (service as any).queue as Queue;
-      const waitingCount = await queue.getWaitingCount();
-      expect(waitingCount).toBe(1);
-
-      // Resume queue
-      await (service as any).resume();
+      const counts = await queue.getJobCounts('waiting', 'prioritized');
+      expect(counts.waiting + counts.prioritized).toBe(1);
     });
 
     it('should get accurate queue health metrics', async () => {
-      // Pause queue to prevent immediate processing
-      await (service as any).pause();
-
-      // Enqueue multiple jobs
+      // Enqueue multiple jobs (no worker exists, so no processing will occur)
       const jobs = Array.from({ length: 5 }, (_, i) => ({
         outboxId: `job-${i}`,
         companyId: '00000000-0000-0000-0000-000000000002',
@@ -161,9 +152,6 @@ describe('QueueService Integration Tests', () => {
       expect(health.active).toBe(0);
       expect(health.failed).toBe(0);
       expect(health.total).toBe(5); // waiting + active + delayed
-
-      // Resume queue
-      await (service as any).resume();
     });
 
     it('should detect unhealthy queue state', async () => {
@@ -293,8 +281,8 @@ describe('QueueService Integration Tests', () => {
 
       // Should have attempted at least twice
       expect(attempts.length).toBeGreaterThanOrEqual(2);
-      expect(attempts[0]).toBe(1); // First attempt
-      expect(attempts[1]).toBe(2); // First retry
+      expect(attempts[0]).toBe(0); // First attempt (BullMQ attemptsMade is 0-indexed)
+      expect(attempts[1]).toBe(1); // First retry
     }, 15000);
 
     it('should move job to failed after max retries', async () => {

@@ -30,6 +30,12 @@ describe('MetricsService - alerts', () => {
       types.forEach((t) => (res[t] = map[t] || 0));
       return res;
     }),
+    getWaitingCount: jest.fn(async () => 0),
+    getActiveCount: jest.fn(async () => 0),
+    getCompletedCount: jest.fn(async () => 0),
+    getFailedCount: jest.fn(async () => 0),
+    getDelayedCount: jest.fn(async () => 0),
+    getPrioritizedCount: jest.fn(async () => 0),
   } as any;
 
   const service = new MetricsService(redis, queue);
