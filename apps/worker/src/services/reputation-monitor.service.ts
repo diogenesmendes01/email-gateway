@@ -354,7 +354,10 @@ export class ReputationMonitorService {
   /**
    * Calcular score de reputação
    */
-  private calculateReputationScore(metrics: ReputationMetrics): number {
+  calculateReputationScore(
+    metrics: ReputationMetrics,
+    context?: { rblListingCount?: number },
+  ): number {
     // Score de 0-100 baseado em métricas
     let score = 100;
 
@@ -373,6 +376,11 @@ export class ReputationMonitorService {
     // Bônus por engagement
     const engagementRate = (metrics.openRate + metrics.clickRate) / 2;
     score += engagementRate * 20; // Até 20 pontos de bônus
+
+    // Penalidade por RBL listing (-15 pontos por listing)
+    if (context?.rblListingCount && context.rblListingCount > 0) {
+      score -= context.rblListingCount * 15;
+    }
 
     // Garantir score entre 0 e 100
     return Math.max(0, Math.min(100, score));
