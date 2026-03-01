@@ -18,18 +18,20 @@ export class IPPoolSelectorService {
   static async selectPool(params: IPPoolSelectorParams): Promise<IPPool | null> {
     const { requestedPoolId, fallbackType } = params;
 
-    // Priority 1: Exact pool by ID (unchanged behavior)
+    // Priority 1: Exact pool by ID if active and not RBL-listed
     if (requestedPoolId) {
       const pool = await prisma.iPPool.findFirst({
         where: {
           id: requestedPoolId,
           isActive: true,
+          rblListed: false,
         },
       });
 
       if (pool) {
         return pool;
       }
+      // If requested pool is listed/inactive, fall through to fallback selection
     }
 
     // Priority 2: Select by type with RBL filtering and load-based rotation

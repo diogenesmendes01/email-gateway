@@ -106,8 +106,9 @@ export class ReputationMonitorService {
         actions.push('throttled_sending_warmup_limit');
       }
 
-      // Guardrail 4: Reputation Score
-      const reputationScore = this.calculateReputationScore(metrics);
+      // Guardrail 4: Reputation Score (with RBL context)
+      const rblListingCount = await this.getActiveRBLListingCount(companyId);
+      const reputationScore = this.calculateReputationScore(metrics, { rblListingCount });
       if (reputationScore < 50) {
         this.logger.error(
           `CRITICAL REPUTATION SCORE for company ${companyId}: ${reputationScore.toFixed(2)}`
@@ -392,7 +393,8 @@ export class ReputationMonitorService {
   async saveReputationMetric(companyId: string): Promise<void> {
     try {
       const metrics = await this.calculateLast24hMetrics(companyId);
-      const score = this.calculateReputationScore(metrics);
+      const rblListingCount = await this.getActiveRBLListingCount(companyId);
+      const score = this.calculateReputationScore(metrics, { rblListingCount });
 
       await this.prisma.reputationMetric.create({
         data: {
@@ -419,6 +421,36 @@ export class ReputationMonitorService {
       );
     } catch (error) {
       this.logger.error(`Failed to save reputation metric: ${(error as Error).message}`);
+    }
+  }
+
+  /**
+   * Count active (unresolved) RBL listings for IPs associated with a company's domains
+   */
+  private async getActiveRBLListingCount(companyId: string): Promise<number> {
+    try {
+      // Find IP pools used by this company's provider configs
+      const providerConfigs = await this.prisma.emailProviderConfig.findMany({
+        where: { companyId, isActive: true },
+        select: { ipPoolId: true },
+      });
+
+      const poolIds = providerConfigs
+        .map((c) => c.ipPoolId)
+        .filter((id): id is string => id !== null);
+
+      if (poolIds.length === 0) return 0;
+
+      return await this.prisma.rBLCheck.count({
+        where: {
+          ipPoolId: { in: poolIds },
+          listed: true,
+          resolvedAt: null,
+        },
+      });
+    } catch (error) {
+      this.logger.error(`Failed to get RBL listing count: ${(error as Error).message}`);
+      return 0;
     }
   }
 

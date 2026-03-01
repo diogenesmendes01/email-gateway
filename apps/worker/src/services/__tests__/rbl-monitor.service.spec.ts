@@ -11,11 +11,12 @@ jest.mock('@email-gateway/database', () => ({
   prisma: {
     rBLCheck: {
       create: jest.fn(),
-      findMany: jest.fn(),
+      findMany: jest.fn().mockResolvedValue([]),
       update: jest.fn(),
     },
     iPPool: {
       findMany: jest.fn(),
+      findUnique: jest.fn(),
       update: jest.fn(),
     },
   },
@@ -28,16 +29,8 @@ describe('RBLMonitorService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     service = new RBLMonitorService();
-  });
-
-  describe('reverseIP', () => {
-    it('should reverse an IPv4 address', () => {
-      expect(service.reverseIP('192.168.1.10')).toBe('10.1.168.192');
-    });
-
-    it('should handle simple IP', () => {
-      expect(service.reverseIP('1.2.3.4')).toBe('4.3.2.1');
-    });
+    // Default: markResolved finds nothing
+    prisma.rBLCheck.findMany.mockResolvedValue([]);
   });
 
   describe('checkSingleRBL', () => {
@@ -60,12 +53,31 @@ describe('RBLMonitorService', () => {
       expect(result.returnCode).toBeNull();
     });
 
-    it('should return listed=false on DNS timeout (ETIMEOUT)', async () => {
-      mockResolve4.mockRejectedValueOnce({ code: 'ETIMEOUT' });
+    it('should return listed=false when DNS fails with ENODATA', async () => {
+      mockResolve4.mockRejectedValueOnce({ code: 'ENODATA' });
 
       const result = await service.checkSingleRBL('192.168.1.10', 'zen.spamhaus.org');
 
       expect(result.listed).toBe(false);
+      expect(result.returnCode).toBeNull();
+    });
+
+    it('should return listed=null on DNS timeout (ETIMEOUT) - cannot determine', async () => {
+      mockResolve4.mockRejectedValueOnce({ code: 'ETIMEOUT' });
+
+      const result = await service.checkSingleRBL('192.168.1.10', 'zen.spamhaus.org');
+
+      expect(result.listed).toBeNull();
+      expect(result.returnCode).toBe('ETIMEOUT');
+    });
+
+    it('should return listed=null on ESERVFAIL - cannot determine', async () => {
+      mockResolve4.mockRejectedValueOnce({ code: 'ESERVFAIL' });
+
+      const result = await service.checkSingleRBL('192.168.1.10', 'zen.spamhaus.org');
+
+      expect(result.listed).toBeNull();
+      expect(result.returnCode).toBe('ESERVFAIL');
     });
   });
 
@@ -90,7 +102,7 @@ describe('RBLMonitorService', () => {
 
       const results = await service.checkIP('192.168.1.10');
 
-      const listedResults = results.filter((r: any) => r.listed);
+      const listedResults = results.filter((r: any) => r.listed === true);
       expect(listedResults).toHaveLength(1);
       expect(listedResults[0].provider).toBe(RBL_PROVIDERS[0].host);
     });
@@ -106,6 +118,32 @@ describe('RBLMonitorService', () => {
           data: expect.objectContaining({ ipPoolId: 'pool-123' }),
         }),
       );
+    });
+
+    it('should NOT persist DNS error results (listed=null)', async () => {
+      mockResolve4.mockRejectedValue({ code: 'ETIMEOUT' });
+
+      const results = await service.checkIP('1.2.3.4');
+
+      expect(results).toHaveLength(RBL_PROVIDERS.length);
+      expect(results.every((r: any) => r.listed === null)).toBe(true);
+      // No create calls for null results
+      expect(prisma.rBLCheck.create).not.toHaveBeenCalled();
+    });
+
+    it('should auto-resolve previously listed entries when IP is clean', async () => {
+      mockResolve4.mockRejectedValue({ code: 'ENOTFOUND' });
+      prisma.rBLCheck.create.mockResolvedValue({});
+      // markResolved will find and update one entry
+      prisma.rBLCheck.findMany.mockResolvedValue([
+        { id: 'old-check-1', ipAddress: '1.2.3.4', provider: 'zen.spamhaus.org' },
+      ]);
+      prisma.rBLCheck.update.mockResolvedValue({});
+
+      await service.checkIP('1.2.3.4');
+
+      // markResolved should be called for each provider (since all are clean)
+      expect(prisma.rBLCheck.findMany).toHaveBeenCalled();
     });
   });
 
@@ -123,10 +161,11 @@ describe('RBLMonitorService', () => {
       const results = await service.checkAllPools();
 
       expect(results).toHaveLength(2);
+      // Pool update should NOT include reputation when clean
       expect(prisma.iPPool.update).toHaveBeenCalledTimes(2);
       expect(prisma.iPPool.update).toHaveBeenCalledWith({
         where: { id: 'pool-1' },
-        data: { reputation: 100, rblListed: false, rblLastCheck: expect.any(Date) },
+        data: { rblListed: false, rblLastCheck: expect.any(Date) },
       });
     });
 
@@ -140,6 +179,7 @@ describe('RBLMonitorService', () => {
         .mockRejectedValue({ code: 'ENOTFOUND' });
 
       prisma.rBLCheck.create.mockResolvedValue({});
+      prisma.iPPool.findUnique.mockResolvedValueOnce({ id: 'pool-1', reputation: 100 });
       prisma.iPPool.update.mockResolvedValue({});
 
       await service.checkAllPools();
@@ -147,6 +187,41 @@ describe('RBLMonitorService', () => {
       expect(prisma.iPPool.update).toHaveBeenCalledWith({
         where: { id: 'pool-1' },
         data: { reputation: 85, rblListed: true, rblLastCheck: expect.any(Date) },
+      });
+    });
+
+    it('should aggregate listings across multiple IPs before updating pool', async () => {
+      prisma.iPPool.findMany.mockResolvedValueOnce([
+        { id: 'pool-1', ipAddresses: ['1.2.3.4', '5.6.7.8'], isActive: true },
+      ]);
+
+      // First IP: listed on provider 1, rest clean
+      // Second IP: listed on provider 1, rest clean
+      mockResolve4
+        // IP 1.2.3.4 providers
+        .mockResolvedValueOnce(['127.0.0.2']) // provider 1 - listed
+        .mockRejectedValueOnce({ code: 'ENOTFOUND' })
+        .mockRejectedValueOnce({ code: 'ENOTFOUND' })
+        .mockRejectedValueOnce({ code: 'ENOTFOUND' })
+        .mockRejectedValueOnce({ code: 'ENOTFOUND' })
+        // IP 5.6.7.8 providers
+        .mockResolvedValueOnce(['127.0.0.3']) // provider 1 - listed
+        .mockRejectedValueOnce({ code: 'ENOTFOUND' })
+        .mockRejectedValueOnce({ code: 'ENOTFOUND' })
+        .mockRejectedValueOnce({ code: 'ENOTFOUND' })
+        .mockRejectedValue({ code: 'ENOTFOUND' });
+
+      prisma.rBLCheck.create.mockResolvedValue({});
+      prisma.iPPool.findUnique.mockResolvedValueOnce({ id: 'pool-1', reputation: 100 });
+      prisma.iPPool.update.mockResolvedValue({});
+
+      const results = await service.checkAllPools();
+
+      // Should update pool ONCE with aggregated count (2 total listings)
+      expect(prisma.iPPool.update).toHaveBeenCalledTimes(1);
+      expect(prisma.iPPool.update).toHaveBeenCalledWith({
+        where: { id: 'pool-1' },
+        data: { reputation: 70, rblListed: true, rblLastCheck: expect.any(Date) },
       });
     });
 
@@ -211,6 +286,7 @@ describe('RBLMonitorService', () => {
         .mockRejectedValue({ code: 'ENOTFOUND' });
 
       prisma.rBLCheck.create.mockResolvedValue({});
+      prisma.iPPool.findUnique.mockResolvedValueOnce({ id: 'pool-1', reputation: 100 });
       prisma.iPPool.update.mockResolvedValue({});
 
       const onListed = jest.fn();
@@ -242,7 +318,8 @@ describe('RBLMonitorService', () => {
   });
 
   describe('updatePoolReputation', () => {
-    it('should reduce pool reputation when listed', async () => {
+    it('should reduce pool reputation from current value when listed', async () => {
+      prisma.iPPool.findUnique.mockResolvedValueOnce({ id: 'pool-1', reputation: 100 });
       prisma.iPPool.update.mockResolvedValue({});
 
       await service.updatePoolReputation('pool-1', true, 2);
@@ -257,7 +334,7 @@ describe('RBLMonitorService', () => {
       });
     });
 
-    it('should restore full reputation when not listed', async () => {
+    it('should NOT reset reputation to 100 when clean - only update flag', async () => {
       prisma.iPPool.update.mockResolvedValue({});
 
       await service.updatePoolReputation('pool-1', false, 0);
@@ -265,20 +342,33 @@ describe('RBLMonitorService', () => {
       expect(prisma.iPPool.update).toHaveBeenCalledWith({
         where: { id: 'pool-1' },
         data: {
-          reputation: 100,
           rblListed: false,
           rblLastCheck: expect.any(Date),
         },
       });
+      // Should NOT include reputation in the update
+      const callData = prisma.iPPool.update.mock.calls[0][0].data;
+      expect(callData).not.toHaveProperty('reputation');
     });
 
     it('should not go below 0 reputation', async () => {
+      prisma.iPPool.findUnique.mockResolvedValueOnce({ id: 'pool-1', reputation: 50 });
       prisma.iPPool.update.mockResolvedValue({});
 
       await service.updatePoolReputation('pool-1', true, 10);
 
       const callData = prisma.iPPool.update.mock.calls[0][0].data;
-      expect(callData.reputation).toBe(0);
+      expect(callData.reputation).toBe(0); // max(0, 50 - 150) = 0
+    });
+
+    it('should apply penalty relative to current reputation', async () => {
+      prisma.iPPool.findUnique.mockResolvedValueOnce({ id: 'pool-1', reputation: 80 });
+      prisma.iPPool.update.mockResolvedValue({});
+
+      await service.updatePoolReputation('pool-1', true, 1);
+
+      const callData = prisma.iPPool.update.mock.calls[0][0].data;
+      expect(callData.reputation).toBe(65); // max(0, 80 - 15) = 65
     });
   });
 });

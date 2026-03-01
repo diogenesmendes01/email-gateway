@@ -49,6 +49,7 @@ describe('IPPoolSelectorService', () => {
         where: {
           id: 'pool-1',
           isActive: true,
+          rblListed: false,
         },
       });
     });
@@ -75,6 +76,30 @@ describe('IPPoolSelectorService', () => {
       });
 
       expect(result).toEqual(mockFallbackPool);
+    });
+
+    it('deve fazer fallback se o pool solicitado estiver em RBL', async () => {
+      const cleanFallback = {
+        id: 'pool-fallback',
+        name: 'Fallback',
+        type: IPPoolType.SHARED,
+        isActive: true,
+        reputation: 90,
+        rblListed: false,
+        sentToday: 10,
+      };
+
+      // Requested pool is RBL-listed, so findFirst returns null
+      prisma.iPPool.findFirst.mockResolvedValueOnce(null);
+      prisma.iPPool.findMany.mockResolvedValueOnce([cleanFallback]);
+
+      const result = await IPPoolSelectorService.selectPool({
+        companyId: 'company-1',
+        requestedPoolId: 'pool-listed',
+        fallbackType: IPPoolType.SHARED,
+      });
+
+      expect(result).toEqual(cleanFallback);
     });
 
     it('deve retornar null se nenhum pool estiver disponível', async () => {

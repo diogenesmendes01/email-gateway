@@ -213,9 +213,8 @@ class EmailWorker {
     this.setupRBLMonitoring();
 
     console.log(
-      `[EmailWorker] Worker started successfully with concurrency=${config.concurrency}`,
+      `[EmailWorker] Worker started (concurrency=${config.concurrency})`,
     );
-    console.log('[EmailWorker] Metrics and tracing enabled (TASK 7.1)');
   }
 
   /**
@@ -251,7 +250,7 @@ class EmailWorker {
     // Then check every 5 minutes
     setInterval(checkAlerts, checkInterval);
 
-    console.log('[EmailWorker] Alert monitoring enabled (checking every 5 minutes)');
+    // Alert monitoring checks every 5 minutes
   }
 
   /**
@@ -316,21 +315,23 @@ class EmailWorker {
     setTimeout(evaluate, 2 * 60 * 1000);
     setInterval(evaluate, checkInterval);
 
-    console.log('[EmailWorker] SLO monitoring enabled (every 5 minutes)');
+    // SLO monitoring checks every 5 minutes
   }
 
   /**
-   * Setup RBL monitoring: check all IP pools every 30 minutes
+   * Setup RBL monitoring: check all IP pools every 30 minutes.
+   * Uses recursive setTimeout with reentrancy guard to prevent overlapping checks.
    */
   private setupRBLMonitoring() {
     const rblService = new RBLMonitorService();
     const checkInterval = 30 * 60 * 1000; // 30 minutes
+    let isRBLRunning = false;
 
     const runRBLCheck = async () => {
-      if (this.isShuttingDown) return;
+      if (this.isShuttingDown || isRBLRunning) return;
 
+      isRBLRunning = true;
       try {
-        console.log('[EmailWorker] Running RBL check on all IP pools...');
         const results = await rblService.checkAllPools({
           onListed: (result) => {
             console.error(
@@ -340,21 +341,24 @@ class EmailWorker {
         });
 
         const listedCount = results.filter((r) => r.isListed).length;
-        console.log(
-          `[EmailWorker] RBL check complete: ${results.length} IPs checked, ${listedCount} listed`,
-        );
+        if (listedCount > 0) {
+          console.warn(`[EmailWorker] RBL check: ${listedCount}/${results.length} IPs listed`);
+        }
       } catch (error) {
         console.error('[EmailWorker] Error during RBL check:', error);
+      } finally {
+        isRBLRunning = false;
+        // Schedule next check only after current one completes
+        if (!this.isShuttingDown) {
+          setTimeout(runRBLCheck, checkInterval);
+        }
       }
     };
 
-    // Initial check after 1 minute
+    // Initial check after 1 minute, then recursive setTimeout
     setTimeout(runRBLCheck, 60 * 1000);
 
-    // Then check every 30 minutes
-    setInterval(runRBLCheck, checkInterval);
-
-    console.log('[EmailWorker] RBL monitoring enabled (checking every 30 minutes)');
+    // RBL monitoring checks every 30 minutes
   }
 
   /**

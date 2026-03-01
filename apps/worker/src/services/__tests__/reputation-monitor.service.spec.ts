@@ -11,7 +11,8 @@ describe('ReputationMonitorService', () => {
       domain: { findFirst: jest.fn() },
       reputationMetric: { create: jest.fn() },
       suppression: { deleteMany: jest.fn() },
-      rBLCheck: { findMany: jest.fn() },
+      rBLCheck: { findMany: jest.fn(), count: jest.fn().mockResolvedValue(0) },
+      emailProviderConfig: { findMany: jest.fn().mockResolvedValue([]) },
     } as any;
 
     beforeEach(() => {
