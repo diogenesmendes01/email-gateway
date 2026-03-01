@@ -95,7 +95,9 @@ export class RBLMonitorService {
   /**
    * Check all active IP pools against all RBL providers
    */
-  async checkAllPools(): Promise<PoolCheckResult[]> {
+  async checkAllPools(options?: {
+    onListed?: (result: PoolCheckResult) => void;
+  }): Promise<PoolCheckResult[]> {
     const pools = await prisma.iPPool.findMany({
       where: { isActive: true },
     });
@@ -107,25 +109,43 @@ export class RBLMonitorService {
         const checks = await this.checkIP(ip, pool.id);
         const isListed = checks.some((c) => c.listed);
 
-        results.push({
+        const poolResult: PoolCheckResult = {
           poolId: pool.id,
           ipAddress: ip,
           isListed,
           listings: checks.filter((c) => c.listed),
-        });
+        };
 
-        // Update pool RBL status
-        await prisma.iPPool.update({
-          where: { id: pool.id },
-          data: {
-            rblListed: isListed,
-            rblLastCheck: new Date(),
-          },
-        });
+        results.push(poolResult);
+
+        if (isListed && options?.onListed) {
+          options.onListed(poolResult);
+        }
+
+        // Update pool RBL status and reputation
+        const listingCount = checks.filter((c) => c.listed).length;
+        await this.updatePoolReputation(pool.id, isListed, listingCount);
       }
     }
 
     return results;
+  }
+
+  /**
+   * Update pool reputation based on RBL check results
+   */
+  async updatePoolReputation(poolId: string, isListed: boolean, listingCount: number): Promise<void> {
+    const reputationPenalty = listingCount * 15;
+    const newReputation = Math.max(0, 100 - reputationPenalty);
+
+    await prisma.iPPool.update({
+      where: { id: poolId },
+      data: {
+        reputation: isListed ? newReputation : 100,
+        rblListed: isListed,
+        rblLastCheck: new Date(),
+      },
+    });
   }
 
   /**

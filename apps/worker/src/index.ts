@@ -22,6 +22,7 @@ import { loadWorkerConfig } from './config/worker.config';
 import { EmailDriverService } from './services/email-driver.service';
 import { loadPostalConfig, validatePostalConfig } from './drivers/postal/postal-config';
 import { MXRateLimiterService } from './services/mx-rate-limiter.service';
+import { RBLMonitorService } from './services/rbl-monitor.service';
 
 /**
  * Classe principal do Worker
@@ -208,6 +209,9 @@ class EmailWorker {
     // TASK 7.2: Setup SLO monitoring (check every 5 minutes)
     this.setupSLOMonitoring();
 
+    // RBL monitoring: check all IP pools every 30 minutes
+    this.setupRBLMonitoring();
+
     console.log(
       `[EmailWorker] Worker started successfully with concurrency=${config.concurrency}`,
     );
@@ -313,6 +317,44 @@ class EmailWorker {
     setInterval(evaluate, checkInterval);
 
     console.log('[EmailWorker] SLO monitoring enabled (every 5 minutes)');
+  }
+
+  /**
+   * Setup RBL monitoring: check all IP pools every 30 minutes
+   */
+  private setupRBLMonitoring() {
+    const rblService = new RBLMonitorService();
+    const checkInterval = 30 * 60 * 1000; // 30 minutes
+
+    const runRBLCheck = async () => {
+      if (this.isShuttingDown) return;
+
+      try {
+        console.log('[EmailWorker] Running RBL check on all IP pools...');
+        const results = await rblService.checkAllPools({
+          onListed: (result) => {
+            console.error(
+              `[EmailWorker] RBL ALERT: IP ${result.ipAddress} in pool ${result.poolId} is blacklisted on ${result.listings.length} provider(s)`,
+            );
+          },
+        });
+
+        const listedCount = results.filter((r) => r.isListed).length;
+        console.log(
+          `[EmailWorker] RBL check complete: ${results.length} IPs checked, ${listedCount} listed`,
+        );
+      } catch (error) {
+        console.error('[EmailWorker] Error during RBL check:', error);
+      }
+    };
+
+    // Initial check after 1 minute
+    setTimeout(runRBLCheck, 60 * 1000);
+
+    // Then check every 30 minutes
+    setInterval(runRBLCheck, checkInterval);
+
+    console.log('[EmailWorker] RBL monitoring enabled (checking every 30 minutes)');
   }
 
   /**
