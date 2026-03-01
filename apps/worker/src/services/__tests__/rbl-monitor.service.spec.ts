@@ -148,7 +148,7 @@ describe('RBLMonitorService', () => {
   });
 
   describe('checkAllPools', () => {
-    it('should check all active IP pools and update rblListed flag', async () => {
+    it('should check all active IP pools and recover reputation when clean', async () => {
       prisma.iPPool.findMany.mockResolvedValueOnce([
         { id: 'pool-1', ipAddresses: ['1.2.3.4'], isActive: true },
         { id: 'pool-2', ipAddresses: ['5.6.7.8'], isActive: true },
@@ -156,17 +156,41 @@ describe('RBLMonitorService', () => {
 
       mockResolve4.mockRejectedValue({ code: 'ENOTFOUND' });
       prisma.rBLCheck.create.mockResolvedValue({});
+      // Pool 1 has degraded reputation, pool 2 is at 100
+      prisma.iPPool.findUnique
+        .mockResolvedValueOnce({ id: 'pool-1', reputation: 70 })
+        .mockResolvedValueOnce({ id: 'pool-2', reputation: 100 });
       prisma.iPPool.update.mockResolvedValue({});
 
       const results = await service.checkAllPools();
 
       expect(results).toHaveLength(2);
-      // Pool update should NOT include reputation when clean
       expect(prisma.iPPool.update).toHaveBeenCalledTimes(2);
+      // Pool 1: reputation recovers from 70 -> 80 (+10)
       expect(prisma.iPPool.update).toHaveBeenCalledWith({
         where: { id: 'pool-1' },
-        data: { rblListed: false, rblLastCheck: expect.any(Date) },
+        data: { reputation: 80, rblListed: false, rblLastCheck: expect.any(Date) },
       });
+      // Pool 2: reputation stays at 100 (capped)
+      expect(prisma.iPPool.update).toHaveBeenCalledWith({
+        where: { id: 'pool-2' },
+        data: { reputation: 100, rblListed: false, rblLastCheck: expect.any(Date) },
+      });
+    });
+
+    it('should NOT update pool status when all DNS lookups fail', async () => {
+      prisma.iPPool.findMany.mockResolvedValueOnce([
+        { id: 'pool-1', ipAddresses: ['1.2.3.4'], isActive: true },
+      ]);
+
+      // All DNS lookups timeout — no definitive results
+      mockResolve4.mockRejectedValue({ code: 'ETIMEOUT' });
+
+      const results = await service.checkAllPools();
+
+      expect(results).toHaveLength(1);
+      // Pool update should NOT be called — preserve existing status
+      expect(prisma.iPPool.update).not.toHaveBeenCalled();
     });
 
     it('should mark pool as rblListed when any IP is listed', async () => {
@@ -179,11 +203,11 @@ describe('RBLMonitorService', () => {
         .mockRejectedValue({ code: 'ENOTFOUND' });
 
       prisma.rBLCheck.create.mockResolvedValue({});
-      prisma.iPPool.findUnique.mockResolvedValueOnce({ id: 'pool-1', reputation: 100 });
       prisma.iPPool.update.mockResolvedValue({});
 
       await service.checkAllPools();
 
+      // Fixed penalty from 100: 100 - 1*15 = 85
       expect(prisma.iPPool.update).toHaveBeenCalledWith({
         where: { id: 'pool-1' },
         data: { reputation: 85, rblListed: true, rblLastCheck: expect.any(Date) },
@@ -212,12 +236,12 @@ describe('RBLMonitorService', () => {
         .mockRejectedValue({ code: 'ENOTFOUND' });
 
       prisma.rBLCheck.create.mockResolvedValue({});
-      prisma.iPPool.findUnique.mockResolvedValueOnce({ id: 'pool-1', reputation: 100 });
       prisma.iPPool.update.mockResolvedValue({});
 
       const results = await service.checkAllPools();
 
       // Should update pool ONCE with aggregated count (2 total listings)
+      // Fixed penalty from 100: 100 - 2*15 = 70
       expect(prisma.iPPool.update).toHaveBeenCalledTimes(1);
       expect(prisma.iPPool.update).toHaveBeenCalledWith({
         where: { id: 'pool-1' },
@@ -286,7 +310,6 @@ describe('RBLMonitorService', () => {
         .mockRejectedValue({ code: 'ENOTFOUND' });
 
       prisma.rBLCheck.create.mockResolvedValue({});
-      prisma.iPPool.findUnique.mockResolvedValueOnce({ id: 'pool-1', reputation: 100 });
       prisma.iPPool.update.mockResolvedValue({});
 
       const onListed = jest.fn();
@@ -308,6 +331,7 @@ describe('RBLMonitorService', () => {
 
       mockResolve4.mockRejectedValue({ code: 'ENOTFOUND' });
       prisma.rBLCheck.create.mockResolvedValue({});
+      prisma.iPPool.findUnique.mockResolvedValueOnce({ id: 'pool-1', reputation: 100 });
       prisma.iPPool.update.mockResolvedValue({});
 
       const onListed = jest.fn();
@@ -318,8 +342,7 @@ describe('RBLMonitorService', () => {
   });
 
   describe('updatePoolReputation', () => {
-    it('should reduce pool reputation from current value when listed', async () => {
-      prisma.iPPool.findUnique.mockResolvedValueOnce({ id: 'pool-1', reputation: 100 });
+    it('should apply fixed penalty from 100 when listed (not cumulative)', async () => {
       prisma.iPPool.update.mockResolvedValue({});
 
       await service.updatePoolReputation('pool-1', true, 2);
@@ -334,7 +357,25 @@ describe('RBLMonitorService', () => {
       });
     });
 
-    it('should NOT reset reputation to 100 when clean - only update flag', async () => {
+    it('should produce same reputation for same listing count across cycles', async () => {
+      prisma.iPPool.update.mockResolvedValue({});
+
+      // First cycle
+      await service.updatePoolReputation('pool-1', true, 1);
+      const firstCall = prisma.iPPool.update.mock.calls[0][0].data;
+
+      prisma.iPPool.update.mockClear();
+
+      // Second cycle — same listing count should produce same reputation
+      await service.updatePoolReputation('pool-1', true, 1);
+      const secondCall = prisma.iPPool.update.mock.calls[0][0].data;
+
+      expect(firstCall.reputation).toBe(85);
+      expect(secondCall.reputation).toBe(85);
+    });
+
+    it('should recover reputation gradually when clean (+10 per cycle)', async () => {
+      prisma.iPPool.findUnique.mockResolvedValueOnce({ id: 'pool-1', reputation: 70 });
       prisma.iPPool.update.mockResolvedValue({});
 
       await service.updatePoolReputation('pool-1', false, 0);
@@ -342,33 +383,30 @@ describe('RBLMonitorService', () => {
       expect(prisma.iPPool.update).toHaveBeenCalledWith({
         where: { id: 'pool-1' },
         data: {
+          reputation: 80, // 70 + 10 = 80
           rblListed: false,
           rblLastCheck: expect.any(Date),
         },
       });
-      // Should NOT include reputation in the update
+    });
+
+    it('should cap recovery at 100', async () => {
+      prisma.iPPool.findUnique.mockResolvedValueOnce({ id: 'pool-1', reputation: 95 });
+      prisma.iPPool.update.mockResolvedValue({});
+
+      await service.updatePoolReputation('pool-1', false, 0);
+
       const callData = prisma.iPPool.update.mock.calls[0][0].data;
-      expect(callData).not.toHaveProperty('reputation');
+      expect(callData.reputation).toBe(100); // min(100, 95 + 10) = 100
     });
 
     it('should not go below 0 reputation', async () => {
-      prisma.iPPool.findUnique.mockResolvedValueOnce({ id: 'pool-1', reputation: 50 });
       prisma.iPPool.update.mockResolvedValue({});
 
       await service.updatePoolReputation('pool-1', true, 10);
 
       const callData = prisma.iPPool.update.mock.calls[0][0].data;
-      expect(callData.reputation).toBe(0); // max(0, 50 - 150) = 0
-    });
-
-    it('should apply penalty relative to current reputation', async () => {
-      prisma.iPPool.findUnique.mockResolvedValueOnce({ id: 'pool-1', reputation: 80 });
-      prisma.iPPool.update.mockResolvedValue({});
-
-      await service.updatePoolReputation('pool-1', true, 1);
-
-      const callData = prisma.iPPool.update.mock.calls[0][0].data;
-      expect(callData.reputation).toBe(65); // max(0, 80 - 15) = 65
+      expect(callData.reputation).toBe(0); // max(0, 100 - 150) = 0
     });
   });
 });

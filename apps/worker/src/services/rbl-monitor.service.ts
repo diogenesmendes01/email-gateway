@@ -88,6 +88,10 @@ export class RBLMonitorService {
 
       // Only persist definitive results (listed true/false), skip DNS errors (null)
       if (listed !== null) {
+        // Resolve any existing active records for this ip+provider before creating new one.
+        // This prevents accumulation of duplicate records across check cycles.
+        await this.markResolved(ip, provider.host);
+
         await prisma.rBLCheck.create({
           data: {
             ipAddress: ip,
@@ -97,11 +101,6 @@ export class RBLMonitorService {
             returnCode,
           },
         });
-
-        // Auto-resolve previously listed entries when IP is now clean
-        if (!listed) {
-          await this.markResolved(ip, provider.host);
-        }
       }
     }
 
@@ -124,12 +123,18 @@ export class RBLMonitorService {
     for (const pool of pools) {
       let poolHasListedIP = false;
       let poolTotalListings = 0;
+      let hasAnyDefinitiveResult = false;
 
       for (const ip of pool.ipAddresses) {
         const checks = await this.checkIP(ip, pool.id);
-        // Only definitive listings count (listed === true, not null)
+        // Only definitive results count (listed === true or false, not null)
+        const definitiveChecks = checks.filter((c) => c.listed !== null);
         const definitiveListings = checks.filter((c) => c.listed === true);
         const isListed = definitiveListings.length > 0;
+
+        if (definitiveChecks.length > 0) {
+          hasAnyDefinitiveResult = true;
+        }
 
         const poolResult: PoolCheckResult = {
           poolId: pool.id,
@@ -149,23 +154,26 @@ export class RBLMonitorService {
         }
       }
 
-      // Update pool status ONCE after checking all IPs
-      await this.updatePoolReputation(pool.id, poolHasListedIP, poolTotalListings);
+      // Only update pool status if we got at least one definitive DNS result.
+      // If ALL lookups failed (DNS infrastructure issue), preserve existing status.
+      if (hasAnyDefinitiveResult) {
+        await this.updatePoolReputation(pool.id, poolHasListedIP, poolTotalListings);
+      }
     }
 
     return results;
   }
 
   /**
-   * Update pool RBL status and apply reputation penalty if listed.
-   * Does NOT reset reputation to 100 when clean — only applies penalties.
+   * Update pool RBL status and reputation.
+   * Penalty is calculated as a fixed offset from 100 (not cumulative),
+   * preventing reputation from compounding to 0 over repeated cycles.
+   * When clean, reputation recovers gradually (+10 per cycle, capped at 100).
    */
   async updatePoolReputation(poolId: string, isListed: boolean, listingCount: number): Promise<void> {
     if (isListed) {
-      const reputationPenalty = listingCount * 15;
-      const pool = await prisma.iPPool.findUnique({ where: { id: poolId } });
-      const currentReputation = pool?.reputation ?? 100;
-      const newReputation = Math.max(0, currentReputation - reputationPenalty);
+      // Fixed penalty from 100 — same listing count always produces same reputation
+      const newReputation = Math.max(0, 100 - listingCount * 15);
 
       await prisma.iPPool.update({
         where: { id: poolId },
@@ -176,10 +184,15 @@ export class RBLMonitorService {
         },
       });
     } else {
-      // Only update rblListed flag and timestamp, do NOT touch reputation
+      // Gradual recovery: +10 per clean cycle, capped at 100
+      const pool = await prisma.iPPool.findUnique({ where: { id: poolId } });
+      const currentReputation = pool?.reputation ?? 100;
+      const recoveredReputation = Math.min(100, currentReputation + 10);
+
       await prisma.iPPool.update({
         where: { id: poolId },
         data: {
+          reputation: recoveredReputation,
           rblListed: false,
           rblLastCheck: new Date(),
         },
