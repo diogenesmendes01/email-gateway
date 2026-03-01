@@ -10,6 +10,9 @@ import type { SendResult } from '../base/email-driver-result';
 import { ErrorMappingService } from '../../services/error-mapping.service';
 import { ReturnPathGenerator } from './return-path-generator';
 import type { PostalSMTPConfig } from './postal-config';
+import { createLogger } from '../../utils/logger';
+
+const log = createLogger('PostalSMTPDriver');
 
 export class PostalSMTPDriver implements IEmailDriver {
   private readonly transporter: Transporter;
@@ -57,7 +60,7 @@ export class PostalSMTPDriver implements IEmailDriver {
       await transporter.verify();
       return true;
     } catch (error) {
-      console.error('[PostalSMTPDriver] Configuration validation failed:', error);
+      log.error('Configuration validation failed', { error: (error as Error).message });
       return false;
     }
   }

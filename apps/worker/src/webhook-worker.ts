@@ -14,12 +14,15 @@ import { PrismaClient } from '@email-gateway/database';
 import axios, { AxiosError } from 'axios';
 import { createHmac } from 'crypto';
 import Redis from 'ioredis';
+import { createLogger } from './utils/logger';
 
 interface WebhookJobData {
   webhookId: string;
   eventType: string;
   payload: any;
 }
+
+const log = createLogger('WebhookWorker');
 
 /**
  * Webhook Delivery Worker
@@ -46,7 +49,7 @@ class WebhookWorker {
    * Start the webhook worker
    */
   async start() {
-    console.log('[WebhookWorker] Starting webhook delivery worker...');
+    log.info('Starting webhook delivery worker');
 
     // Initialize BullMQ worker
     this.worker = new Worker<WebhookJobData>(
@@ -64,7 +67,7 @@ class WebhookWorker {
 
     // Event handlers
     this.worker.on('completed', (job: Job) => {
-      console.log('[WebhookWorker] ✅ Webhook delivered', {
+      log.info('Webhook delivered', {
         jobId: job.id,
         webhookId: job.data.webhookId,
         eventType: job.data.eventType,
@@ -72,7 +75,7 @@ class WebhookWorker {
     });
 
     this.worker.on('failed', (job: Job | undefined, error: Error) => {
-      console.error('[WebhookWorker] ❌ Webhook delivery failed', {
+      log.error('Webhook delivery failed', {
         jobId: job?.id,
         webhookId: job?.data?.webhookId,
         eventType: job?.data?.eventType,
@@ -82,13 +85,13 @@ class WebhookWorker {
     });
 
     this.worker.on('error', (error: Error) => {
-      console.error('[WebhookWorker] Worker error', error);
+      log.error('Worker error', { error: error.message });
     });
 
     // Handle graceful shutdown
     this.setupGracefulShutdown();
 
-    console.log('[WebhookWorker] ✅ Webhook worker started successfully');
+    log.info('Webhook worker started successfully');
   }
 
   /**
@@ -104,12 +107,12 @@ class WebhookWorker {
     });
 
     if (!webhook) {
-      console.warn('[WebhookWorker] Webhook not found, skipping', { webhookId });
+      log.warn('Webhook not found, skipping', { webhookId });
       return;
     }
 
     if (!webhook.isActive) {
-      console.warn('[WebhookWorker] Webhook not active, skipping', { webhookId });
+      log.warn('Webhook not active, skipping', { webhookId });
       return;
     }
 
@@ -155,7 +158,7 @@ class WebhookWorker {
 
       const durationMs = Date.now() - startTime;
 
-      console.log('[WebhookWorker] Webhook delivered successfully', {
+      log.info('Webhook delivered successfully', {
         webhookId,
         deliveryId: delivery.id,
         responseCode: response.status,
@@ -193,7 +196,7 @@ class WebhookWorker {
         },
       });
 
-      console.warn('[WebhookWorker] Webhook delivery failed', {
+      log.warn('Webhook delivery failed', {
         webhookId,
         deliveryId: delivery.id,
         responseCode,
@@ -272,32 +275,29 @@ class WebhookWorker {
   private setupGracefulShutdown() {
     const shutdown = async (signal: string) => {
       if (this.isShuttingDown) {
-        console.log('[WebhookWorker] Already shutting down...');
+        log.warn('Shutdown already in progress');
         return;
       }
 
       this.isShuttingDown = true;
-      console.log(`[WebhookWorker] Received ${signal}, initiating graceful shutdown...`);
+      log.info('Graceful shutdown initiated', { signal });
 
       try {
-        // Stop accepting new jobs
         if (this.worker) {
           await this.worker.close();
-          console.log('[WebhookWorker] Worker closed');
+          log.info('Worker closed');
         }
 
-        // Disconnect from Prisma
         await this.prisma.$disconnect();
-        console.log('[WebhookWorker] Prisma disconnected');
+        log.info('Prisma disconnected');
 
-        // Disconnect from Redis
         await this.redis.quit();
-        console.log('[WebhookWorker] Redis disconnected');
+        log.info('Redis disconnected');
 
-        console.log('[WebhookWorker] ✅ Graceful shutdown complete');
+        log.info('Graceful shutdown complete');
         process.exit(0);
       } catch (error) {
-        console.error('[WebhookWorker] Error during shutdown', error);
+        log.error('Error during shutdown', { error: (error as Error).message });
         process.exit(1);
       }
     };
@@ -311,7 +311,7 @@ class WebhookWorker {
 if (require.main === module) {
   const worker = new WebhookWorker();
   worker.start().catch((error) => {
-    console.error('[WebhookWorker] Fatal error starting webhook worker', error);
+    log.error('Fatal error starting webhook worker', { error: (error as Error).message });
     process.exit(1);
   });
 }

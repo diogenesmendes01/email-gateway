@@ -252,7 +252,7 @@ export class TracingService {
    */
   private output(entry: LogEntry): void {
     // Output as single-line JSON for log aggregation tools
-    console.log(JSON.stringify(entry));
+    process.stdout.write(JSON.stringify(entry) + '\n');
   }
 
   /**

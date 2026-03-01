@@ -38,6 +38,7 @@ import { MetricsService } from '../services/metrics.service';
 import { TracingService, TraceContext } from '../services/tracing.service';
 import { EmailDriverService } from '../services/email-driver.service';
 import type { MappedError } from '../services/error-mapping.service';
+import { createLogger } from '../utils/logger';
 
 /**
  * Processador do job email:send
@@ -45,6 +46,8 @@ import type { MappedError } from '../services/error-mapping.service';
  * Implementa o pipeline completo de estados e validações
  * TASK 7.1: Integrado com métricas e tracing
  */
+const log = createLogger('EmailSendProcessor');
+
 export class EmailSendProcessor {
   private validationService: ValidationService;
   private loggingService: LoggingService;
@@ -349,11 +352,12 @@ export class EmailSendProcessor {
     // Grava logs de sucesso
     await this.loggingService.logSuccess(jobData, sesMessageId, durationMs);
 
-    console.log(
-      `[EmailSendProcessor] SUCCESS: Email sent successfully. ` +
-        `outboxId=${jobData.outboxId}, sesMessageId=${sesMessageId}, ` +
-        `attempt=${jobData.attempt}, duration=${durationMs}ms`,
-    );
+    log.info('Email sent successfully', {
+      outboxId: jobData.outboxId,
+      messageId: sesMessageId,
+      attempt: jobData.attempt,
+      durationMs,
+    });
   }
 
   /**
@@ -384,13 +388,15 @@ export class EmailSendProcessor {
       shouldRetry,
     );
 
-    console.error(
-      `[EmailSendProcessor] ${shouldRetry ? 'RETRY' : 'FAILED'}: ` +
-        `outboxId=${jobData.outboxId}, ` +
-        `error=${error.code}, message="${error.message}", ` +
-        `attempt=${jobData.attempt}/${EMAIL_JOB_CONFIG.MAX_ATTEMPTS}, ` +
-        `duration=${durationMs}ms, willRetry=${shouldRetry}`,
-    );
+    log.error(shouldRetry ? 'Email send retry scheduled' : 'Email send failed', {
+      outboxId: jobData.outboxId,
+      errorCode: error.code,
+      error: error.message,
+      attempt: jobData.attempt,
+      maxAttempts: EMAIL_JOB_CONFIG.MAX_ATTEMPTS,
+      durationMs,
+      willRetry: shouldRetry,
+    });
 
     // Se deve retentar, lança erro para BullMQ reprocessar
     if (shouldRetry) {
