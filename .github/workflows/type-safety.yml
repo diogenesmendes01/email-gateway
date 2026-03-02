@@ -20,7 +20,7 @@ on:
       - '**.tsx'
 
 env:
-  PNPM_VERSION: '9'
+  NODE_VERSION: '20'
 
 jobs:
   audit:
@@ -36,8 +36,6 @@ jobs:
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -111,8 +109,6 @@ jobs:
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4

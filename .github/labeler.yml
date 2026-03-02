@@ -1,21 +1,33 @@
 # Map labels to file path globs. Applied automatically on PRs.
+# Uses actions/labeler@v5 syntax
 frontend:
-  - 'frontend/**'
-  - 'apps/web/**'
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'frontend/**'
+      - 'apps/web/**'
 backend:
-  - 'backend/**'
-  - 'services/**'
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'apps/api/**'
+      - 'apps/worker/**'
 infrastructure:
-  - 'infra/**'
-  - 'deploy/**'
-  - 'docker/**'
-  - 'Dockerfile'
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'infra/**'
+      - 'deploy/**'
+      - 'docker/**'
+      - 'Dockerfile'
+      - '.github/**'
 documentation:
-  - 'docs/**'
-  - '*.md'
-bug:
-  - 'fix/**'
-feature:
-  - 'feature/**'
-refactor:
-  - 'refactor/**'
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'docs/**'
+      - '*.md'
+database:
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'packages/database/**'
+shared:
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'packages/shared/**'
