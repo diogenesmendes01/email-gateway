@@ -547,7 +547,11 @@ model IPPool {
   // Warm-up
   warmupEnabled Boolean     @default(false) @map("warmup_enabled")
   warmupConfig  Json?       @map("warmup_config")
-  
+
+  // RBL Status
+  rblListed     Boolean     @default(false) @map("rbl_listed")
+  rblLastCheck  DateTime?   @map("rbl_last_check")
+
   createdAt     DateTime    @default(now()) @map("created_at")
   updatedAt     DateTime    @updatedAt @map("updated_at")
   
@@ -699,4 +703,20 @@ model ReputationMetric {
   @@unique([companyId, domainId, ipPoolId, date])
   @@index([date, companyId])
   @@map("reputation_metrics")
+}
+
+// RBL/DNSBL Check Results
+model RBLCheck {
+  id          String   @id @default(cuid())
+  ipAddress   String   @map("ip_address") @db.VarChar(45)
+  ipPoolId    String?  @map("ip_pool_id")
+  provider    String   @db.VarChar(100)
+  listed      Boolean  @default(false)
+  returnCode  String?  @map("return_code") @db.VarChar(20)
+  checkedAt   DateTime @default(now()) @map("checked_at")
+  resolvedAt  DateTime? @map("resolved_at")
+
+  @@index([ipAddress, provider, checkedAt])
+  @@index([ipPoolId, listed])
+  @@map("rbl_checks")
 }

@@ -18,6 +18,9 @@ import {
   AuditEvent,
   BreakGlassRequest,
 } from '@email-gateway/shared';
+import { createLogger } from '../utils/logger';
+
+const log = createLogger('AuditService');
 
 export interface AuditServiceConfig {
   enableAuditTrail: boolean;
@@ -71,15 +74,13 @@ export class AuditService {
 
       // Em um sistema real, você salvaria no banco de dados
       // Por agora, vamos apenas logar
-      console.log('🔍 Audit Event:', {
+      log.info('Audit event recorded', {
         id: auditEvent.id,
         userId: auditEvent.userId,
         profile: auditEvent.profile,
         action: auditEvent.action,
         resource: auditEvent.resource,
         success: auditEvent.success,
-        timestamp: auditEvent.timestamp,
-        breakGlassRequestId: auditEvent.breakGlassRequestId,
       });
 
       // Salva no banco de dados
@@ -104,7 +105,7 @@ export class AuditService {
         },
       });
     } catch (error) {
-      console.error('❌ Erro ao registrar evento de auditoria:', error);
+      log.error('Failed to record audit event', { error: (error as Error).message });
       // Não falhar a operação principal por erro de auditoria
     }
   }
@@ -121,7 +122,7 @@ export class AuditService {
     durationMinutes: number = 60
   ): Promise<BreakGlassRequest | null> {
     if (!this.config.enableBreakGlass) {
-      console.warn('⚠️ Break-glass está desabilitado');
+      log.warn('Break-glass is disabled');
       return null;
     }
 
@@ -139,13 +140,10 @@ export class AuditService {
         durationMinutes
       );
 
-      console.log('🚨 Break-glass Request Created:', {
+      log.warn('Break-glass request created', {
         id: request.id,
         userId: request.userId,
         profile: request.profile,
-        justification: request.justification.substring(0, 50) + '...',
-        expiresAt: request.expiresAt,
-        ipAddress: request.ipAddress,
       });
 
       // Salva solicitação break-glass como evento de auditoria
@@ -172,7 +170,7 @@ export class AuditService {
 
       return request;
     } catch (error) {
-      console.error('❌ Erro ao criar solicitação break-glass:', error);
+      log.error('Failed to create break-glass request', { error: (error as Error).message });
       throw error;
     }
   }
@@ -185,11 +183,7 @@ export class AuditService {
     approvedBy: string
   ): Promise<boolean> {
     try {
-      console.log('✅ Break-glass Request Approved:', {
-        requestId,
-        approvedBy,
-        approvedAt: new Date(),
-      });
+      log.info('Break-glass request approved', { requestId, approvedBy });
 
       // Atualiza solicitação break-glass no audit log
       await this.prisma.auditLog.update({
@@ -209,7 +203,7 @@ export class AuditService {
 
       return true;
     } catch (error) {
-      console.error('❌ Erro ao aprovar solicitação break-glass:', error);
+      log.error('Failed to approve break-glass request', { error: (error as Error).message });
       return false;
     }
   }
@@ -239,7 +233,7 @@ export class AuditService {
       
       return expiresAt > now && metadata.status === 'approved';
     } catch (error) {
-      console.error('❌ Erro ao validar solicitação break-glass:', error);
+      log.error('Failed to validate break-glass request', { error: (error as Error).message });
       return false;
     }
   }
@@ -374,7 +368,7 @@ export class AuditService {
       const cutoffDate = new Date();
       cutoffDate.setDate(cutoffDate.getDate() - this.config.auditRetentionDays);
 
-      console.log(`🧹 Limpando eventos de auditoria anteriores a ${cutoffDate.toISOString()}`);
+      log.info('Cleaning old audit events', { cutoffDate: cutoffDate.toISOString() });
 
       // Limpa eventos de auditoria antigos
       const result = await this.prisma.auditLog.deleteMany({
@@ -387,7 +381,7 @@ export class AuditService {
 
       return result.count;
     } catch (error) {
-      console.error('❌ Erro ao limpar eventos de auditoria:', error);
+      log.error('Failed to clean audit events', { error: (error as Error).message });
       return 0;
     }
   }
@@ -407,7 +401,7 @@ export class AuditService {
     eventsByAction: Record<string, number>;
   }> {
     try {
-      console.log(`📊 Gerando relatório de auditoria de ${startDate.toISOString()} a ${endDate.toISOString()}`);
+      log.info('Generating audit report', { startDate: startDate.toISOString(), endDate: endDate.toISOString() });
 
       // Gera relatório de auditoria do banco de dados
       const events = await this.prisma.auditLog.findMany({
@@ -456,7 +450,7 @@ export class AuditService {
         eventsByAction,
       };
     } catch (error) {
-      console.error('❌ Erro ao gerar relatório de auditoria:', error);
+      log.error('Failed to generate audit report', { error: (error as Error).message });
       throw error;
     }
   }

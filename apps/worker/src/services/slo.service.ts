@@ -1,4 +1,7 @@
 import { MetricsService } from './metrics.service';
+import { createLogger } from '../utils/logger';
+
+const log = createLogger('SLOService');
 
 interface SLOConfig {
   targetSuccessRatePct: number; // ex: 95
@@ -70,7 +73,7 @@ export class SLOService {
         },
       };
     } catch (error) {
-      console.error('[SLOService] Failed to evaluate metrics:', error);
+      log.error('Failed to evaluate metrics', { error: (error as Error).message });
       return {
         withinSLO: false,
         violations: ['metrics_unavailable'],

@@ -22,10 +22,14 @@ import { loadWorkerConfig } from './config/worker.config';
 import { EmailDriverService } from './services/email-driver.service';
 import { loadPostalConfig, validatePostalConfig } from './drivers/postal/postal-config';
 import { MXRateLimiterService } from './services/mx-rate-limiter.service';
+import { RBLMonitorService } from './services/rbl-monitor.service';
+import { createLogger } from './utils/logger';
 
 /**
  * Classe principal do Worker
  */
+const log = createLogger('EmailWorker');
+
 class EmailWorker {
   private worker?: Worker;
   private prisma: PrismaClient;
@@ -90,17 +94,17 @@ class EmailWorker {
       mxRateLimiter,
     });
 
-    console.log('[EmailWorker] Email providers configured:', driverDescriptors.map((descriptor) => descriptor.config.provider));
+    log.info('Email providers configured', { providers: driverDescriptors.map((d) => d.config.provider) });
 
     emailDriverService
       .validatePrimaryConfig()
       .then((ok) => {
         if (!ok) {
-          console.warn('[EmailWorker] Primary email provider configuration validation failed during startup');
+          log.warn('Primary email provider validation failed during startup');
         }
       })
       .catch((error) => {
-        console.error('[EmailWorker] Error validating primary email provider during startup', error);
+        log.error('Error validating primary email provider', { error: (error as Error).message });
       });
 
     // Inicializa o processador com métricas e tracing (TASK 7.1)
@@ -116,25 +120,13 @@ class EmailWorker {
    * Inicia o worker
    */
   async start() {
-    console.log('[EmailWorker] Starting email worker...');
+    log.info('Starting email worker');
 
     // Carrega configuração
     const config = loadWorkerConfig();
 
     this.currentConcurrency = config.concurrency;
     this.originalConcurrency = config.concurrency;
-    console.log('[EmailWorker] Configuration:', {
-      concurrency: config.concurrency,
-      redis: {
-        host: config.redis.host,
-        port: config.redis.port,
-        db: config.redis.db,
-      },
-      retry: {
-        maxAttempts: config.retry.maxAttempts,
-        backoffDelays: config.retry.backoffDelays,
-      },
-    });
 
     // Cria o worker BullMQ
     this.worker = new Worker<EmailSendJobData>(
@@ -175,28 +167,21 @@ class EmailWorker {
     );
 
     // Event handlers
-    this.worker.on('completed', (job) => {
-      console.log(
-        `[EmailWorker] Job completed: ${job.id} (attempt ${job.attemptsMade})`,
-      );
-    });
-
     this.worker.on('failed', (job, err) => {
-      console.error(
-        `[EmailWorker] Job failed: ${job?.id} (attempt ${job?.attemptsMade}/${config.retry.maxAttempts})`,
-        {
-          error: err.message,
-          jobData: job?.data,
-        },
-      );
+      log.error('Job failed', {
+        jobId: job?.id,
+        attempt: job?.attemptsMade,
+        maxAttempts: config.retry.maxAttempts,
+        error: err.message,
+      });
     });
 
     this.worker.on('error', (err) => {
-      console.error('[EmailWorker] Worker error:', err);
+      log.error('Worker error', { error: err.message });
     });
 
     this.worker.on('stalled', (jobId) => {
-      console.warn(`[EmailWorker] Job stalled: ${jobId}`);
+      log.warn('Job stalled', { jobId });
     });
 
     // Setup graceful shutdown
@@ -208,10 +193,10 @@ class EmailWorker {
     // TASK 7.2: Setup SLO monitoring (check every 5 minutes)
     this.setupSLOMonitoring();
 
-    console.log(
-      `[EmailWorker] Worker started successfully with concurrency=${config.concurrency}`,
-    );
-    console.log('[EmailWorker] Metrics and tracing enabled (TASK 7.1)');
+    // RBL monitoring: check all IP pools every 30 minutes
+    this.setupRBLMonitoring();
+
+    log.info('Worker started', { concurrency: config.concurrency });
   }
 
   /**
@@ -230,14 +215,11 @@ class EmailWorker {
         const alertResult = await this.metricsService.checkAlerts();
 
         if (alertResult.dlqAlert || alertResult.queueAgeAlert) {
-          console.error(`[EmailWorker] ALERT: ${alertResult.message}`);
-
-          // Get full metrics summary for context
           const metrics = await this.metricsService.getMetricsSummary();
-          console.error('[EmailWorker] Current metrics:', metrics);
+          log.error('Alert triggered', { alert: alertResult.message, metrics });
         }
       } catch (error) {
-        console.error('[EmailWorker] Error checking alerts:', error);
+        log.error('Error checking alerts', { error: (error as Error).message });
       }
     };
 
@@ -247,7 +229,7 @@ class EmailWorker {
     // Then check every 5 minutes
     setInterval(checkAlerts, checkInterval);
 
-    console.log('[EmailWorker] Alert monitoring enabled (checking every 5 minutes)');
+    // Alert monitoring checks every 5 minutes
   }
 
   /**
@@ -268,10 +250,8 @@ class EmailWorker {
         const result = await this.sloService.evaluate();
 
         if (!result.withinSLO) {
-          console.error('[EmailWorker] SLO violation detected:', result.violations.join(', '));
+          log.error('SLO violation', { violations: result.violations });
 
-          // Estratégia simples de auto-throttle: reduzir concorrência pela metade
-          // até o mínimo de 1 sempre que houver violação
           const current = this.currentConcurrency;
           const next = Math.max(minConcurrency, Math.floor(current / 2));
 
@@ -280,9 +260,9 @@ class EmailWorker {
               await this.worker.pause();
               this.currentConcurrency = next;
               await this.worker.resume();
-              console.warn(`[EmailWorker] Auto-throttle applied: concurrency ${current} -> ${next}`);
+              log.warn('Auto-throttle applied', { from: current, to: next });
             } catch (err) {
-              console.error('[EmailWorker] Failed to apply auto-throttle:', err);
+              log.error('Failed to apply auto-throttle', { error: (err as Error).message });
             }
           }
           this.violationCount += 1;
@@ -297,14 +277,14 @@ class EmailWorker {
               await this.worker.pause();
               this.currentConcurrency = increased;
               await this.worker.resume();
-              console.log(`[EmailWorker] SLO recovered; concurrency increased to ${increased}`);
+              log.info('SLO recovered, concurrency increased', { concurrency: increased });
             } catch (err) {
-              console.error('[EmailWorker] Failed to increase concurrency:', err);
+              log.error('Failed to increase concurrency', { error: (err as Error).message });
             }
           }
         }
       } catch (error) {
-        console.error('[EmailWorker] Error in SLO monitoring:', error);
+        log.error('Error in SLO monitoring', { error: (error as Error).message });
       }
     };
 
@@ -312,7 +292,52 @@ class EmailWorker {
     setTimeout(evaluate, 2 * 60 * 1000);
     setInterval(evaluate, checkInterval);
 
-    console.log('[EmailWorker] SLO monitoring enabled (every 5 minutes)');
+    // SLO monitoring checks every 5 minutes
+  }
+
+  /**
+   * Setup RBL monitoring: check all IP pools every 30 minutes.
+   * Uses recursive setTimeout with reentrancy guard to prevent overlapping checks.
+   */
+  private setupRBLMonitoring() {
+    const rblService = new RBLMonitorService();
+    const checkInterval = 30 * 60 * 1000; // 30 minutes
+    let isRBLRunning = false;
+
+    const runRBLCheck = async () => {
+      if (this.isShuttingDown || isRBLRunning) return;
+
+      isRBLRunning = true;
+      try {
+        const results = await rblService.checkAllPools({
+          onListed: (result) => {
+            log.error('RBL listing detected', {
+              ip: result.ipAddress,
+              poolId: result.poolId,
+              providers: result.listings.length,
+            });
+          },
+        });
+
+        const listedCount = results.filter((r) => r.isListed).length;
+        if (listedCount > 0) {
+          log.warn('RBL check completed with listings', { listed: listedCount, total: results.length });
+        }
+      } catch (error) {
+        log.error('Error during RBL check', { error: (error as Error).message });
+      } finally {
+        isRBLRunning = false;
+        // Schedule next check only after current one completes
+        if (!this.isShuttingDown) {
+          setTimeout(runRBLCheck, checkInterval);
+        }
+      }
+    };
+
+    // Initial check after 1 minute, then recursive setTimeout
+    setTimeout(runRBLCheck, 60 * 1000);
+
+    // RBL monitoring checks every 30 minutes
   }
 
   /**
@@ -326,45 +351,39 @@ class EmailWorker {
   private setupGracefulShutdown() {
     const shutdown = async (signal: string) => {
       if (this.isShuttingDown) {
-        console.log('[EmailWorker] Shutdown already in progress...');
+        log.warn('Shutdown already in progress');
         return;
       }
 
       this.isShuttingDown = true;
-      console.log(`[EmailWorker] Received ${signal}, starting graceful shutdown...`);
+      log.info('Graceful shutdown initiated', { signal });
 
       try {
         if (this.worker) {
-          console.log('[EmailWorker] Pausing worker (stop accepting new jobs)...');
+          log.info('Pausing worker (stop accepting new jobs)');
           await this.worker.pause();
 
-          console.log(
-            '[EmailWorker] Waiting for active jobs to complete (max 30s)...',
-          );
+          log.info('Waiting for active jobs to complete (max 30s)');
 
           // Aguarda até 30s para jobs ativos terminarem
           const shutdownTimeout = 30000; // 30 segundos
           const startTime = Date.now();
 
           while (Date.now() - startTime < shutdownTimeout) {
-            // Aguarda um pouco antes de verificar novamente
             await new Promise((resolve) => setTimeout(resolve, 1000));
-            
-            // Verifica se ainda há jobs processando (aproximação)
-            console.log('[EmailWorker] Waiting for active jobs to complete...');
           }
 
-          console.log('[EmailWorker] Closing worker...');
+          log.info('Closing worker');
           await this.worker.close();
         }
 
-        console.log('[EmailWorker] Closing Prisma connection...');
+        log.info('Closing Prisma connection');
         await this.prisma.$disconnect();
 
-        console.log('[EmailWorker] Graceful shutdown completed');
+        log.info('Graceful shutdown completed');
         process.exit(0);
       } catch (error) {
-        console.error('[EmailWorker] Error during shutdown:', error);
+        log.error('Error during shutdown', { error: (error as Error).message });
         process.exit(1);
       }
     };
@@ -374,12 +393,12 @@ class EmailWorker {
 
     // Handle uncaught errors
     process.on('uncaughtException', (error) => {
-      console.error('[EmailWorker] Uncaught exception:', error);
+      log.error('Uncaught exception', { error: error.message });
       shutdown('uncaughtException');
     });
 
     process.on('unhandledRejection', (reason, promise) => {
-      console.error('[EmailWorker] Unhandled rejection:', reason);
+      log.error('Unhandled rejection', { error: String(reason) });
       shutdown('unhandledRejection');
     });
   }
@@ -389,6 +408,6 @@ class EmailWorker {
 const worker = new EmailWorker();
 
 worker.start().catch((error) => {
-  console.error('[EmailWorker] Failed to start worker:', error);
+  log.error('Failed to start worker', { error: (error as Error).message });
   process.exit(1);
 });
