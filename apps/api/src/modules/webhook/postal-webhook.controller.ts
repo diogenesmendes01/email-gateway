@@ -10,6 +10,7 @@ import {
 } from '@nestjs/common';
 import {
   POSTAL_WEBHOOK_MAX_AGE_SECONDS,
+  POSTAL_WEBHOOK_REPLAY_TTL_SECONDS,
   PostalWebhookValidatorService,
 } from './postal-webhook-validator.service';
 import { WebhookIngestQueueService } from './webhook-ingest-queue.service';
@@ -179,7 +180,7 @@ export class PostalWebhookController {
       return await this.redisService.setIfNotExists(
         replayKey,
         '1',
-        POSTAL_WEBHOOK_MAX_AGE_SECONDS,
+        POSTAL_WEBHOOK_REPLAY_TTL_SECONDS,
       );
     } catch (error) {
       this.logger.error(`Failed to access replay protection store: ${(error as Error).message}`);
