@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { BullModule } from '@nestjs/bull';
+import { AuthModule } from '../auth/auth.module';
 import { PostalWebhookController } from './postal-webhook.controller';
 import { PostalWebhookValidatorService } from './postal-webhook-validator.service';
 import { WebhookQueueService } from './webhook-queue.service';
@@ -11,6 +12,7 @@ import { WebhookIngestQueueService } from './webhook-ingest-queue.service';
  */
 @Module({
   imports: [
+    AuthModule,
     BullModule.registerQueue({
       name: 'webhook-ingest',
     }),

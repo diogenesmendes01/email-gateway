@@ -1,5 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { ExecutionContext, HttpException, HttpStatus } from '@nestjs/common';
+import {
+  ExecutionContext,
+  HttpException,
+  HttpStatus,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { RateLimitGuard } from './rate-limit.guard';
 import { AuthService } from './auth.service';
 import { RedisService } from './redis.service';
@@ -59,6 +64,7 @@ describe('RateLimitGuard', () => {
 
   afterEach(() => {
     jest.clearAllMocks();
+    delete process.env.RATE_LIMIT_FAIL_OPEN;
   });
 
   it('should be defined', () => {
@@ -159,12 +165,55 @@ describe('RateLimitGuard', () => {
       expect(mockResponse.setHeader).toHaveBeenCalledWith('X-RateLimit-Burst-Remaining', '119');
     });
 
-    it('should handle Redis connection failure gracefully', async () => {
+    it('should fail closed when Redis is unavailable', async () => {
       // Mock Redis connection failure
       (redisService.incr as jest.Mock).mockRejectedValue(new Error('Redis connection failed'));
 
-      // Should allow request when Redis fails (fail-open strategy)
-      const result = await guard.canActivate(mockContext);
+      await expect(guard.canActivate(mockContext)).rejects.toBeInstanceOf(ServiceUnavailableException);
+
+      try {
+        await guard.canActivate(mockContext);
+      } catch (error) {
+        const exception = error as ServiceUnavailableException;
+        expect(exception.getStatus()).toBe(HttpStatus.SERVICE_UNAVAILABLE);
+        expect(exception.getResponse()).toEqual({
+          error: expect.objectContaining({
+            code: 'RATE_LIMIT_BACKEND_UNAVAILABLE',
+          }),
+        });
+      }
+    });
+
+    it('should allow request when fail-open is explicitly enabled', async () => {
+      process.env.RATE_LIMIT_FAIL_OPEN = 'true';
+
+      const module: TestingModule = await Test.createTestingModule({
+        providers: [
+          RateLimitGuard,
+          {
+            provide: AuthService,
+            useValue: {
+              getRateLimitConfig: jest.fn().mockReturnValue({
+                rps: 60,
+                burst: 120,
+                windowMs: 1000,
+              }),
+            },
+          },
+          {
+            provide: RedisService,
+            useValue: {
+              incr: jest.fn().mockRejectedValue(new Error('Redis connection failed')),
+              expire: jest.fn(),
+              ttl: jest.fn(),
+              get: jest.fn(),
+            },
+          },
+        ],
+      }).compile();
+
+      const failOpenGuard = module.get<RateLimitGuard>(RateLimitGuard);
+      const result = await failOpenGuard.canActivate(mockContext);
       expect(result).toBe(true);
     });
 

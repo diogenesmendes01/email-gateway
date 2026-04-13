@@ -11,7 +11,9 @@ import {
   Logger,
 } from '@nestjs/common';
 import { SuppressionService } from './suppression.service';
+import { ApiProtected, Company } from '../auth/decorators';
 
+@ApiProtected()
 @Controller('suppressions')
 export class SuppressionController {
   private readonly logger = new Logger(SuppressionController.name);
@@ -28,12 +30,9 @@ export class SuppressionController {
     reason: string;
     source?: string;
     notes?: string;
-  }) {
+  }, @Company() companyId: string) {
     try {
       this.logger.log(`Adding email to suppression: ${body.email}`);
-
-      // TODO: Get company ID from authenticated user
-      const companyId = 'placeholder-company-id';
 
       await this.suppressionService.addToSuppression({
         companyId,
@@ -68,15 +67,13 @@ export class SuppressionController {
    */
   @Get()
   async listSuppressions(
+    @Company() companyId: string,
     @Query('page') page: string = '1',
     @Query('limit') limit: string = '50',
     @Query('reason') reason?: string,
     @Query('search') search?: string,
   ) {
     try {
-      // TODO: Get company ID from authenticated user
-      const companyId = 'placeholder-company-id';
-
       const pageNum = parseInt(page, 10);
       const limitNum = parseInt(limit, 10);
 
@@ -115,11 +112,11 @@ export class SuppressionController {
    * Remove email from suppression list
    */
   @Delete(':id')
-  async removeSuppression(@Param('id') id: string) {
+  async removeSuppression(@Param('id') id: string, @Company() companyId: string) {
     try {
       this.logger.log(`Removing suppression entry: ${id}`);
 
-      await this.suppressionService.removeFromSuppression(id);
+      await this.suppressionService.removeFromSuppression(id, companyId);
 
       return {
         success: true,
@@ -145,11 +142,8 @@ export class SuppressionController {
    * Check if email is suppressed
    */
   @Post('check')
-  async checkSuppression(@Body() body: { email: string }) {
+  async checkSuppression(@Body() body: { email: string }, @Company() companyId: string) {
     try {
-      // TODO: Get company ID from authenticated user
-      const companyId = 'placeholder-company-id';
-
       const result = await this.suppressionService.checkSuppression(companyId, body.email);
 
       return {
@@ -180,12 +174,9 @@ export class SuppressionController {
     emails: string[];
     reason: string;
     source?: string;
-  }) {
+  }, @Company() companyId: string) {
     try {
       this.logger.log('Importing suppression list from CSV');
-
-      // TODO: Get company ID from authenticated user
-      const companyId = 'placeholder-company-id';
 
       const result = await this.suppressionService.importSuppressions(companyId, {
         emails: body.emails,

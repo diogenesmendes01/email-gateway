@@ -12,6 +12,7 @@ import { DKIMGeneratorService } from './dkim-generator.service';
 import { DNSVerifierService } from './dns-verifier.service';
 import { ChecklistGeneratorService } from './checklist-generator.service';
 import { ProductionReadinessService } from './production-readiness.service';
+import { AdminProtected, Company, SandboxAllowed } from '../auth/decorators';
 
 /**
  * DTO de validação para iniciar onboarding
@@ -58,13 +59,18 @@ export class OnboardingController {
    * CORREÇÃO: Adicionada validação de UUID para domainId
    */
   @Post('start')
-  async startOnboarding(@Param('domainId') domainId: string) {
+  @SandboxAllowed()
+  async startOnboarding(
+    @Param('domainId') domainId: string,
+    @Company() companyId: string,
+  ) {
     try {
       // Validar UUID format
       if (!this.isValidUUID(domainId)) {
         throw new BadRequestException('Invalid domain ID format');
       }
 
+      await this.checklistGenerator.assertDomainAccess(domainId, companyId);
       this.logger.log(`Starting onboarding process for domain: ${domainId}`);
 
       const result = await this.checklistGenerator.initializeOnboarding(domainId);
@@ -95,13 +101,18 @@ export class OnboardingController {
    * CORREÇÃO: Melhor tratamento de erros
    */
   @Get('status')
-  async getOnboardingStatus(@Param('domainId') domainId: string) {
+  @SandboxAllowed()
+  async getOnboardingStatus(
+    @Param('domainId') domainId: string,
+    @Company() companyId: string,
+  ) {
     try {
       // Validar UUID format
       if (!this.isValidUUID(domainId)) {
         throw new BadRequestException('Invalid domain ID format');
       }
 
+      await this.checklistGenerator.assertDomainAccess(domainId, companyId);
       const status = await this.checklistGenerator.getOnboardingStatus(domainId);
 
       if (!status) {
@@ -135,7 +146,11 @@ export class OnboardingController {
    * CORREÇÃO: Validação de entrada melhorada
    */
   @Post('generate-dkim')
-  async generateDKIM(@Param('domainId') domainId: string) {
+  @SandboxAllowed()
+  async generateDKIM(
+    @Param('domainId') domainId: string,
+    @Company() companyId: string,
+  ) {
     try {
       // Validar UUID format
       if (!this.isValidUUID(domainId)) {
@@ -145,10 +160,7 @@ export class OnboardingController {
       this.logger.log(`Generating DKIM for domain: ${domainId}`);
 
       // Get domain info first
-      const domain = await this.checklistGenerator.getDomainInfo(domainId);
-      if (!domain) {
-        throw new BadRequestException('Domain not found');
-      }
+      const domain = await this.checklistGenerator.assertDomainAccess(domainId, companyId);
 
       // Validate domain format
       if (!this.isValidDomain(domain.domain)) {
@@ -204,13 +216,18 @@ export class OnboardingController {
    * CORREÇÃO: Validação de entrada e melhor tratamento de erros
    */
   @Post('verify')
-  async verifyDNS(@Param('domainId') domainId: string) {
+  @SandboxAllowed()
+  async verifyDNS(
+    @Param('domainId') domainId: string,
+    @Company() companyId: string,
+  ) {
     try {
       // Validar UUID format
       if (!this.isValidUUID(domainId)) {
         throw new BadRequestException('Invalid domain ID format');
       }
 
+      await this.checklistGenerator.assertDomainAccess(domainId, companyId);
       this.logger.log(`Triggering DNS verification for domain: ${domainId}`);
 
       const verificationResult = await this.dnsVerifier.verifyAllRecords(domainId);
@@ -242,13 +259,18 @@ export class OnboardingController {
    * CORREÇÃO: Validação de entrada
    */
   @Get('checklist')
-  async getChecklist(@Param('domainId') domainId: string) {
+  @SandboxAllowed()
+  async getChecklist(
+    @Param('domainId') domainId: string,
+    @Company() companyId: string,
+  ) {
     try {
       // Validar UUID format
       if (!this.isValidUUID(domainId)) {
         throw new BadRequestException('Invalid domain ID format');
       }
 
+      await this.checklistGenerator.assertDomainAccess(domainId, companyId);
       const checklist = await this.checklistGenerator.generateChecklist(domainId);
 
       if (!checklist || !checklist.items) {
@@ -284,6 +306,7 @@ export class OnboardingController {
    * CORREÇÃO: Validação completa de body com DTO
    */
   @Post('approve-production')
+  @AdminProtected()
   async approveForProduction(
     @Param('domainId') domainId: string,
     @Body() body: ApproveProductionDto

@@ -93,17 +93,71 @@ export class ApiKeyGuard implements CanActivate {
   private getClientIp(request: Request): string {
     const forwarded = request.headers['x-forwarded-for'];
     const realIp = request.headers['x-real-ip'];
-    const remoteAddress = request.connection?.remoteAddress;
-    
-    if (forwarded) {
-      return Array.isArray(forwarded) ? forwarded[0] : forwarded.split(',')[0].trim();
+    const remoteAddress = this.normalizeIp(
+      request.socket?.remoteAddress || request.connection?.remoteAddress,
+    );
+
+    // Forwarded headers are only trustworthy when the immediate peer is a trusted proxy.
+    if (remoteAddress && this.isTrustedProxy(remoteAddress)) {
+      if (realIp) {
+        const candidate = this.normalizeIp(Array.isArray(realIp) ? realIp[0] : realIp);
+        if (candidate) {
+          return candidate;
+        }
+      }
+
+      if (forwarded) {
+        const forwardedValue = Array.isArray(forwarded) ? forwarded[0] : forwarded;
+        const candidate = this.normalizeIp(forwardedValue.split(',')[0].trim());
+        if (candidate) {
+          return candidate;
+        }
+      }
     }
-    
-    if (realIp) {
-      return Array.isArray(realIp) ? realIp[0] : realIp;
-    }
-    
+
     return remoteAddress || 'unknown';
+  }
+
+  private normalizeIp(ip?: string | null): string | null {
+    if (!ip) {
+      return null;
+    }
+
+    if (ip.startsWith('::ffff:')) {
+      return ip.substring(7);
+    }
+
+    return ip;
+  }
+
+  private isTrustedProxy(remoteAddress: string): boolean {
+    const configuredTrustedProxies = (process.env.TRUSTED_PROXY_IPS || '')
+      .split(',')
+      .map((value) => value.trim())
+      .filter(Boolean);
+
+    if (configuredTrustedProxies.length > 0) {
+      return configuredTrustedProxies.includes(remoteAddress);
+    }
+
+    return this.isPrivateOrLoopbackIp(remoteAddress);
+  }
+
+  private isPrivateOrLoopbackIp(ip: string): boolean {
+    if (ip === '::1' || ip === '127.0.0.1' || ip === 'localhost') {
+      return true;
+    }
+
+    if (ip.startsWith('10.') || ip.startsWith('192.168.')) {
+      return true;
+    }
+
+    if (ip.startsWith('172.')) {
+      const secondOctet = Number.parseInt(ip.split('.')[1] || '', 10);
+      return secondOctet >= 16 && secondOctet <= 31;
+    }
+
+    return ip.startsWith('fc') || ip.startsWith('fd');
   }
 }
 

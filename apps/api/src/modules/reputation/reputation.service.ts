@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 
 export interface ReputationMetrics {
@@ -107,8 +107,20 @@ export class ReputationService {
   /**
    * Get domain-specific reputation metrics
    */
-  async getDomainReputation(domainId: string): Promise<ReputationMetrics> {
+  async getDomainReputation(companyId: string, domainId: string): Promise<ReputationMetrics> {
     this.logger.log(`Getting reputation metrics for domain: ${domainId}`);
+
+    const domain = await this.prisma.domain.findFirst({
+      where: {
+        id: domainId,
+        companyId,
+      },
+      select: { id: true },
+    });
+
+    if (!domain) {
+      throw new NotFoundException(`Domain ${domainId} not found`);
+    }
 
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);

@@ -7,7 +7,9 @@ import {
   Logger,
 } from '@nestjs/common';
 import { ReputationService } from './reputation.service';
+import { ApiProtected, Company } from '../auth/decorators';
 
+@ApiProtected()
 @Controller('reputation')
 export class ReputationController {
   private readonly logger = new Logger(ReputationController.name);
@@ -19,11 +21,8 @@ export class ReputationController {
    * Get company reputation metrics
    */
   @Get()
-  async getCompanyReputation() {
+  async getCompanyReputation(@Company() companyId: string) {
     try {
-      // TODO: Get company ID from authenticated user
-      const companyId = 'placeholder-company-id';
-
       const reputation = await this.reputationService.getCompanyReputation(companyId);
 
       return {
@@ -48,10 +47,13 @@ export class ReputationController {
    * GET /reputation/domain/:id
    * Get domain-specific reputation metrics
    */
-  @Get('domain/:id')
-  async getDomainReputation(@Param('domainId') domainId: string) {
+  @Get('domain/:domainId')
+  async getDomainReputation(
+    @Param('domainId') domainId: string,
+    @Company() companyId: string,
+  ) {
     try {
-      const reputation = await this.reputationService.getDomainReputation(domainId);
+      const reputation = await this.reputationService.getDomainReputation(companyId, domainId);
 
       return {
         domainId,
@@ -76,11 +78,8 @@ export class ReputationController {
    * Get active reputation alerts
    */
   @Get('alerts')
-  async getReputationAlerts() {
+  async getReputationAlerts(@Company() companyId: string) {
     try {
-      // TODO: Get company ID from authenticated user
-      const companyId = 'placeholder-company-id';
-
       const alerts = await this.reputationService.getActiveAlerts(companyId);
 
       return {
@@ -106,11 +105,8 @@ export class ReputationController {
    * Get Gmail Postmaster Tools data (if configured)
    */
   @Get('postmaster')
-  async getPostmasterData() {
+  async getPostmasterData(@Company() companyId: string) {
     try {
-      // TODO: Get company ID from authenticated user
-      const companyId = 'placeholder-company-id';
-
       const postmasterData = await this.reputationService.getPostmasterData(companyId);
 
       return {

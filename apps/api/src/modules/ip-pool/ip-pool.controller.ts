@@ -3,7 +3,9 @@ import { Body, Controller, Delete, Get, Param, Post, Put, Query } from '@nestjs/
 import { CreateIpPoolDto } from './dto/create-ip-pool.dto';
 import { UpdateIpPoolDto } from './dto/update-ip-pool.dto';
 import { IpPoolService } from './ip-pool.service';
+import { AdminProtected } from '../auth/decorators';
 
+@AdminProtected()
 @Controller('ip-pools')
 export class IpPoolController {
   constructor(private readonly ipPoolService: IpPoolService) {}

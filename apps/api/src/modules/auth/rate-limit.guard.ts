@@ -5,6 +5,7 @@ import {
   HttpException,
   HttpStatus,
   Logger,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { Request } from 'express';
 import { AuthService, RateLimitConfig } from './auth.service';
@@ -13,6 +14,7 @@ import { RedisService } from './redis.service';
 @Injectable()
 export class RateLimitGuard implements CanActivate {
   private readonly logger = new Logger(RateLimitGuard.name);
+  private readonly failOpen = process.env.RATE_LIMIT_FAIL_OPEN === 'true';
   private readonly defaultConfig: RateLimitConfig = {
     rps: 60,        // 60 requests per second
     burst: 120,     // burst de 120 requests
@@ -116,17 +118,31 @@ export class RateLimitGuard implements CanActivate {
         throw error;
       }
 
-      // Em caso de erro no Redis, permite a requisição (fail-open)
+      // Security default: fail closed unless explicitly overridden.
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       const errorStack = error instanceof Error ? error.stack : undefined;
 
       this.logger.error({
-        message: 'Redis rate limiting error - failing open',
+        message: this.failOpen
+          ? 'Redis rate limiting error - failing open'
+          : 'Redis rate limiting backend unavailable',
         error: errorMessage,
         stack: errorStack,
         companyId: (context.switchToHttp().getRequest() as any)['companyId'],
       });
-      return true;
+
+      if (this.failOpen) {
+        return true;
+      }
+
+      throw new ServiceUnavailableException({
+        error: {
+          code: 'RATE_LIMIT_BACKEND_UNAVAILABLE',
+          message: 'Rate limiting service is temporarily unavailable',
+          requestId: request.headers['x-request-id'] || 'unknown',
+          timestamp: new Date().toISOString(),
+        },
+      });
     }
   }
 

@@ -105,15 +105,22 @@ export class SuppressionService {
   /**
    * Remover email da lista de supressão
    */
-  async removeFromSuppression(suppressionId: string): Promise<void> {
+  async removeFromSuppression(suppressionId: string, companyId: string): Promise<void> {
     this.logger.log(`Removendo supressão: ${suppressionId}`);
 
     try {
-      const result = await this.prisma.suppression.delete({
-        where: { id: suppressionId },
+      const result = await this.prisma.suppression.deleteMany({
+        where: {
+          id: suppressionId,
+          companyId,
+        },
       });
 
-      this.logger.log(`Email ${result.email} removido da lista de supressão`);
+      if (result.count === 0) {
+        throw new Error('Suppression entry not found');
+      }
+
+      this.logger.log(`Supressão ${suppressionId} removida da lista`);
     } catch (error) {
       this.logger.error(`Erro ao remover supressão ${suppressionId}:`, error);
       throw new BadRequestException('Suppression entry not found');
@@ -209,9 +216,13 @@ export class SuppressionService {
     const skip = (page - 1) * limit;
 
     const where: any = {
-      OR: [
-        { companyId },
-        { companyId: null }, // Supressões globais
+      AND: [
+        {
+          OR: [
+            { companyId },
+            { companyId: null }, // Supressões globais
+          ],
+        },
       ],
     };
 
@@ -220,10 +231,12 @@ export class SuppressionService {
     }
 
     if (search) {
-      where.OR = [
-        { email: { contains: search, mode: 'insensitive' } },
-        { domain: { contains: search, mode: 'insensitive' } },
-      ];
+      where.AND.push({
+        OR: [
+          { email: { contains: search, mode: 'insensitive' } },
+          { domain: { contains: search, mode: 'insensitive' } },
+        ],
+      });
     }
 
     try {

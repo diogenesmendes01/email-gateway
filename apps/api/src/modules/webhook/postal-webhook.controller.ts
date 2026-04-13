@@ -6,9 +6,11 @@ import {
   Logger,
   UnauthorizedException,
   BadRequestException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { PostalWebhookValidatorService } from './postal-webhook-validator.service';
 import { WebhookIngestQueueService } from './webhook-ingest-queue.service';
+import { RedisService } from '../auth/redis.service';
 
 /**
  * Postal Webhook Controller - TRACK 2
@@ -22,6 +24,7 @@ export class PostalWebhookController {
   constructor(
     private readonly validatorService: PostalWebhookValidatorService,
     private readonly ingestQueue: WebhookIngestQueueService,
+    private readonly redisService: RedisService,
   ) {}
 
   /**
@@ -42,10 +45,23 @@ export class PostalWebhookController {
       // Validar signature (HMAC)
       const signature = req.headers['x-postal-signature'] as string || '';
       const secret = process.env.POSTAL_WEBHOOK_SECRET || '';
+      if (!secret) {
+        throw new ServiceUnavailableException('Postal webhook secret not configured');
+      }
       const isValid = this.validatorService.validateSignature(JSON.stringify(payload), signature, secret);
       if (!isValid) {
         this.logger.warn(`Invalid webhook signature`);
         throw new UnauthorizedException('Invalid webhook signature');
+      }
+
+      const webhookTimestamp = Number(payload.timestamp);
+      if (!Number.isFinite(webhookTimestamp) || !this.validatorService.validateTimestamp(webhookTimestamp)) {
+        throw new UnauthorizedException('Invalid or expired webhook timestamp');
+      }
+
+      const replayAccepted = await this.registerWebhookAttempt(signature, webhookTimestamp);
+      if (!replayAccepted) {
+        throw new UnauthorizedException('Replay webhook detected');
       }
 
       // Parse do evento
@@ -144,6 +160,17 @@ export class PostalWebhookController {
     } catch (error) {
       this.logger.error(`Failed to parse Postal event: ${(error as Error).message}`);
       return null;
+    }
+  }
+
+  private async registerWebhookAttempt(signature: string, timestamp: number): Promise<boolean> {
+    const replayKey = `postal:webhook:replay:${signature}:${timestamp}`;
+
+    try {
+      return await this.redisService.setIfNotExists(replayKey, '1', 300);
+    } catch (error) {
+      this.logger.error(`Failed to access replay protection store: ${(error as Error).message}`);
+      throw new ServiceUnavailableException('Webhook replay protection unavailable');
     }
   }
 }

@@ -3,7 +3,9 @@ import { Body, Controller, Delete, Get, Param, Post, Put, Query } from '@nestjs/
 import { CreateRateLimitDto } from './dto/create-rate-limit.dto';
 import { UpdateRateLimitDto } from './dto/update-rate-limit.dto';
 import { RateLimitService } from './rate-limit.service';
+import { AdminProtected } from '../auth/decorators';
 
+@AdminProtected()
 @Controller('rate-limits')
 export class RateLimitController {
   constructor(private readonly rateLimitService: RateLimitService) {}
