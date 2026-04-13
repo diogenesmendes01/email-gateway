@@ -1,5 +1,5 @@
 import type { Transporter } from 'nodemailer';
-// @ts-ignore - nodemailer types
+// @ts-expect-error -- nodemailer default import typing does not match this project setup
 import nodemailer from 'nodemailer';
 
 import { EmailProvider, EmailSendJobData } from '@email-gateway/shared';

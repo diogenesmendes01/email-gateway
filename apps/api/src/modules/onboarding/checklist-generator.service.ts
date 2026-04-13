@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { DomainOnboardingStatus } from '@email-gateway/database';
 
@@ -293,6 +293,28 @@ export class ChecklistGeneratorService {
       this.logger.error(`Failed to get domain info for ${domainId}:`, error);
       return null;
     }
+  }
+
+  async assertDomainAccess(
+    domainId: string,
+    companyId: string,
+  ): Promise<{ id: string; domain: string }> {
+    const domain = await this.prisma.domain.findFirst({
+      where: {
+        id: domainId,
+        companyId,
+      },
+      select: {
+        id: true,
+        domain: true,
+      },
+    });
+
+    if (!domain) {
+      throw new NotFoundException('Domain not found');
+    }
+
+    return domain;
   }
 
   /**

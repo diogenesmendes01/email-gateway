@@ -19,6 +19,10 @@ export type PostalEventType =
   | 'MessageDeleted'
   | 'MessageSuppressed';
 
+export const POSTAL_WEBHOOK_MAX_AGE_SECONDS = 300;
+export const POSTAL_WEBHOOK_REPLAY_TTL_SECONDS =
+  POSTAL_WEBHOOK_MAX_AGE_SECONDS + 30;
+
 /**
  * Postal Webhook Validator Service
  * Validates and parses Postal webhook messages with HMAC signature verification
@@ -42,11 +46,19 @@ export class PostalWebhookValidatorService {
         .update(payload)
         .digest('hex');
 
+      const normalizedSignature = signature.trim();
+      if (
+        normalizedSignature.length !== expectedSignature.length ||
+        !/^[a-f0-9]+$/i.test(normalizedSignature)
+      ) {
+        return false;
+      }
+
+      const expectedBuffer = Buffer.from(expectedSignature, 'hex');
+      const receivedBuffer = Buffer.from(normalizedSignature, 'hex');
+
       // Constant-time comparison to prevent timing attacks
-      return crypto.timingSafeEqual(
-        Buffer.from(signature),
-        Buffer.from(expectedSignature),
-      );
+      return crypto.timingSafeEqual(expectedBuffer, receivedBuffer);
     } catch (error) {
       this.logger.warn(`Signature validation failed: ${(error as Error).message}`);
       return false;
@@ -244,7 +256,10 @@ export class PostalWebhookValidatorService {
   /**
    * Validate webhook timestamp (prevent replay attacks)
    */
-  validateTimestamp(webhookTimestamp: number, maxAgeSeconds: number = 300): boolean {
+  validateTimestamp(
+    webhookTimestamp: number,
+    maxAgeSeconds: number = POSTAL_WEBHOOK_MAX_AGE_SECONDS,
+  ): boolean {
     const now = Date.now() / 1000; // Convert to seconds
     const age = now - webhookTimestamp;
 

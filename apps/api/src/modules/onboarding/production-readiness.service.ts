@@ -42,6 +42,7 @@ export class ProductionReadinessService {
       where: { id: domainId },
       select: {
         domain: true,
+        status: true,
         isProductionReady: true,
         createdAt: true,
       },
@@ -67,15 +68,15 @@ export class ProductionReadinessService {
       throw new Error('Domain or onboarding record not found');
     }
 
-    // Check 1: Domain is active
+    // Check 1: Domain verification is complete
     checks.push({
-      id: 'domain-active',
-      name: 'Domain Active',
-      description: 'Domain must be active in the system',
-      passed: domain.isProductionReady,
+      id: 'domain-verified',
+      name: 'Domain Verified',
+      description: 'Domain DNS ownership must be verified in the system',
+      passed: domain.status === 'VERIFIED',
       severity: 'critical',
-      details: domain.isProductionReady ? 'Domain is active' : 'Domain is inactive',
-      fix: domain.isProductionReady ? undefined : 'Activate the domain in domain management',
+      details: domain.status === 'VERIFIED' ? 'Domain ownership verified' : `Domain status is ${domain.status}`,
+      fix: domain.status === 'VERIFIED' ? undefined : 'Verify the domain ownership and DNS records first',
     });
 
     // Check 2: DKIM keys generated
@@ -188,7 +189,9 @@ export class ProductionReadinessService {
     const criticalChecks = checks.filter(c => c.severity === 'critical');
     const allCriticalPassed = criticalChecks.every(c => c.passed);
 
-    const ready = allCriticalPassed && onboarding.status === DomainOnboardingStatus.PRODUCTION_READY;
+    const ready =
+      allCriticalPassed &&
+      onboarding.status === DomainOnboardingStatus.PRODUCTION_READY;
 
     return {
       ready,

@@ -44,13 +44,21 @@ describe('ApiKeyGuard', () => {
   });
 
   describe('canActivate', () => {
-    const createMockContext = (apiKey?: string, ipAddress?: string) => ({
+    const createMockContext = (
+      apiKey?: string,
+      ipAddress?: string,
+      headers?: Record<string, string>,
+    ) => ({
       switchToHttp: () => ({
         getRequest: () => ({
           headers: {
             'x-api-key': apiKey,
+            ...headers,
           },
           ip: ipAddress || '192.168.1.1',
+          socket: {
+            remoteAddress: ipAddress || '192.168.1.1',
+          },
           connection: {
             remoteAddress: ipAddress || '192.168.1.1',
           },
@@ -228,6 +236,9 @@ describe('ApiKeyGuard', () => {
               'x-api-key': apiKey,
             },
             ip: '192.168.1.1',
+            socket: {
+              remoteAddress: '192.168.1.1',
+            },
             connection: {
               remoteAddress: '192.168.1.1',
             },
@@ -254,6 +265,64 @@ describe('ApiKeyGuard', () => {
 
       expect(result).toBe(true);
       expect(authService.validateApiKey).toHaveBeenCalledWith(apiKey);
+    });
+
+    it('should ignore forwarded headers from untrusted peers', async () => {
+      const apiKey = 'sk_live_valid_key';
+      const context = createMockContext(apiKey, '203.0.113.10', {
+        'x-forwarded-for': '198.51.100.20',
+      });
+      const mockPayload: ApiKeyPayload = {
+        companyId: 'company-123',
+        prefix: 'sk_live',
+        expiresAt: new Date(Date.now() + 86400000),
+        allowedIps: ['203.0.113.10'],
+        isActive: true,
+        isApproved: true,
+        isSuspended: false,
+      };
+
+      (authService.validateApiKey as jest.Mock).mockResolvedValue(mockPayload);
+      (authService.isApiKeyExpired as jest.Mock).mockReturnValue(false);
+      (authService.validateIpAllowlist as jest.Mock).mockResolvedValue(true);
+      (authService.updateLastUsedAt as jest.Mock).mockResolvedValue(undefined);
+
+      const result = await guard.canActivate(context);
+
+      expect(result).toBe(true);
+      expect(authService.validateIpAllowlist).toHaveBeenCalledWith(
+        'company-123',
+        '203.0.113.10',
+      );
+    });
+
+    it('should accept forwarded headers from trusted proxies', async () => {
+      const apiKey = 'sk_live_valid_key';
+      const context = createMockContext(apiKey, '172.18.0.5', {
+        'x-forwarded-for': '198.51.100.20, 172.18.0.5',
+      });
+      const mockPayload: ApiKeyPayload = {
+        companyId: 'company-123',
+        prefix: 'sk_live',
+        expiresAt: new Date(Date.now() + 86400000),
+        allowedIps: ['198.51.100.20'],
+        isActive: true,
+        isApproved: true,
+        isSuspended: false,
+      };
+
+      (authService.validateApiKey as jest.Mock).mockResolvedValue(mockPayload);
+      (authService.isApiKeyExpired as jest.Mock).mockReturnValue(false);
+      (authService.validateIpAllowlist as jest.Mock).mockResolvedValue(true);
+      (authService.updateLastUsedAt as jest.Mock).mockResolvedValue(undefined);
+
+      const result = await guard.canActivate(context);
+
+      expect(result).toBe(true);
+      expect(authService.validateIpAllowlist).toHaveBeenCalledWith(
+        'company-123',
+        '198.51.100.20',
+      );
     });
   });
 });

@@ -6,9 +6,10 @@ import { DNSCheckerService } from './dns-checker.service';
 import { ChecklistGeneratorService } from './checklist-generator.service';
 import { ProductionReadinessService } from './production-readiness.service';
 import { DatabaseModule } from '../../database/database.module';
+import { AuthModule } from '../auth/auth.module';
 
 @Module({
-  imports: [DatabaseModule],
+  imports: [DatabaseModule, AuthModule],
   controllers: [OnboardingController],
   providers: [
     DKIMGeneratorService,
