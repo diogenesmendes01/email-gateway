@@ -189,7 +189,9 @@ export class ProductionReadinessService {
     const criticalChecks = checks.filter(c => c.severity === 'critical');
     const allCriticalPassed = criticalChecks.every(c => c.passed);
 
-    const ready = allCriticalPassed;
+    const ready =
+      allCriticalPassed &&
+      onboarding.status === DomainOnboardingStatus.PRODUCTION_READY;
 
     return {
       ready,

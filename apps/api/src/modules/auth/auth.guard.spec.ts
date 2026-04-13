@@ -232,16 +232,16 @@ describe('ApiKeyGuard', () => {
       const context = {
         switchToHttp: () => ({
           getRequest: () => ({
-          headers: {
-            'x-api-key': apiKey,
-          },
-          ip: '192.168.1.1',
-          socket: {
-            remoteAddress: '192.168.1.1',
-          },
-          connection: {
-            remoteAddress: '192.168.1.1',
-          },
+            headers: {
+              'x-api-key': apiKey,
+            },
+            ip: '192.168.1.1',
+            socket: {
+              remoteAddress: '192.168.1.1',
+            },
+            connection: {
+              remoteAddress: '192.168.1.1',
+            },
           }),
         }),
       } as ExecutionContext;

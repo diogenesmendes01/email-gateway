@@ -11,10 +11,17 @@ import { MetricsService } from '../metrics/metrics.service';
 
 @Injectable()
 export class ApiKeyGuard implements CanActivate {
+  private readonly trustedProxies: string[];
+
   constructor(
     private authService: AuthService,
     private metricsService: MetricsService,
-  ) {}
+  ) {
+    this.trustedProxies = (process.env.TRUSTED_PROXY_IPS || '')
+      .split(',')
+      .map((value) => value.trim())
+      .filter(Boolean);
+  }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<Request>();
@@ -131,13 +138,8 @@ export class ApiKeyGuard implements CanActivate {
   }
 
   private isTrustedProxy(remoteAddress: string): boolean {
-    const configuredTrustedProxies = (process.env.TRUSTED_PROXY_IPS || '')
-      .split(',')
-      .map((value) => value.trim())
-      .filter(Boolean);
-
-    if (configuredTrustedProxies.length > 0) {
-      return configuredTrustedProxies.includes(remoteAddress);
+    if (this.trustedProxies.length > 0) {
+      return this.trustedProxies.includes(remoteAddress);
     }
 
     return this.isPrivateOrLoopbackIp(remoteAddress);

@@ -19,6 +19,8 @@ export type PostalEventType =
   | 'MessageDeleted'
   | 'MessageSuppressed';
 
+export const POSTAL_WEBHOOK_MAX_AGE_SECONDS = 300;
+
 /**
  * Postal Webhook Validator Service
  * Validates and parses Postal webhook messages with HMAC signature verification
@@ -244,7 +246,10 @@ export class PostalWebhookValidatorService {
   /**
    * Validate webhook timestamp (prevent replay attacks)
    */
-  validateTimestamp(webhookTimestamp: number, maxAgeSeconds: number = 300): boolean {
+  validateTimestamp(
+    webhookTimestamp: number,
+    maxAgeSeconds: number = POSTAL_WEBHOOK_MAX_AGE_SECONDS,
+  ): boolean {
     const now = Date.now() / 1000; // Convert to seconds
     const age = now - webhookTimestamp;
 

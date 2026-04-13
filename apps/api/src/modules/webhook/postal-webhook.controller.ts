@@ -8,7 +8,10 @@ import {
   BadRequestException,
   ServiceUnavailableException,
 } from '@nestjs/common';
-import { PostalWebhookValidatorService } from './postal-webhook-validator.service';
+import {
+  POSTAL_WEBHOOK_MAX_AGE_SECONDS,
+  PostalWebhookValidatorService,
+} from './postal-webhook-validator.service';
 import { WebhookIngestQueueService } from './webhook-ingest-queue.service';
 import { RedisService } from '../auth/redis.service';
 
@@ -55,7 +58,13 @@ export class PostalWebhookController {
       }
 
       const webhookTimestamp = Number(payload.timestamp);
-      if (!Number.isFinite(webhookTimestamp) || !this.validatorService.validateTimestamp(webhookTimestamp)) {
+      if (
+        !Number.isFinite(webhookTimestamp) ||
+        !this.validatorService.validateTimestamp(
+          webhookTimestamp,
+          POSTAL_WEBHOOK_MAX_AGE_SECONDS,
+        )
+      ) {
         throw new UnauthorizedException('Invalid or expired webhook timestamp');
       }
 
@@ -167,7 +176,11 @@ export class PostalWebhookController {
     const replayKey = `postal:webhook:replay:${signature}:${timestamp}`;
 
     try {
-      return await this.redisService.setIfNotExists(replayKey, '1', 300);
+      return await this.redisService.setIfNotExists(
+        replayKey,
+        '1',
+        POSTAL_WEBHOOK_MAX_AGE_SECONDS,
+      );
     } catch (error) {
       this.logger.error(`Failed to access replay protection store: ${(error as Error).message}`);
       throw new ServiceUnavailableException('Webhook replay protection unavailable');
